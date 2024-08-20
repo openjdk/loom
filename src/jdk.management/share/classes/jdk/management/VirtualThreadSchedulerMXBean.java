@@ -26,6 +26,7 @@ package jdk.management;
 
 import java.lang.management.PlatformManagedObject;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinPool;
 
 /**
  * Management interface for the JDK's default {@linkplain Thread##virtual-threads
@@ -37,6 +38,8 @@ public interface VirtualThreadSchedulerMXBean extends PlatformManagedObject {
 
     /**
      * {@return the scheduler's target parallelism}
+     * 
+     * @see java.util.concurrent.ForkJoinPool#getParallelism()
      */
     int getParallelism();
 
@@ -48,12 +51,17 @@ public interface VirtualThreadSchedulerMXBean extends PlatformManagedObject {
      *         greater than the maximum, supported by the scheduler
      * @throws UnsupportedOperationException if changing the target
      *         parallelism is not suppored by the scheduler
+     *         
+     * @see java.util.concurrent.ForkJoinPool#setParallelism(int)
      */
     void setParallelism(int size);
 
     /**
      * {@return the current number of platform threads in the scheduler's pool;
      * {@code -1} if not known}
+     *
+     * @apiNote The number of threads may be greater than the scheduler's target
+     * parallelism.
      */
     int getThreadCount();
 

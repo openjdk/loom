@@ -44,8 +44,7 @@ public class VirtualThreadSchedulerImpls {
 
     public static VirtualThreadSchedulerMXBean create() {
         if (ContinuationSupport.isSupported()) {
-            var scheduler = SharedSecrets.getJavaLangAccess().virtualThreadDefaultScheduler();
-            return new VirtualThreadSchedulerImpl(scheduler);
+            return new VirtualThreadSchedulerImpl();
         } else {
             return new BoundVirtualThreadSchedulerImpl();
         }
@@ -96,22 +95,36 @@ public class VirtualThreadSchedulerImpls {
      * implemented with continuations + scheduler.
      */
     private static class VirtualThreadSchedulerImpl extends BaseVirtualThreadSchedulerImpl {
-        private final Executor scheduler;
+        VirtualThreadSchedulerImpl() {
+        }
 
-        VirtualThreadSchedulerImpl(Executor scheduler) {
-            this.scheduler = scheduler;
+        /**
+         * Holder class for scheduler.
+         */
+        private static class Scheduler {
+            private static final Executor scheduler =
+                SharedSecrets.getJavaLangAccess().virtualThreadDefaultScheduler();
+
+            static Executor instance() {
+                return scheduler;
+            }
         }
 
         @Override
         public int getParallelism() {
+            Executor scheduler = Scheduler.instance();
             if (scheduler instanceof ForkJoinPool pool) {
                 return pool.getParallelism();
+            }
+            if (scheduler instanceof ThreadPoolExecutor pool) {
+                return pool.getMaximumPoolSize();
             }
             return -1;
         }
 
         @Override
         void impSetParallelism(int size) {
+            Executor scheduler = Scheduler.instance();
             if (scheduler instanceof ForkJoinPool pool) {
                 pool.setParallelism(size);
                 return;
@@ -121,6 +134,7 @@ public class VirtualThreadSchedulerImpls {
 
         @Override
         public int getThreadCount() {
+            Executor scheduler = Scheduler.instance();
             if (scheduler instanceof ForkJoinPool pool) {
                 return pool.getPoolSize();
             }
@@ -132,6 +146,7 @@ public class VirtualThreadSchedulerImpls {
 
         @Override
         public int getCarrierThreadCount() {
+            Executor scheduler = Scheduler.instance();
             if (scheduler instanceof ForkJoinPool pool) {
                 return pool.getActiveThreadCount();
             }
@@ -143,6 +158,7 @@ public class VirtualThreadSchedulerImpls {
 
         @Override
         public long getQueuedVirtualThreadCount() {
+            Executor scheduler = Scheduler.instance();
             if (scheduler instanceof ForkJoinPool pool) {
                 return pool.getQueuedTaskCount() + pool.getQueuedSubmissionCount();
             }
