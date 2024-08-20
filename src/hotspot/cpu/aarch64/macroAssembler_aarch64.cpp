@@ -745,7 +745,7 @@ void MacroAssembler::reserved_stack_check() {
     // We have already removed our own frame.
     // throw_delayed_StackOverflowError will think that it's been
     // called by our caller.
-    lea(rscratch1, RuntimeAddress(StubRoutines::throw_delayed_StackOverflowError_entry()));
+    lea(rscratch1, RuntimeAddress(SharedRuntime::throw_delayed_StackOverflowError_entry()));
     br(rscratch1);
     should_not_reach_here();
 
@@ -1961,7 +1961,7 @@ void MacroAssembler::call_VM_leaf_base(address entry_point,
   if (retaddr)
     bind(*retaddr);
 
-  if (entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter_obj)) {
+  if (entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter)) {
     ldr(rscratch1, Address(rthread, JavaThread::preempt_alternate_return_offset()));
     cbz(rscratch1, not_preempted);
     str(zr, Address(rthread, JavaThread::preempt_alternate_return_offset()));
@@ -6791,9 +6791,9 @@ void MacroAssembler::double_move(VMRegPair src, VMRegPair dst, Register tmp) {
 //  - obj: the object to be locked
 //  - t1, t2, t3: temporary registers, will be destroyed
 //  - slow: branched to if locking fails, absolute offset may larger than 32KB (imm14 encoding).
-void MacroAssembler::lightweight_lock(Register obj, Register t1, Register t2, Register t3, Label& slow) {
+void MacroAssembler::lightweight_lock(Register basic_lock, Register obj, Register t1, Register t2, Register t3, Label& slow) {
   assert(LockingMode == LM_LIGHTWEIGHT, "only used with new lightweight locking");
-  assert_different_registers(obj, t1, t2, t3, rscratch1);
+  assert_different_registers(basic_lock, obj, t1, t2, t3, rscratch1);
 
   Label push;
   const Register top = t1;
@@ -6803,6 +6803,11 @@ void MacroAssembler::lightweight_lock(Register obj, Register t1, Register t2, Re
   // Preload the markWord. It is important that this is the first
   // instruction emitted as it is part of C1's null check semantics.
   ldr(mark, Address(obj, oopDesc::mark_offset_in_bytes()));
+
+  if (UseObjectMonitorTable) {
+    // Clear cache in case fast locking succeeds.
+    str(zr, Address(basic_lock, BasicObjectLock::lock_offset() + in_ByteSize((BasicLock::object_monitor_cache_offset_in_bytes()))));
+  }
 
   // Check if the lock-stack is full.
   ldrw(top, Address(rthread, JavaThread::lock_stack_top_offset()));

@@ -104,6 +104,7 @@ private:
   Register _t1;
   Register _t2;
   Register _thread;
+  Label _slow_path;
   Label _push_and_slow_path;
   Label _check_successor;
   Label _unlocked_continuation;
@@ -112,6 +113,7 @@ public:
     _obj(obj), _mark(mark), _t1(t1), _t2(t2), _thread(thread) {}
   int max_size() const;
   void emit(C2_MacroAssembler& masm);
+  Label& slow_path() { return _slow_path; }
   Label& push_and_slow_path() { return _push_and_slow_path; }
   Label& check_successor() { return _check_successor; }
   Label& unlocked_continuation() { return _unlocked_continuation; }
