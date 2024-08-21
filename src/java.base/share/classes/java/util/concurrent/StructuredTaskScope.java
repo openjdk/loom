@@ -1105,14 +1105,13 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
 
             // subtasks are done or execution is cancelled
             joined = true;
-
-            // throw if timeout expired while waiting
-            if (timeoutExpired) {
-                throw new ExecutionException(new TimeoutException());
-            }
-
-            cancelTimeout();
         }
+
+        // throw if timeout expired
+        if (timeoutExpired) {
+            throw new ExecutionException(new TimeoutException());
+        }
+        cancelTimeout();
 
         // invoke joiner to get result
         try {
