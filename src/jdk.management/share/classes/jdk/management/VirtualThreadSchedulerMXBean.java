@@ -25,8 +25,6 @@
 package jdk.management;
 
 import java.lang.management.PlatformManagedObject;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinPool;
 
 /**
  * Management interface for the JDK's default {@linkplain Thread##virtual-threads
