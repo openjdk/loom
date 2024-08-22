@@ -384,10 +384,10 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test repeated calls to join.
+     * Test repeated calls to join when there is a result.
      */
     @Test
-    void testJoinAfterJoin() throws Exception {
+    void testJoinAfterJoin1() throws Exception {
         var results = new LinkedTransferQueue<>(List.of("foo", "bar", "baz"));
         Joiner<Object, String> joiner = results::take;
         try (var scope = StructuredTaskScope.open(joiner)) {
@@ -397,6 +397,38 @@ class StructuredTaskScopeTest {
             assertEquals("foo", scope.join());
             assertEquals("bar", scope.join());
             assertEquals("baz", scope.join());
+        }
+    }
+
+    /**
+     * Test repeated calls to join when there is an exception.
+     */
+    @Test
+    void testJoinAfterJoin2() throws Exception {
+        try (var scope = StructuredTaskScope.open(Joiner.anySuccessfulResultOrThrow())) {
+            scope.fork(() -> { throw new FooException(); });
+            for (int i = 0 ; i < 3; i++) {
+                Throwable ex = assertThrows(ExecutionException.class, scope::join);
+                assertTrue(ex.getCause() instanceof FooException);
+            }
+        }
+    }
+
+    /**
+     * Test repeated calls to join when scope cancelled due to timeout.
+     */
+    @Test
+    void testJoinAfterJoin3() throws Exception {
+        try (var scope = StructuredTaskScope.open(Joiner.anySuccessfulResultOrThrow(),
+                cf -> cf.withTimeout(Duration.ofMillis(100)))) {
+            // wait for scope to be cancelled by timeout
+            while (!scope.isCancelled()) {
+                Thread.sleep(20);
+            }
+            for (int i = 0 ; i < 3; i++) {
+                Throwable ex = assertThrows(ExecutionException.class, scope::join);
+                assertTrue(ex.getCause() instanceof TimeoutException);
+            }
         }
     }
 
