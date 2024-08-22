@@ -275,8 +275,8 @@ import jdk.internal.misc.ThreadFlock;
  *     // @link substring="newInstance" target="ScopedValue#newInstance()" :
  *     private static final ScopedValue<String> USERNAME = ScopedValue.newInstance();
  *
- *     // @link substring="callWhere" target="ScopedValue#callWhere" :
- *     Result result = ScopedValue.callWhere(USERNAME, "duke", () -> {
+ *     // @link substring="callWhere" target="ScopedValue#where" :
+ *     Result result = ScopedValue.where(USERNAME, "duke").call(() -> {
  *
  *         try (var scope = StructuredTaskScope.open(Joiner.awaitAllSuccessfulOrThrow())) {
  *
