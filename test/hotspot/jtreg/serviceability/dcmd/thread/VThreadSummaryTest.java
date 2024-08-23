@@ -24,7 +24,6 @@
 /*
  * @test
  * @summary Basic test for jcmd Thread.vthread_summary
- * @enablePreview
  * @library /test/lib
  * @run main/othervm VThreadSummaryTest
  */
