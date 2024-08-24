@@ -24,11 +24,26 @@
  */
 package jdk.management;
 
+import java.lang.management.ManagementFactory;
 import java.lang.management.PlatformManagedObject;
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
 
 /**
- * Management interface for the JDK's default {@linkplain Thread##virtual-threads
- * virtual thread} scheduler.
+ * Management interface for the JDK's default {@linkplain Thread##virtual-threads virtual
+ * thread} scheduler.
+ *
+ * <p> {@code VirtualThreadSchedulerMXBean} supports monitoring of the virtual thread
+ * scheduler's target parallelism and the {@linkplain Thread##platform-threads platform
+ * threads} used by the virtual thread scheduler as <em>carrier threads</em>. It also
+ * supports dynamically changing the scheduler's target parallelism.
+ *
+ * <p> The management interface is registered with the platform {@link MBeanServer
+ * MBeanServer}. The {@link ObjectName ObjectName} that uniquely identifies the management
+ * interface within the {@code MBeanServer} is: "jdk.management:type=VirtualThreadScheduler}".
+ *
+ * <p> Direct access to the MXBean interface can be obtained with
+ * {@link ManagementFactory#getPlatformMXBean(Class)}.
  *
  * @since 24
  */
