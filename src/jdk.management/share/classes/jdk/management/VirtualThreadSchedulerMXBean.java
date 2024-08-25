@@ -40,7 +40,7 @@ import javax.management.ObjectName;
  *
  * <p> The management interface is registered with the platform {@link MBeanServer
  * MBeanServer}. The {@link ObjectName ObjectName} that uniquely identifies the management
- * interface within the {@code MBeanServer} is: "jdk.management:type=VirtualThreadScheduler}".
+ * interface within the {@code MBeanServer} is: "jdk.management:type=VirtualThreadScheduler".
  *
  * <p> Direct access to the MXBean interface can be obtained with
  * {@link ManagementFactory#getPlatformMXBean(Class)}.
