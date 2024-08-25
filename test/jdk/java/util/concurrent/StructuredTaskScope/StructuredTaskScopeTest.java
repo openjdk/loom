@@ -1363,7 +1363,7 @@ class StructuredTaskScopeTest {
      * Test Joiner.awaitAllSuccessfulOrThrow() with no subtasks.
      */
     @Test
-    void testIgnoreSuccessfulOrThrow1() throws Throwable {
+    void testAwaitSuccessfulOrThrow1() throws Throwable {
         try (var scope = StructuredTaskScope.open(Joiner.awaitAllSuccessfulOrThrow())) {
             var result = scope.join();
             assertNull(result);
@@ -1375,7 +1375,7 @@ class StructuredTaskScopeTest {
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testIgnoreSuccessfulOrThrow2(ThreadFactory factory) throws Throwable {
+    void testAwaitSuccessfulOrThrow2(ThreadFactory factory) throws Throwable {
         try (var scope = StructuredTaskScope.open(Joiner.<String>awaitAllSuccessfulOrThrow(),
                 cf -> cf.withThreadFactory(factory))) {
             var subtask1 = scope.fork(() -> "foo");
@@ -1393,7 +1393,7 @@ class StructuredTaskScopeTest {
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testIgnoreSuccessfulOrThrow3(ThreadFactory factory) throws Throwable {
+    void testAwaitSuccessfulOrThrow3(ThreadFactory factory) throws Throwable {
         try (var scope = StructuredTaskScope.open(Joiner.<String>awaitAllSuccessfulOrThrow(),
                 cf -> cf.withThreadFactory(factory))) {
             scope.fork(() -> "foo");
@@ -1410,7 +1410,7 @@ class StructuredTaskScopeTest {
      * Test Joiner.awaitAll() with no subtasks.
      */
     @Test
-    void testIgnoreAll1() throws Throwable {
+    void testAwaitAll1() throws Throwable {
         try (var scope = StructuredTaskScope.open(Joiner.awaitAll())) {
             var result = scope.join();
             assertNull(result);
@@ -1422,7 +1422,7 @@ class StructuredTaskScopeTest {
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testIgnoreAll2(ThreadFactory factory) throws Throwable {
+    void testAwaitAll2(ThreadFactory factory) throws Throwable {
         try (var scope = StructuredTaskScope.open(Joiner.<String>awaitAll(),
                 cf -> cf.withThreadFactory(factory))) {
             var subtask1 = scope.fork(() -> "foo");
@@ -1440,7 +1440,7 @@ class StructuredTaskScopeTest {
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testIgnoreAll3(ThreadFactory factory) throws Throwable {
+    void testAwaitAll3(ThreadFactory factory) throws Throwable {
         try (var scope = StructuredTaskScope.open(Joiner.<String>awaitAll(),
                 cf -> cf.withThreadFactory(factory))) {
             var subtask1 = scope.fork(() -> "foo");
