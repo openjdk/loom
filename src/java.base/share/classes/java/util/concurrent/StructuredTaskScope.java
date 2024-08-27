@@ -48,9 +48,9 @@ import jdk.internal.misc.ThreadFlock;
  * ensure that the lifetime of a concurrent operation is confined by a <em>syntax block</em>,
  * just like that of a sequential operation in structured programming.
  *
- * <p> {@code StructuredTaskScope} defines the static method {@link #open(Joiner) open}
- * to open a new {@code StructuredTaskScope} and the {@link #close() close} method to close
- * it. The API is designed to be used with the {@code try-with-resources} statement where
+ * <p> {@code StructuredTaskScope} defines the static method {@link #open() open} to open
+ * a new {@code StructuredTaskScope} and the {@link #close() close} method to close it.
+ * The API is designed to be used with the {@code try-with-resources} statement where
  * the {@code StructuredTaskScope} is opened as a resource and then closed automatically.
  * The code in the block uses the {@link #fork(Callable) fork} method to fork subtasks.
  * After forking, it uses the {@link #join() join} method to wait for all subtasks to
@@ -62,7 +62,37 @@ import jdk.internal.misc.ThreadFlock;
  * StructuredTaskScope}), and the {@code close} method throws an exception after closing
  * if the owner did not invoke the {@code join} method.
  *
- * <p> A {@code StructuredTaskScope} is opened with a {@link Joiner} that handles subtask
+ * <p> As a first example, consider a main task that splits into two subtasks to concurrently
+ * fetch resources from two URL locations "left" and "right". Both subtasks may complete
+ * successfully, one subtask may succeed and the other may fail, or both subtasks may
+ * fail. The main task in this example is interested in the successful result from both
+ * subtasks. It waits in the {@link #join() join} method for both subtasks to complete
+ * successfully or for either subtask to fail.
+ * {@snippet lang=java :
+ *    // @link substring="open" target="#open()" :
+ *    try (var scope = StructuredTaskScope.open()) {
+ *
+ *        // @link substring="fork" target="#fork(Callable)" :
+ *        Subtask<String> subtask1 = scope.fork(() -> query(left));
+ *        Subtask<Integer> subtask2 = scope.fork(() -> query(right));
+ *
+ *        // throws if either subtask fails
+ *        scope.join();  // @link substring="join" target="#join()"
+ *
+ *        // both subtasks completed successfully
+ *        return new MyResult(subtask1.get(), subtask2.get()); // @link substring="get" target="Subtask#get()"
+ *
+ *    }
+ * }
+ *
+ * <p> If both subtasks complete successfully then the {@code join} method
+ * completes and the main task uses the {@link Subtask#get() Subtask.get()} method to get
+ * the result of each subtask. If one of the subtasks fails then the other subtask
+ * is cancelled (this will interrupt the thread executing the other subtask) and the
+ * {@code join} method throws {@link ExecutionException} with the exception from
+ * the failed subtask as the {@linkplain Throwable#getCause() cause}.
+ *
+ * <p> A {@code StructuredTaskScope} may be opened with a {@link Joiner} that handles subtask
  * completion and produces the outcome (the result or an exception) for the {@link #join()
  * join} method. The {@code Joiner} interface defines static methods to create a
  * {@code Joiner} for common cases.
@@ -78,39 +108,6 @@ import jdk.internal.misc.ThreadFlock;
  * threads finish. Subtasks should be coded so that they finish as soon as possible when
  * interrupted. Subtasks that do not respond to interrupt, e.g. block on methods that are
  * not interruptible, may delay the closing of a task scope indefinitely.
- *
- * <p> Consider the example of a main task that splits into two subtasks to concurrently
- * fetch resources from two URL locations "left" and "right". Both subtasks may complete
- * successfully, one subtask may succeed and the other may fail, or both subtasks may
- * fail. The main task in this example is interested in the successful result from both
- * subtasks. It uses {@link Joiner#awaitAllSuccessfulOrThrow()
- * Joiner.awaitAllSuccessfulOrThrow()} to create a {@code Joiner} that waits for both
- * subtasks to complete successfully or for either subtask to fail.
- * {@snippet lang=java :
- *    try (var scope = StructuredTaskScope.open(Joiner.awaitAllSuccessfulOrThrow())) {
- *
- *        // @link substring="fork" target="#fork(Callable)" :
- *        Subtask<String> subtask1 = scope.fork(() -> query(left));
- *        Subtask<Integer> subtask2 = scope.fork(() -> query(right));
- *
- *        // throws if either subtask fails
- *        scope.join();  // @link substring="join" target="#join()"
- *
- *        // both subtasks completed successfully
- *        return new MyResult(subtask1.get(), subtask2.get()); // @link substring="get" target="Subtask#get()"
- *
- *    }
- * }
- *
- * <p> In this example, the main task forks the two subtasks. The {@code fork} method
- * returns a {@link Subtask Subtask} that is a handle to the forked subtask. The main task
- * waits in the {@code join} method for both subtasks to complete successfully or for either
- * subtask to fail. If both subtasks complete successfully then the {@code join} method
- * completes and the main task uses the {@link Subtask#get() Subtask.get()} method to get
- * the result of each subtask. If either subtask fails then the {@code Joiner} causes the
- * other subtask to be cancelled (this will interrupt the thread executing the subtask)
- * and the {@code join} method throws {@link ExecutionException} with the exception from
- * the failed subtask as the {@linkplain Throwable#getCause() cause}.
  *
  * <p> Now consider another example that also splits into two subtasks to concurrently
  * fetch resources. In this example, the code in the main task is only interested in the
@@ -179,7 +176,7 @@ import jdk.internal.misc.ThreadFlock;
  * consists of a {@link ThreadFactory} to create threads, an optional name for monitoring
  * and management purposes, and an optional timeout.
  *
- * <p> The 1-arg {@link #open(Joiner) open} method creates a {@code StructuredTaskScope}
+ * <p> The {@link #open()} and {@link #open(Joiner)} methods create a {@code StructuredTaskScope}
  * with the <a id="DefaultConfiguration"> <em>default configuration</em></a>. The default
  * configuration has a {@code ThreadFactory} that creates unnamed
  * <a href="{@docRoot}/java.base/java/lang/Thread.html#virtual-threads">virtual threads</a>,
@@ -960,6 +957,33 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      */
     public static <T, R> StructuredTaskScope<T, R> open(Joiner<? super T, ? extends R> joiner) {
         return open(joiner, Function.identity());
+    }
+
+    /**
+     * Opens a new structured task scope that can be used to fork subtasks that return
+     * results of any type. The {@link #join()} method waits for all subtasks to succeed
+     * or any subtask to fail.
+     *
+     * <p> The {@code join} method returns {@code null} if all subtasks complete successfully.
+     * It throws {@link ExecutionException} if any subtask fails, with the exception from
+     * the first subtask to fail as the cause.
+     *
+     * <p> The task scope is created with the <a href="#DefaultConfiguration">default
+     * configuration</a>. The default configuration has a {@code ThreadFactory} that creates
+     * unnamed <a href="{@docRoot}/java.base/java/lang/Thread.html#virtual-threads">virtual
+     * threads</a>, is unnamed for monitoring and management purposes, and has no timeout.
+     *
+     * @implSpec
+     * This factory method is equivalent to invoking the 2-arg open method with a joiner
+     * created with {@link Joiner#awaitAllSuccessfulOrThrow() awaitAllSuccessfulOrThrow()}
+     * and the {@linkplain Function#identity() identity function}.
+     *
+     * @param <T> the result type of subtasks
+     * @return a new task scope
+     * @since 24
+     */
+    public static <T> StructuredTaskScope<T, Void> open() {
+        return open(Joiner.awaitAllSuccessfulOrThrow(), Function.identity());
     }
 
     /**
