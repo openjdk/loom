@@ -45,7 +45,7 @@ import jdk.management.VirtualThreadSchedulerMXBean;
 import sun.management.ManagementFactoryHelper;
 import sun.management.spi.PlatformMBeanProvider;
 
-@SuppressWarnings("removal")
+@SuppressWarnings({"removal", "restricted"})
 public final class PlatformMBeanProviderImpl extends PlatformMBeanProvider {
     static final String DIAGNOSTIC_COMMAND_MBEAN_NAME =
         "com.sun.management:type=DiagnosticCommand";
