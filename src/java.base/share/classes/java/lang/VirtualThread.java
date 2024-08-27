@@ -1605,9 +1605,7 @@ final class VirtualThread extends BaseVirtualThread {
     private static Future<?> schedule(Runnable command, long delay, TimeUnit unit) {
         long tid = Thread.currentThread().threadId();
         int index = (int) tid & (DELAYED_TASK_SCHEDULERS.length - 1);
-        // cap delay to 146 years to avoid overflow in STPE
-        long delayNanos = Math.min(unit.toNanos(delay), (Long.MAX_VALUE >> 1) - 1);
-        return DELAYED_TASK_SCHEDULERS[index].schedule(command, delayNanos, NANOSECONDS);
+        return DELAYED_TASK_SCHEDULERS[index].schedule(command, delay, unit);
     }
 
     /**
