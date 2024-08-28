@@ -128,7 +128,9 @@ void FreezeBase::adjust_interpreted_frame_unextended_sp(frame& f) {
 }
 
 inline void FreezeBase::prepare_freeze_interpreted_top_frame(const frame& f) {
-  Unimplemented();
+  assert(*f.addr_at(frame::interpreter_frame_last_sp_offset) == 0, "should be null for top frame");
+  intptr_t* lspp = f.addr_at(frame::interpreter_frame_last_sp_offset);
+  *lspp = f.unextended_sp() - f.fp();
 }
 
 inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, const frame& hf) {
@@ -151,10 +153,16 @@ inline void FreezeBase::relativize_interpreted_frame_metadata(const frame& f, co
   // extended_sp is already relativized by TemplateInterpreterGenerator::generate_normal_entry or
   // AbstractInterpreter::layout_activation
 
+  // The interpreter native wrapper code adds space in the stack equal to size_of_parameters()
+  // after the fixed part of the frame. For wait0 this is equal to 3 words (this + long parameter).
+  // We adjust by this size since otherwise the saved last sp will be less than the extended_sp.
+  DEBUG_ONLY(Method* m = hf.interpreter_frame_method();)
+  DEBUG_ONLY(int extra_space = m->is_object_wait0() ? m->size_of_parameters() : 0;)
+
   assert((hf.fp() - hf.unextended_sp()) == (f.fp() - f.unextended_sp()), "");
   assert(hf.unextended_sp() == (intptr_t*)hf.at(frame::interpreter_frame_last_sp_offset), "");
   assert(hf.unextended_sp() <= (intptr_t*)hf.at(frame::interpreter_frame_initial_sp_offset), "");
-  assert(hf.unextended_sp() >  (intptr_t*)hf.at(frame::interpreter_frame_extended_sp_offset), "");
+  assert(hf.unextended_sp() + extra_space >  (intptr_t*)hf.at(frame::interpreter_frame_extended_sp_offset), "");
   assert(hf.fp()            >  (intptr_t*)hf.at(frame::interpreter_frame_initial_sp_offset), "");
 #ifdef ASSERT
   if (f.interpreter_frame_method()->max_locals() > 0) {
@@ -207,7 +215,8 @@ inline void Thaw<ConfigT>::patch_caller_links(intptr_t* sp, intptr_t* bottom) {
 
 inline frame ThawBase::new_entry_frame() {
   intptr_t* sp = _cont.entrySP();
-  return frame(sp, sp, _cont.entryFP(), _cont.entryPC()); // TODO PERF: This finds code blob and computes deopt state
+  // TODO PERF: This finds code blob and computes deopt state
+  return frame(sp, sp, _cont.entryFP(), _cont.entryPC());
 }
 
 template<typename FKind> frame ThawBase::new_stack_frame(const frame& hf, frame& caller, bool bottom) {
@@ -219,7 +228,6 @@ template<typename FKind> frame ThawBase::new_stack_frame(const frame& hf, frame&
     // If caller is interpreted it already made room for the callee arguments
     int overlap = caller.is_interpreted_frame() ? ContinuationHelper::InterpretedFrame::stack_argsize(hf) : 0;
     const int fsize = (int)(ContinuationHelper::InterpretedFrame::frame_bottom(hf) - hf.unextended_sp() - overlap);
-    const int locals = hf.interpreter_frame_method()->max_locals();
     intptr_t* frame_sp = caller.unextended_sp() - fsize;
     intptr_t* fp = frame_sp + (hf.fp() - heap_sp);
     if ((intptr_t)fp % frame::frame_alignment != 0) {
@@ -241,7 +249,7 @@ template<typename FKind> frame ThawBase::new_stack_frame(const frame& hf, frame&
     int fsize = FKind::size(hf);
     intptr_t* frame_sp = caller.unextended_sp() - fsize;
     if (bottom || caller.is_interpreted_frame()) {
-      int argsize = hf.compiled_frame_stack_argsize();
+      int argsize = FKind::stack_argsize(hf);
 
       fsize += argsize;
       frame_sp -= argsize;
@@ -256,13 +264,16 @@ template<typename FKind> frame ThawBase::new_stack_frame(const frame& hf, frame&
     intptr_t* fp;
     if (PreserveFramePointer) {
       // we need to recreate a "real" frame pointer, pointing into the stack
-      fp = frame_sp + FKind::size(hf) - 2;
+      fp = frame_sp + FKind::size(hf) - frame::sender_sp_offset;
     } else {
-      fp = FKind::stub
-        ? frame_sp + fsize - 2 // On RISCV, this value is used for the safepoint stub
-        : *(intptr_t**)(hf.sp() - 2); // we need to re-read fp because it may be an oop and we might have fixed the frame.
+      fp = FKind::stub || FKind::native
+        // fp always points to the address above the pushed return pc. We need correct address.
+        ? frame_sp + fsize - frame::sender_sp_offset
+        // we need to re-read fp because it may be an oop and we might have fixed the frame.
+        : *(intptr_t**)(hf.sp() - 2);
     }
-    return frame(frame_sp, frame_sp, fp, hf.pc(), hf.cb(), hf.oop_map(), false); // TODO PERF : this computes deopt state; is it necessary?
+    // TODO PERF : this computes deopt state; is it necessary?
+    return frame(frame_sp, frame_sp, fp, hf.pc(), hf.cb(), hf.oop_map(), false);
   }
 }
 
@@ -284,17 +295,88 @@ inline void ThawBase::patch_pd(frame& f, const frame& caller) {
 }
 
 inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
-  Unimplemented();
+  intptr_t* fp = caller_sp - frame::sender_sp_offset;
+  patch_callee_link(f, fp);
 }
 
-inline intptr_t* ThawBase::push_resume_adapter(frame& top, bool is_interpreted_frame) {
-  Unimplemented();
-  return nullptr;
+inline void ThawBase::fix_native_wrapper_return_pc_pd(frame& top) {
+  // Nothing to do since the last pc saved before making the call to
+  // JVM_MonitorWait() was already set to the correct resume pc. Just
+  // do some sanity check.
+#ifdef ASSERT
+  Method* method = top.is_interpreted_frame() ? top.interpreter_frame_method() : CodeCache::find_blob(top.pc())->as_nmethod()->method();
+  assert(method->is_object_wait0(), "");
+#endif
+}
+
+inline intptr_t* ThawBase::push_resume_adapter(frame& top) {
+  intptr_t* sp = top.sp();
+  CodeBlob* cb = top.cb();
+
+#ifdef ASSERT
+  RegisterMap map(JavaThread::current(),
+                  RegisterMap::UpdateMap::skip,
+                  RegisterMap::ProcessFrames::skip,
+                  RegisterMap::WalkContinuation::skip);
+  frame caller = top.sender(&map);
+  intptr_t link_addr = (intptr_t)ContinuationHelper::Frame::callee_link_address(caller);
+  assert(sp[-2] == link_addr + 16, "wrong link address: " INTPTR_FORMAT " != " INTPTR_FORMAT, sp[-2], link_addr + 16);
+#endif
+
+  bool interpreted = top.is_interpreted_frame();
+  if (!interpreted && cb->frame_size() == 2) {
+    // C2 runtime stub case. For riscv64 the real size of the c2 runtime stub is 2 words bigger
+    // than what we think, i.e. size is 4. This is because the _last_Java_sp is not set to the
+    // sp right before making the call to the VM, but rather it is artificially set 2 words above
+    // this real sp so that we can store the return address at last_Java_sp[-1], and keep this
+    // property where we can retrieve the last_Java_pc from the last_Java_sp. But that means that
+    // once we return to the runtime stub, the code will adjust sp according to this real size.
+    // So we must adjust the frame size back here. We just copy ra/fp again. These 2 top words
+    // will be the ones popped in generate_cont_resume_compiler_adapter(). The other 2 words
+    // will just be discarded once back in the runtime stub (add sp, sp, #0x10).
+    sp -= 2;
+    sp[-2] = sp[0];
+    sp[-1] = sp[1];
+  }
+
+  intptr_t* fp = sp - frame::sender_sp_offset;
+  address pc = interpreted ? Interpreter::cont_resume_interpreter_adapter()
+                           : StubRoutines::cont_resume_compiler_adapter();
+
+  sp -= frame::metadata_words;
+  *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
+  *(intptr_t**)(sp - 2) = fp;
+
+  log_develop_trace(continuations, preempt)(
+    "push_resume_%s_adapter() initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT,
+    interpreted ? "interpreter" : "compiler", p2i(sp + frame::metadata_words), p2i(sp), p2i(fp));
+
+  return sp;
 }
 
 inline intptr_t* ThawBase::push_resume_monitor_operation(stackChunkOop chunk) {
-  Unimplemented();
-  return nullptr;
+  frame enterSpecial = new_entry_frame();
+  intptr_t* sp = enterSpecial.sp();
+
+  // First push the return barrier frame
+  sp -= frame::metadata_words;
+  sp[1] = (intptr_t)StubRoutines::cont_returnBarrier();
+  sp[0] = (intptr_t)enterSpecial.fp();
+
+  // Now push the ObjectWaiter*
+  sp -= frame::metadata_words;
+  sp[1] = (intptr_t)chunk->object_waiter(); // alignment
+  sp[0] = (intptr_t)chunk->object_waiter();
+
+  // Finally arrange to return to the resume_monitor_operation stub
+  sp[-1] = (intptr_t)StubRoutines::cont_resume_monitor_operation();
+  sp[-2] = (intptr_t)enterSpecial.fp();
+
+  log_develop_trace(continuations, preempt)(
+    "push_resume_monitor_operation initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT,
+    p2i(sp + 2 * frame::metadata_words), p2i(sp));
+
+  return sp;
 }
 
 inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {
@@ -304,8 +386,11 @@ inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, c
   // Make sure that monitor_block_top is still relativized.
   assert(f.at_absolute(frame::interpreter_frame_monitor_block_top_offset) <= frame::interpreter_frame_initial_sp_offset, "");
 
+  DEBUG_ONLY(Method* m = hf.interpreter_frame_method();)
+  DEBUG_ONLY(int extra_space = m->is_object_wait0() ? m->size_of_parameters() : 0;) // see comment in relativize_interpreted_frame_metadata()
+
   // Make sure that extended_sp is kept relativized.
-  assert((intptr_t*)f.at_relative(frame::interpreter_frame_extended_sp_offset) < f.unextended_sp(), "");
+  assert((intptr_t*)f.at_relative(frame::interpreter_frame_extended_sp_offset) < f.unextended_sp() + extra_space, "");
 }
 
 #endif // CPU_RISCV_CONTINUATIONFREEZETHAW_RISCV_INLINE_HPP
