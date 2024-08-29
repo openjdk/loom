@@ -940,8 +940,8 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
-     * Exception thrown by {@link #join()} if the task scope is created with the timeout
-     * expires before or while waiting in {@code join}.
+     * Exception thrown by {@link #join()} if the task scope was created a timeout and
+     * the timeout expired before or while waiting in {@code join}.
      *
      * @since 24
      * @see Config#withTimeout(Duration)
