@@ -904,7 +904,7 @@ inline void FreezeBase::before_freeze_java_frame(const frame& f, const frame& ca
     LogStream ls(lt);
     ls.print_cr("======== FREEZING FRAME interpreted: %d bottom: %d", f.is_interpreted_frame(), is_bottom_frame);
     ls.print_cr("fsize: %d argsize: %d", fsize, argsize);
-    f.print_value_on(&ls, nullptr);
+    f.print_value_on(&ls);
   }
   assert(caller.is_interpreted_frame() == Interpreter::contains(caller.pc()), "");
 }
@@ -913,7 +913,7 @@ inline void FreezeBase::after_freeze_java_frame(const frame& hf, bool is_bottom_
   LogTarget(Trace, continuations) lt;
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
-    DEBUG_ONLY(hf.print_value_on(&ls, nullptr);)
+    DEBUG_ONLY(hf.print_value_on(&ls);)
     assert(hf.is_heap_frame(), "should be");
     DEBUG_ONLY(print_frame_layout(hf, false, &ls);)
     if (is_bottom_frame) {
@@ -2264,7 +2264,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
     LogStream ls(lt);
     ls.print_cr("top hframe before (thaw):");
     assert(heap_frame.is_heap_frame(), "should have created a relative frame");
-    heap_frame.print_value_on(&ls, nullptr);
+    heap_frame.print_value_on(&ls);
   }
 
   frame caller; // the thawed caller on the stack
@@ -2358,7 +2358,7 @@ inline void ThawBase::before_thaw_java_frame(const frame& hf, const frame& calle
     LogStream ls(lt);
     ls.print_cr("======== THAWING FRAME: %d", num_frame);
     assert(hf.is_heap_frame(), "should be");
-    hf.print_value_on(&ls, nullptr);
+    hf.print_value_on(&ls);
   }
   assert(bottom == _cont.is_entry_frame(caller), "bottom: %d is_entry_frame: %d", bottom, _cont.is_entry_frame(hf));
 }
@@ -2754,7 +2754,7 @@ void ThawBase::finish_thaw(frame& f) {
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
     ls.print_cr("top hframe after (thaw):");
-    _cont.last_frame().print_value_on(&ls, nullptr);
+    _cont.last_frame().print_value_on(&ls);
   }
 }
 
@@ -2766,7 +2766,7 @@ void ThawBase::push_return_frame(frame& f) { // see generate_cont_thaw
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
     ls.print_cr("push_return_frame");
-    f.print_value_on(&ls, nullptr);
+    f.print_value_on(&ls);
   }
 
   assert(f.sp() - frame::metadata_words_at_bottom >= _top_stack_address, "overwrote past thawing space"
@@ -3013,7 +3013,7 @@ static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont,
   if (lt.develop_is_enabled()) {
     LogStream ls(lt);
     ls.print_cr("Jumping to frame (thaw):");
-    frame(sp).print_value_on(&ls, nullptr);
+    frame(sp).print_value_on(&ls);
   }
 }
 #endif // ASSERT

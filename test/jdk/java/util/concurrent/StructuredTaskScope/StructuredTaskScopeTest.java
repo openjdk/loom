@@ -45,16 +45,16 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.StructuredTaskScope;
+import java.util.concurrent.StructuredTaskScope.TimeoutException;
 import java.util.concurrent.StructuredTaskScope.Config;
+import java.util.concurrent.StructuredTaskScope.FailedException;
 import java.util.concurrent.StructuredTaskScope.Joiner;
 import java.util.concurrent.StructuredTaskScope.Subtask;
 import java.util.concurrent.StructureViolationException;
@@ -248,14 +248,8 @@ class StructuredTaskScopeTest {
             Thread.currentThread().interrupt();
             assertThrows(InterruptedException.class, scope::join);
 
-            // allow subtask1 to finish
-            latch.countDown();
-
-            // continue to fork
-            var subtask2 = scope.fork(() -> "bar");
-            scope.join();
-            assertEquals("foo", subtask1.get());
-            assertEquals("bar", subtask2.get());
+            // fork should throw
+            assertThrows(IllegalStateException.class, () -> scope.fork(() -> "bar"));
         }
     }
 
@@ -384,7 +378,7 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test repeated calls to join when there is a result.
+     * Test join after join completed with a result.
      */
     @Test
     void testJoinAfterJoin1() throws Exception {
@@ -392,30 +386,34 @@ class StructuredTaskScopeTest {
         Joiner<Object, String> joiner = results::take;
         try (var scope = StructuredTaskScope.open(joiner)) {
             scope.fork(() -> "foo");
-
-            // each call to join should invoke Joiner::result
             assertEquals("foo", scope.join());
-            assertEquals("bar", scope.join());
-            assertEquals("baz", scope.join());
-        }
-    }
 
-    /**
-     * Test repeated calls to join when there is an exception.
-     */
-    @Test
-    void testJoinAfterJoin2() throws Exception {
-        try (var scope = StructuredTaskScope.open(Joiner.anySuccessfulResultOrThrow())) {
-            scope.fork(() -> { throw new FooException(); });
+            // join already called
             for (int i = 0 ; i < 3; i++) {
-                Throwable ex = assertThrows(ExecutionException.class, scope::join);
-                assertTrue(ex.getCause() instanceof FooException);
+                assertThrows(IllegalStateException.class, scope::join);
             }
         }
     }
 
     /**
-     * Test repeated calls to join when scope cancelled due to timeout.
+     * Test join after join completed with an exception.
+     */
+    @Test
+    void testJoinAfterJoin2() throws Exception {
+        try (var scope = StructuredTaskScope.open(Joiner.anySuccessfulResultOrThrow())) {
+            scope.fork(() -> { throw new FooException(); });
+            Throwable ex = assertThrows(FailedException.class, scope::join);
+            assertTrue(ex.getCause() instanceof FooException);
+
+            // join already called
+            for (int i = 0 ; i < 3; i++) {
+                assertThrows(IllegalStateException.class, scope::join);
+            }
+        }
+    }
+
+    /**
+     * Test join after join completed with a timeout.
      */
     @Test
     void testJoinAfterJoin3() throws Exception {
@@ -425,9 +423,11 @@ class StructuredTaskScopeTest {
             while (!scope.isCancelled()) {
                 Thread.sleep(20);
             }
+            assertThrows(TimeoutException.class, scope::join);
+
+            // join already called
             for (int i = 0 ; i < 3; i++) {
-                Throwable ex = assertThrows(ExecutionException.class, scope::join);
-                assertTrue(ex.getCause() instanceof TimeoutException);
+                assertThrows(IllegalStateException.class, scope::join);
             }
         }
     }
@@ -469,10 +469,8 @@ class StructuredTaskScopeTest {
         try (var scope = StructuredTaskScope.open(Joiner.awaitAll(),
                 cf -> cf.withThreadFactory(factory))) {
 
-            var latch = new CountDownLatch(1);
-
             Subtask<String> subtask = scope.fork(() -> {
-                latch.await();
+                Thread.sleep(60_000);
                 return "foo";
             });
 
@@ -483,14 +481,7 @@ class StructuredTaskScopeTest {
                 fail("join did not throw");
             } catch (InterruptedException expected) {
                 assertFalse(Thread.interrupted());   // interrupt status should be cleared
-            } finally {
-                // let task continue
-                latch.countDown();
             }
-
-            // join should complete
-            scope.join();
-            assertEquals("foo", subtask.get());
         }
     }
 
@@ -505,7 +496,7 @@ class StructuredTaskScopeTest {
 
             var latch = new CountDownLatch(1);
             Subtask<String> subtask = scope.fork(() -> {
-                latch.await();
+                Thread.sleep(60_000);
                 return "foo";
             });
 
@@ -516,14 +507,7 @@ class StructuredTaskScopeTest {
                 fail("join did not throw");
             } catch (InterruptedException expected) {
                 assertFalse(Thread.interrupted());   // interrupt status should be clear
-            } finally {
-                // let task continue
-                latch.countDown();
             }
-
-            // join should complete
-            scope.join();
-            assertEquals("foo", subtask.get());
         }
     }
 
@@ -607,12 +591,7 @@ class StructuredTaskScopeTest {
                 return null;
             });
 
-            try {
-                scope.join();
-                fail();
-            } catch (ExecutionException e) {
-                assertTrue(e.getCause() instanceof TimeoutException);
-            }
+            assertThrows(TimeoutException.class, scope::join);
             expectDuration(startMillis, /*min*/1900, /*max*/20_000);
 
             assertTrue(scope.isCancelled());
@@ -635,12 +614,8 @@ class StructuredTaskScopeTest {
                 return null;
             });
 
-            try {
-                scope.join();
-                fail();
-            } catch (ExecutionException e) {
-                assertTrue(e.getCause() instanceof TimeoutException);
-            }
+            assertThrows(TimeoutException.class, scope::join);
+
             assertTrue(scope.isCancelled());
             assertEquals(Subtask.State.UNAVAILABLE, subtask.state());
         }
@@ -750,12 +725,8 @@ class StructuredTaskScopeTest {
                 interrupted.await();
             }
 
-            try {
-                scope.join();
-                fail();
-            } catch (ExecutionException e) {
-                assertTrue(e.getCause() instanceof TimeoutException);
-            }
+            assertThrows(TimeoutException.class, scope::join);
+
             assertEquals(Subtask.State.UNAVAILABLE, subtask.state());
         }
     }
@@ -782,7 +753,14 @@ class StructuredTaskScopeTest {
                 Thread.sleep(Duration.ofDays(1));
                 return null;
             });
+
+            // first call to close should throw
             assertThrows(IllegalStateException.class, scope::close);
+
+            // subsequent calls to close should not throw
+            for (int i = 0; i < 3; i++) {
+                scope.close();
+            }
 
             // subtask result/exception not available
             assertEquals(Subtask.State.UNAVAILABLE, subtask.state());
@@ -1280,7 +1258,7 @@ class StructuredTaskScopeTest {
             scope.fork(() -> { throw new FooException(); });
             try {
                 scope.join();
-            } catch (ExecutionException e) {
+            } catch (FailedException e) {
                 assertTrue(e.getCause() instanceof FooException);
             }
         }
@@ -1294,7 +1272,7 @@ class StructuredTaskScopeTest {
         try (var scope = StructuredTaskScope.open(Joiner.anySuccessfulResultOrThrow())) {
             try {
                 scope.join();
-            } catch (ExecutionException e) {
+            } catch (FailedException e) {
                 assertTrue(e.getCause() instanceof NoSuchElementException);
             }
         }
@@ -1354,7 +1332,7 @@ class StructuredTaskScopeTest {
         try (var scope = StructuredTaskScope.open(Joiner.anySuccessfulResultOrThrow(),
                 cf -> cf.withThreadFactory(factory))) {
             scope.fork(() -> { throw new FooException(); });
-            Throwable ex = assertThrows(ExecutionException.class, scope::join);
+            Throwable ex = assertThrows(FailedException.class, scope::join);
             assertTrue(ex.getCause() instanceof FooException);
         }
     }
@@ -1400,7 +1378,7 @@ class StructuredTaskScopeTest {
             scope.fork(() -> { throw new FooException(); });
             try {
                 scope.join();
-            } catch (ExecutionException e) {
+            } catch (FailedException e) {
                 assertTrue(e.getCause() instanceof FooException);
             }
         }

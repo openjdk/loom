@@ -59,8 +59,10 @@ import jdk.internal.misc.ThreadFlock;
  * beyond the {@code close} method until all threads started to execute subtasks have finished.
  * To ensure correct usage, the {@code fork}, {@code join} and {@code close} methods may
  * only be invoked by the <em>owner thread</em> (the thread that opened the {@code
- * StructuredTaskScope}), and the {@code close} method throws an exception after closing
- * if the owner did not invoke the {@code join} method.
+ * StructuredTaskScope}), the {@code fork} method may not be called after {@code join},
+ * the {@code join} method may only be invoked once, and the {@code close} method throws
+ * an exception after closing if the owner did not invoke the {@code join} method after
+ * forking subtasks.
  *
  * <p> As a first example, consider a main task that splits into two subtasks to concurrently
  * fetch resources from two URL locations "left" and "right". Both subtasks may complete
@@ -89,7 +91,7 @@ import jdk.internal.misc.ThreadFlock;
  * completes and the main task uses the {@link Subtask#get() Subtask.get()} method to get
  * the result of each subtask. If one of the subtasks fails then the other subtask
  * is cancelled (this will interrupt the thread executing the other subtask) and the
- * {@code join} method throws {@link ExecutionException} with the exception from
+ * {@code join} method throws {@link FailedException} with the exception from
  * the failed subtask as the {@linkplain Throwable#getCause() cause}.
  *
  * <p> A {@code StructuredTaskScope} may be opened with a {@link Joiner} that handles subtask
@@ -102,12 +104,16 @@ import jdk.internal.misc.ThreadFlock;
  * require the result of subtasks that are still executing. Cancelling execution prevents
  * new threads from being started to execute further subtasks, {@linkplain Thread#interrupt()
  * interrupts} the threads executing subtasks that have not completed, and causes the
- * {@code join} method to wakeup with a result (or exception). The {@link #close() close}
- * method always waits for threads executing subtasks to finish, even if execution is
- * cancelled, so it cannot continue beyond the {@code close} method until the interrupted
- * threads finish. Subtasks should be coded so that they finish as soon as possible when
- * interrupted. Subtasks that do not respond to interrupt, e.g. block on methods that are
- * not interruptible, may delay the closing of a task scope indefinitely.
+ * {@code join} method to wakeup with a result (or exception). In the above example,
+ * the no-arg {@link #open() open} method created the {@code StructuredTaskScope} with a
+ * {@code Joiner} that cancelled execution when any subtask failed.
+ *
+ * <p> The {@link #close() close} method always waits for threads executing subtasks to
+ * finish, even if execution is cancelled, so it cannot continue beyond the {@code close}
+ * method until the interrupted threads finish. Subtasks should be coded so that they
+ * finish as soon as possible when interrupted. Subtasks that do not respond to interrupt,
+ * e.g. block on methods that are not interruptible, may delay the closing of a task scope
+ * indefinitely.
  *
  * <p> Now consider another example that also splits into two subtasks to concurrently
  * fetch resources. In this example, the code in the main task is only interested in the
@@ -136,7 +142,7 @@ import jdk.internal.misc.ThreadFlock;
  * subtask to be cancelled (this will interrupt the thread executing the subtask), and
  * the {@code join} method returns the result from the first subtask. Cancelling the other
  * subtask avoids the main task waiting for a result that it doesn't care about. If both
- * subtasks fail then the {@code join} method throws {@link ExecutionException} with the
+ * subtasks fail then the {@code join} method throws {@link FailedException} with the
  * exception from one of the subtasks as the {@linkplain Throwable#getCause() cause}.
  *
  * <p> Whether code uses the {@code Subtask} returned from {@code fork} will depend on
@@ -152,19 +158,34 @@ import jdk.internal.misc.ThreadFlock;
  * handles subtask completion and produces the outcome for the {@link #join() join} method.
  * In some cases, the outcome will be a result, in other cases it will be an exception.
  * If the outcome is an exception then the {@code join} method throws {@link
- * ExecutionException} with the exception as the {@linkplain Throwable#getCause()
+ * FailedException} with the exception as the {@linkplain Throwable#getCause()
  * cause}. For many {@code Joiner} implementations, the exception will be an exception
  * thrown by a subtask that failed. In the case of {@link Joiner#allSuccessfulOrThrow()
  * allSuccessfulOrThrow} and {@link Joiner#awaitAllSuccessfulOrThrow() awaitAllSuccessfulOrThrow}
  * for example, the exception is from the first subtask to fail.
  *
  * <p> Many of the details for how exceptions are handled will depend on usage. In some
- * cases, the {@code join} method will be called in a {@code try-catch} block to catch
- * {@code ExecutionException} and handle the cause. The exception handling may use
- * {@code instanceof} with pattern matching to handle specific causes. In some cases it
- * may not be useful to catch {@code ExecutionException} but instead leave it to propagate
- * to the configured {@linkplain Thread.UncaughtExceptionHandler uncaught exception handler}
- * for logging purposes.
+ * cases it may be useful t add a {@code catch} block to catch {@code FailedException}.
+ * The exception handling may use {@code instanceof} with pattern matching to handle
+ * specific causes.
+ * {@snippet lang=java :
+ *    try (var scope = StructuredTaskScope.open()) {
+ *
+ *        ..
+ *
+ *    } catch (StructuredTaskScope.FailedException e) {
+ *
+ *        Throwable cause = e.getCause();
+ *        switch (cause) {
+ *            case IOException ioe -> ..
+ *            default -> ..
+ *        }
+ *
+ *    }
+ * }
+ * In some cases it may not be useful to catch {@code FailedException} but instead leave
+ * it to propagate to the configured {@linkplain Thread.UncaughtExceptionHandler uncaught
+ * exception handler} for logging purposes.
  *
  * <p> For cases where a specific exception triggers the use of a default result then it
  * may be more appropriate to handle this in the subtask itself rather than the subtask
@@ -212,7 +233,7 @@ import jdk.internal.misc.ThreadFlock;
  * starts when the new task scope is opened. If the timeout expires before the {@code join}
  * method has completed then <a href="#CancelExecution">execution is cancelled</a>. This
  * interrupts the threads executing the two subtasks and causes the {@link #join() join}
- * method to throw {@link ExecutionException} with {@link TimeoutException} as the cause.
+ * method to throw {@link FailedException} with {@link TimeoutException} as the cause.
  * {@snippet lang=java :
  *    Duration timeout = Duration.ofSeconds(10);
  *
@@ -337,10 +358,15 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     private final ThreadFactory threadFactory;
     private final ThreadFlock flock;
 
-    // fields that are only accessed by owner thread
-    private boolean needToJoin;     // set by fork to indicate that owner must join
-    private boolean joined;         // set to true when owner joins
-    private boolean closed;
+    // state, only accessed by owner thread
+    private static final int ST_NEW            = 0;
+    private static final int ST_FORKED         = 1;   // subtasks forked, need to join
+    private static final int ST_JOIN_STARTED   = 2;   // join started, can no longer fork
+    private static final int ST_JOIN_COMPLETED = 3;   // join completed
+    private static final int ST_CLOSED         = 4;   // closed
+    private int state;
+
+    // timer task, only accessed by owner thread
     private Future<?> timerTask;
 
     // set or read by any thread
@@ -348,16 +374,6 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
 
     // set by the timer thread, read by the owner thread
     private volatile boolean timeoutExpired;
-
-    /**
-     * Throws IllegalStateException if the task scope is closed.
-     */
-    private void ensureOpen() {
-        assert Thread.currentThread() == flock.owner();
-        if (closed) {
-            throw new IllegalStateException("Task scope is closed");
-        }
-    }
 
     /**
      * Throws WrongThreadException if the current thread is not the owner thread.
@@ -369,13 +385,32 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
+     * Throws IllegalStateException if the task scope is closed.
+     */
+    private void ensureOpen() {
+        assert Thread.currentThread() == flock.owner();
+        if (state == ST_CLOSED) {
+            throw new IllegalStateException("Task scope is closed");
+        }
+    }
+
+    /**
+     * Throws IllegalStateException if the already joined or task scope is closed.
+     */
+    private void ensureNotJoined() {
+        assert Thread.currentThread() == flock.owner();
+        if (state > ST_FORKED) {
+            throw new IllegalStateException("Already joined or task scope is closed");
+        }
+    }
+
+    /**
      * Throws IllegalStateException if invoked by the owner thread and the owner thread
      * has not joined.
      */
     private void ensureJoinedIfOwner() {
-        if (Thread.currentThread() == flock.owner() && !joined) {
-            String msg = needToJoin ? "Owner did not join" : "join did not complete";
-            throw new IllegalStateException(msg);
+        if (Thread.currentThread() == flock.owner() && state <= ST_JOIN_STARTED) {
+            throw new IllegalStateException("join not called");
         }
     }
 
@@ -531,7 +566,8 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          *
          * @return the possibly-null result
          * @throws IllegalStateException if the subtask has not completed, did not complete
-         * successfully, or the current thread is the task scope owner and it has not joined
+         * successfully, or the current thread is the task scope owner invoking this
+         * method before {@linkplain #join() joining}
          * @see State#SUCCESS
          */
         T get();
@@ -552,7 +588,8 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          * {@link State#FAILED FAILED} before using this method to get the exception.
          *
          * @throws IllegalStateException if the subtask has not completed, completed with
-         * a result, or the current thread is the task scope owner and it has not joined
+         * a result, or the current thread is the task scope owner invoking this method
+         * before {@linkplain #join() joining}
          * @see State#FAILED
          */
         Throwable exception();
@@ -576,7 +613,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      *   {@code Joiner} that waits for all successful subtasks. It cancels execution and
      *   causes {@code join} to throw if any subtask fails.
      *   <li> {@link #awaitAll() awaitAll()} creates a {@code Joiner} that waits for all
-     *   subtasks. If does not cancel execution.
+     *   subtasks. It does not cancel execution or cause {@code join} to throw.
      * </ul>
      *
      * <p> In addition to the methods to create {@code Joiner} objects for common cases,
@@ -673,14 +710,14 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          * Invoked by {@link #join()} to produce the result (or exception) after waiting
          * for all subtasks to complete or execution to be cancelled. The result from this
          * method is returned by the {@code join} method. If this method throws, then
-         * {@code join} throws {@link ExecutionException} with the exception thrown by
+         * {@code join} throws {@link FailedException} with the exception thrown by
          * this method as the cause.
          *
-         * <p> In normal usage, this method will be called at most once to produce the
-         * result (or exception). If the {@code join} method is called more than once
-         * then this method may be called more than once to produce the result. An
-         * implementation should return an equal result (or throw the same exception) on
-         * second or subsequent calls to produce the outcome.
+         * <p> In normal usage, this method will be called at most once by the {@code join}
+         * method to produce the result (or exception). The behavior of this method when
+         * invoked directly, and invoked more than once, is not specified. Where possible,
+         * an implementation should return an equal result (or throw the same exception)
+         * on second or subsequent calls to produce the outcome.
          *
          * @apiNote This method is invoked by the {@code join} method. It should not be
          * invoked directly.
@@ -823,8 +860,8 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * ThreadFactory} to create threads, an optional name for the purposes of monitoring
      * and management, and an optional timeout.
      *
-     * <p> Creating a {@code StructuredTaskScope} with its 1-arg {@link #open(Joiner) open}
-     * method uses the <a href="StructuredTaskScope.html#DefaultConfiguration">default
+     * <p> Creating a {@code StructuredTaskScope} with {@link #open()} or {@link #open(Joiner)}
+     * uses the <a href="StructuredTaskScope.html#DefaultConfiguration">default
      * configuration</a>. The default configuration consists of a thread factory that
      * creates unnamed <a href="{@docRoot}/java.base/java/lang/Thread.html#virtual-threads">
      * virtual threads</a>, no name for monitoring and management purposes, and no timeout.
@@ -882,6 +919,45 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
+     * Exception thrown by {@link #join()} when the outcome is an exception rather than a
+     * result.
+     *
+     * @since 24
+     */
+    @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
+    public static class FailedException extends RuntimeException {
+        @java.io.Serial
+        static final long serialVersionUID = -1533055100078459923L;
+
+        /**
+         * Constructs a {@code FailedException} with the specified cause.
+         *
+         * @param  cause the cause, can be {@code null}
+         */
+        public FailedException(Throwable cause) {
+            super(cause);
+        }
+    }
+
+    /**
+     * Exception thrown by {@link #join()} if the task scope was created a timeout and
+     * the timeout expired before or while waiting in {@code join}.
+     *
+     * @since 24
+     * @see Config#withTimeout(Duration)
+     */
+    @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
+    public static class TimeoutException extends RuntimeException {
+        @java.io.Serial
+        static final long serialVersionUID = 705788143955048766L;
+
+        /**
+         * Constructs a {@code TimeoutException} with no detail message.
+         */
+        public TimeoutException() { }
+    }
+
+    /**
      * Opens a new structured task scope to use the given {@code Joiner} object and with
      * configuration that is the result of applying the given function to the
      * <a href="#DefaultConfiguration">default configuration</a>.
@@ -898,7 +974,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * <p> If a {@linkplain Config#withTimeout(Duration) timeout} is set then it starts
      * when the task scope is opened. If the timeout expires before the task scope has
      * {@linkplain #join() joined} then execution is cancelled and the {@code join} method
-     * throws {@link ExecutionException} with {@link TimeoutException} as the cause.
+     * throws {@link FailedException} with {@link TimeoutException} as the cause.
      *
      * <p> The new task scope is owned by the current thread. Only code executing in this
      * thread can {@linkplain #fork(Callable) fork}, {@linkplain #join() join}, or
@@ -965,7 +1041,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * or any subtask to fail.
      *
      * <p> The {@code join} method returns {@code null} if all subtasks complete successfully.
-     * It throws {@link ExecutionException} if any subtask fails, with the exception from
+     * It throws {@link FailedException} if any subtask fails, with the exception from
      * the first subtask to fail as the cause.
      *
      * <p> The task scope is created with the <a href="#DefaultConfiguration">default
@@ -1023,9 +1099,9 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * @param task the value-returning task for the thread to execute
      * @param <U> the result type
      * @return the subtask
-     * @throws IllegalStateException if this task scope is closed or the owner has already
-     * joined
      * @throws WrongThreadException if the current thread is not the task scope owner
+     * @throws IllegalStateException if the owner has already {@linkplain #join() joined}
+     * or the task scope is closed
      * @throws StructureViolationException if the current scoped value bindings are not
      * the same as when the task scope was created
      * @throws RejectedExecutionException if the thread factory rejected creating a
@@ -1034,10 +1110,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     public <U extends T> Subtask<U> fork(Callable<? extends U> task) {
         Objects.requireNonNull(task);
         ensureOwner();
-        ensureOpen();
-        if (joined) {
-            throw new IllegalStateException("Already joined");
-        }
+        ensureNotJoined();
 
         var subtask = new SubtaskImpl<U>(this, task);
 
@@ -1062,7 +1135,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
             }
         }
 
-        needToJoin = true;
+        state = ST_FORKED;
         return subtask;
     }
 
@@ -1076,9 +1149,9 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      *
      * @param task the task for the thread to execute
      * @return the subtask
-     * @throws IllegalStateException if this task scope is closed or the owner has already
-     * joined
      * @throws WrongThreadException if the current thread is not the task scope owner
+     * @throws IllegalStateException if the owner has already {@linkplain #join() joined}
+     * or the task scope is closed
      * @throws StructureViolationException if the current scoped value bindings are not
      * the same as when the task scope was created
      * @throws RejectedExecutionException if the thread factory rejected creating a
@@ -1094,10 +1167,10 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * Waits for all subtasks started in this task scope to complete or execution to be
      * cancelled. If a {@linkplain  Config#withTimeout(Duration) timeout} has been set
      * then execution will be cancelled if the timeout expires before or while waiting.
-     * Once finished waiting, the {@code Joiner}'s {@link Joiner#result() result}
-     * method is invoked to get the result or throw an exception. If the {@code result}
-     * method throws then this method throws {@code ExecutionException} with the
-     * exception thrown by the {@code result()} method as the cause.
+     * Once finished waiting, the {@code Joiner}'s {@link Joiner#result() result} method
+     * is invoked to get the result or throw an exception. If the {@code result} method
+     * throws then this method throws {@code FailedException} with the exception thrown
+     * by the {@code result()} method as the cause.
      *
      * <p> This method waits for all subtasks by waiting for all threads {@linkplain
      * #fork(Callable) started} in this task scope to finish execution. It stops waiting
@@ -1106,42 +1179,42 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * to cancel execution, the timeout (if set) expires, or the current thread is
      * {@linkplain Thread#interrupt() interrupted}.
      *
-     * <p> This method may only be invoked by the task scope owner.
+     * <p> This method may only be invoked by the task scope owner, and only once.
      *
      * @return the {@link Joiner#result() result}
-     * @throws IllegalStateException if this task scope is closed
      * @throws WrongThreadException if the current thread is not the task scope owner
-     * @throws ExecutionException if the joiner's {@code result} method throws, or with
-     * cause {@link TimeoutException} if a timeout is set and the timeout expires
+     * @throws IllegalStateException if already joined or this task scope is closed
+     * @throws FailedException if the <i>outcome</i> is an exception, thrown with the
+     * exception from {@link Joiner#result()} as the cause
+     * @throws TimeoutException if a timeout is set and the timeout expires before or
+     * while waiting
      * @throws InterruptedException if interrupted while waiting
      * @since 24
      */
-    public R join() throws ExecutionException, InterruptedException {
+    public R join() throws InterruptedException {
         ensureOwner();
-        ensureOpen();
+        ensureNotJoined();
 
-        if (!joined) {
-            // owner has attempted to join
-            needToJoin = false;
+        // join started
+        state = ST_JOIN_STARTED;
 
-            // wait for all subtasks, execution to be cancelled, or interrupt
-            flock.awaitAll();
-
-            // subtasks are done or execution is cancelled
-            joined = true;
-        }
+        // wait for all subtasks, execution to be cancelled, or interrupt
+        flock.awaitAll();
 
         // throw if timeout expired
         if (timeoutExpired) {
-            throw new ExecutionException(new TimeoutException());
+            throw new TimeoutException();
         }
         cancelTimeout();
+
+        // all subtasks completed or cancelled
+        state = ST_JOIN_COMPLETED;
 
         // invoke joiner to get result
         try {
             return joiner.result();
         } catch (Throwable e) {
-            throw new ExecutionException(e);
+            throw new FailedException(e);
         }
     }
 
@@ -1244,12 +1317,13 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     @Override
     public void close() {
         ensureOwner();
-        if (closed) {
+        int s = state;
+        if (s == ST_CLOSED) {
             return;
         }
 
-        // cancel execution if not already joined
-        if (!joined) {
+        // cancel execution if join did not complete
+        if (s < ST_JOIN_COMPLETED) {
             cancelExecution();
             cancelTimeout();
         }
@@ -1258,13 +1332,12 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         try {
             flock.close();
         } finally {
-            closed = true;
+            state = ST_CLOSED;
         }
 
         // throw ISE if the owner didn't join after forking
-        if (needToJoin) {
-            needToJoin = false;
-            throw new IllegalStateException("Owner did not join");
+        if (s == ST_FORKED) {
+            throw new IllegalStateException("Owner did not join after forking");
         }
     }
 
