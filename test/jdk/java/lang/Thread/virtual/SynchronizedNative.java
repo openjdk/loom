@@ -26,7 +26,7 @@
  * @summary Test virtual threads with a synchronized native method and a native method
  *      that enter/exits a monitor with JNI MonitorEnter/MonitorExit
  * @requires vm.continuations
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @run junit/othervm SynchronizedNative
  */
@@ -34,7 +34,7 @@
 /*
  * @test id=Xint
  * @requires vm.continuations
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @run junit/othervm -Xint SynchronizedNative
  */
@@ -42,7 +42,7 @@
 /*
  * @test id=Xcomp-TieredStopAtLevel1
  * @requires vm.continuations
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=1 SynchronizedNative
  */
@@ -50,7 +50,7 @@
 /*
  * @test id=Xcomp-noTieredCompilation
  * @requires vm.continuations
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @run junit/othervm -Xcomp -XX:-TieredCompilation SynchronizedNative
  */

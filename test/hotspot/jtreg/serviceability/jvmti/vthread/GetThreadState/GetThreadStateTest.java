@@ -25,7 +25,7 @@
  * @test id=default
  * @bug 8312498
  * @summary Basic test for JVMTI GetThreadState with virtual threads
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @run junit/othervm/native --enable-native-access=ALL-UNNAMED GetThreadStateTest
  */
@@ -33,7 +33,7 @@
 /*
  * @test id=no-vmcontinuations
  * @requires vm.continuations
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @run junit/othervm/native -XX:+UnlockExperimentalVMOptions -XX:-VMContinuations --enable-native-access=ALL-UNNAMED GetThreadStateTest
  */

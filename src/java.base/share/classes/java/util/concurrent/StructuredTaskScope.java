@@ -1483,7 +1483,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         @Override
         public boolean onFork(Subtask<? extends T> subtask) {
             @SuppressWarnings("unchecked")
-            var tmp = (Subtask<T>) subtask;
+            var tmp = (Subtask<T>) Objects.requireNonNull(subtask);
             subtasks.add(tmp);
             return false;
         }
@@ -1527,6 +1527,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
 
         @Override
         public boolean onComplete(Subtask<? extends T> subtask) {
+            Objects.requireNonNull(subtask);
             if (firstSuccess == null) {
                 if (subtask.state() == Subtask.State.SUCCESS) {
                     // capture the first subtask that completes successfully
@@ -1603,14 +1604,14 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         @Override
         public boolean onFork(Subtask<? extends T> subtask) {
             @SuppressWarnings("unchecked")
-            var tmp = (Subtask<T>) subtask;
+            var tmp = (Subtask<T>) Objects.requireNonNull(subtask);
             subtasks.add(tmp);
             return false;
         }
 
         @Override
         public boolean onComplete(Subtask<? extends T> subtask) {
-            return isDone.test(subtask);
+            return isDone.test(Objects.requireNonNull(subtask));
         }
 
         @Override
@@ -1646,7 +1647,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
-     * Used to schedule a task to cancel exception when a timeout expires.
+     * Used to schedule a task to cancel execution when a timeout expires.
      */
     private static class TimerSupport {
         private static final ScheduledExecutorService DELAYED_TASK_SCHEDULER;
