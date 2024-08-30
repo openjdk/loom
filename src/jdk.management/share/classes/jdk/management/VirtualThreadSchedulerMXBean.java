@@ -51,7 +51,7 @@ public interface VirtualThreadSchedulerMXBean extends PlatformManagedObject {
 
     /**
      * {@return the scheduler's target parallelism}
-     * 
+     *
      * @see java.util.concurrent.ForkJoinPool#getParallelism()
      */
     int getParallelism();
@@ -64,7 +64,7 @@ public interface VirtualThreadSchedulerMXBean extends PlatformManagedObject {
      *         greater than the maximum, supported by the scheduler
      * @throws UnsupportedOperationException if changing the target
      *         parallelism is not suppored by the scheduler
-     *         
+     *
      * @see java.util.concurrent.ForkJoinPool#setParallelism(int)
      */
     void setParallelism(int size);
