@@ -82,38 +82,52 @@ import jdk.internal.misc.ThreadFlock;
  *        scope.join();  // @link substring="join" target="#join()"
  *
  *        // both subtasks completed successfully
- *        return new MyResult(subtask1.get(), subtask2.get()); // @link substring="get" target="Subtask#get()"
+ *        // @link substring="get" target="Subtask#get()" :
+ *        return new MyResult(subtask1.get(), subtask2.get());
  *
  *    }
  * }
  *
- * <p> If both subtasks complete successfully then the {@code join} method
- * completes and the main task uses the {@link Subtask#get() Subtask.get()} method to get
- * the result of each subtask. If one of the subtasks fails then the other subtask
- * is cancelled (this will interrupt the thread executing the other subtask) and the
- * {@code join} method throws {@link FailedException} with the exception from
- * the failed subtask as the {@linkplain Throwable#getCause() cause}.
+ * <p> If both subtasks complete successfully then the {@code join} method completes
+ * normally and the main task uses the {@link Subtask#get() Subtask.get()} method to get
+ * the result of each subtask. If one of the subtasks fails then the other subtask is
+ * cancelled (this will interrupt the thread executing the other subtask) and the {@code
+ * join} method throws {@link FailedException} with the exception from the failed subtask
+ * as the {@linkplain Throwable#getCause() cause}.
  *
- * <p> A {@code StructuredTaskScope} may be opened with a {@link Joiner} that handles subtask
- * completion and produces the outcome (the result or an exception) for the {@link #join()
- * join} method. The {@code Joiner} interface defines static methods to create a
- * {@code Joiner} for common cases.
+ * <p> In the example, the subtasks produce results of different types ({@code String} and
+ * {@code Integer}). In other cases the subtasks may all produce results of the same type.
+ * If the example had used {@code StructuredTaskScope.<String>open()} then it could
+ * only be used to fork subtasks that return a {@code String} result.
  *
- * <p> A {@code Joiner} may <a id="CancelExecution"><em>cancel execution</em></a>
- * (sometimes called "short-circuiting") when some condition is reached that does not
- * require the result of subtasks that are still executing. Cancelling execution prevents
- * new threads from being started to execute further subtasks, {@linkplain Thread#interrupt()
- * interrupts} the threads executing subtasks that have not completed, and causes the
- * {@code join} method to wakeup with a result (or exception). In the above example,
- * the no-arg {@link #open() open} method created the {@code StructuredTaskScope} with a
- * {@code Joiner} that cancelled execution when any subtask failed.
+ * <h2>Joiners</h2>
  *
- * <p> The {@link #close() close} method always waits for threads executing subtasks to
- * finish, even if execution is cancelled, so it cannot continue beyond the {@code close}
- * method until the interrupted threads finish. Subtasks should be coded so that they
+ * <p> In the example above, the main task fails if any subtask fails. If all subtasks
+ * succeed then the {@code join} method completes normally. Other policy and outcome is
+ * supported by creating a {@code StructuredTaskScope} with a {@link Joiner} that
+ * implements the desired policy. A {@code Joiner} handles subtask completion and produces
+ * the outcome for the {@link #join() join} method. In the example above, {@code join}
+ * returns {@code null}. Depending on the {@code Joiner}, {@code join} may return a
+ * result, a stream of elements, or some other object. The {@code Joiner} interface defines
+ * factory methods to create {@code Joiner}s for some common cases.
+ *
+ * <p> A {@code Joiner} may <a id="CancelExecution"><em>cancel execution</em></a> (sometimes
+ * called "short-circuiting") when some condition is reached that does not require the
+ * result of subtasks that are still executing. Cancelling execution prevents new threads
+ * from being started to execute further subtasks, {@linkplain Thread#interrupt() interrupts}
+ * the threads executing subtasks that have not completed, and causes the {@code join}
+ * method to wakeup with the outcome (result or exception). In the above example, the
+ * outcome is that {@code join} completes with a result of {@code null} when all subtasks
+ * succeed. It cancels execution if any of the subtasks fail, throwing the exception from
+ * the first subtask that fails. Other {@code Joiner} implementations may return an object
+ * instead of {@code null} and may cancel execution or throw based on some other policy.
+ *
+ * <p> To allow for cancelling execution, subtasks must be coded so that they
  * finish as soon as possible when interrupted. Subtasks that do not respond to interrupt,
  * e.g. block on methods that are not interruptible, may delay the closing of a task scope
- * indefinitely.
+ * indefinitely. The {@link #close() close} method always waits for threads executing
+ * subtasks to finish, even if execution is cancelled, so execution cannot continue beyond
+ * the {@code close} method until the interrupted threads finish.
  *
  * <p> Now consider another example that also splits into two subtasks to concurrently
  * fetch resources. In this example, the code in the main task is only interested in the
