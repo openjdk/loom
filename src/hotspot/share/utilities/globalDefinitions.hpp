@@ -1358,7 +1358,7 @@ std::add_rvalue_reference_t<T> declval() noexcept;
 // handled.
 bool IEEE_subnormal_handling_OK();
 
-#if defined(AMD64) || defined (AARCH64)
+#if defined(AMD64) || defined (AARCH64) || defined (RISCV64)
 #define LOOM_MONITOR_SUPPORT true
 #define LOOM_MONITOR_SUPPORT_ONLY(code) code
 #define NOT_LOOM_MONITOR_SUPPORT(code)

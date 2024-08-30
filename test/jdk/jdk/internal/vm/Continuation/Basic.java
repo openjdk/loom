@@ -280,7 +280,7 @@ public class Basic {
 
     @Test
     public void testPinnedMonitor() {
-        if (Platform.isX64() || Platform.isAArch64()) return;
+        if (Platform.isX64() || Platform.isAArch64() || Platform.isRISCV64()) return;
 
         // Test pinning due to held monitor
         final AtomicReference<Continuation.Pinned> res = new AtomicReference<>();

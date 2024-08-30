@@ -2982,10 +2982,10 @@ static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont,
           use_cont_entry = true;
         }
       }
-#ifdef AARCH64
+#if defined (AARCH64) || defined (RISCV64)
       else {
         // Monitorenter case returning to c2 runtime stub requires extra
-        // adjustment on aarch64 (see push_preempt_rerun_adapter()).
+        // adjustment on aarch64 and riscv64 (see push_resume_adapter()).
         address pc1 = *(address*)(sp0 - frame::sender_sp_ret_address_offset());
         CodeBlob* cb = CodeCache::find_blob(pc1);
         assert(cb != nullptr, "should be either c1 or c2 runtime stub");
