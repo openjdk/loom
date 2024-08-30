@@ -25,7 +25,7 @@
  * @test
  * @summary Basic test for JFR jdk.VirtualThreadXXX events
  * @requires vm.continuations
- * @modules jdk.jfr java.base/java.lang:+open
+ * @modules jdk.jfr java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @run junit/othervm --enable-native-access=ALL-UNNAMED JfrEvents
  */

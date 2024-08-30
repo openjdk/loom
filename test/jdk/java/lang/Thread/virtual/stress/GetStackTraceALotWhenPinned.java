@@ -26,7 +26,7 @@
  * @bug 8322818
  * @summary Stress test Thread.getStackTrace on a virtual thread that is pinned
  * @requires vm.debug != true
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @run main/othervm --enable-native-access=ALL-UNNAMED GetStackTraceALotWhenPinned 500000
  */
@@ -34,7 +34,7 @@
 /*
  * @test
  * @requires vm.debug == true
- * @modules java.base/java.lang:+open
+ * @modules java.base/java.lang:+open jdk.managemtn
  * @library /test/lib
  * @run main/othervm/timeout=300 --enable-native-access=ALL-UNNAMED GetStackTraceALotWhenPinned 200000
  */
