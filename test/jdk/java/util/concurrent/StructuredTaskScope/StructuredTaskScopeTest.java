@@ -104,7 +104,7 @@ class StructuredTaskScopeTest {
      * Test that fork creates virtual threads when no ThreadFactory is configured.
      */
     @Test
-    void testForkCreateVirtualThread() throws Exception {
+    void testForkCreatesVirtualThread() throws Exception {
         Set<Thread> threads = ConcurrentHashMap.newKeySet();
         try (var scope = StructuredTaskScope.open(Joiner.awaitAll())) {
             for (int i = 0; i < 50; i++) {
@@ -339,7 +339,7 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test fork when the ThreadFactory rejects creating a thread.
+     * Test fork with a ThreadFactory that rejects creating a thread.
      */
     @Test
     void testForkRejectedExecutionException() {
