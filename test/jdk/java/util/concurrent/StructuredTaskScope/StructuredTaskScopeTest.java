@@ -1620,6 +1620,24 @@ class StructuredTaskScopeTest {
                 () -> StructuredTaskScope.open(Joiner.awaitAll(), cf -> cf.withThreadFactory(null)));
         assertThrows(NullPointerException.class,
                 () -> StructuredTaskScope.open(Joiner.awaitAll(), cf -> cf.withTimeout(null)));
+
+        // Joiner.onFork/onComplete
+        assertThrows(NullPointerException.class,
+                () -> Joiner.awaitAllSuccessfulOrThrow().onFork(null));
+        assertThrows(NullPointerException.class,
+                () -> Joiner.awaitAllSuccessfulOrThrow().onComplete(null));
+        assertThrows(NullPointerException.class,
+                () -> Joiner.awaitAll().onFork(null));
+        assertThrows(NullPointerException.class,
+                () -> Joiner.awaitAll().onComplete(null));
+        assertThrows(NullPointerException.class,
+                () -> Joiner.allSuccessfulOrThrow().onFork(null));
+        assertThrows(NullPointerException.class,
+                () -> Joiner.allSuccessfulOrThrow().onComplete(null));
+        assertThrows(NullPointerException.class,
+                () -> Joiner.anySuccessfulResultOrThrow().onFork(null));
+        assertThrows(NullPointerException.class,
+                () -> Joiner.anySuccessfulResultOrThrow().onComplete(null));
     }
 
     /**
