@@ -135,6 +135,10 @@ public class VThreadRunner {
 
     /**
      * Sets the virtual thread scheduler's target parallelism.
+     *
+     * <p> Tests using this method should use "{@code @modules jdk.management}" to help
+     * test selection.
+     *
      * @return the previous parallelism level
      */
     public static int setParallelism(int size) {
@@ -148,6 +152,10 @@ public class VThreadRunner {
      * Ensures that the virtual thread scheduler's target parallelism is at least
      * the given size. If the target parallelism is less than the given size then
      * it is changed to the given size.
+     *
+     * <p> Tests using this method should use "{@code @modules jdk.management}" to help
+     * test selection.
+     *
      * @return the previous parallelism level
      */
     public static int ensureParallelism(int size) {

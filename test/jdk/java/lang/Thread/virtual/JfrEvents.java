@@ -50,7 +50,7 @@ import jdk.jfr.consumer.RecordedEvent;
 import jdk.jfr.consumer.RecordingFile;
 
 import jdk.test.lib.thread.VThreadPinner;
-import jdk.test.lib.thread.VThreadRunner;
+import jdk.test.lib.thread.VThreadRunner;   // ensureParallelism requires jdk.management
 import jdk.test.lib.thread.VThreadScheduler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
@@ -62,11 +62,8 @@ class JfrEvents {
 
     @BeforeAll
     static void setup() {
-        int minParallelism = 2;
-        if (Thread.currentThread().isVirtual()) {
-            minParallelism++;
-        }
-        VThreadRunner.ensureParallelism(minParallelism);
+        // need at least two carriers to test pinning
+        VThreadRunner.ensureParallelism(2);
     }
 
     /**

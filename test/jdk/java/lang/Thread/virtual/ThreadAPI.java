@@ -64,7 +64,7 @@ import java.util.stream.Stream;
 import java.nio.channels.Selector;
 
 import jdk.test.lib.thread.VThreadPinner;
-import jdk.test.lib.thread.VThreadRunner;
+import jdk.test.lib.thread.VThreadRunner;   // ensureParallelism requires jdk.management
 import jdk.test.lib.thread.VThreadScheduler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
@@ -1085,7 +1085,7 @@ class ThreadAPI {
      * Test Thread.yield releases carrier thread.
      */
     @Test
-    void testYieldRelease() throws Exception {
+    void testYieldReleasesCarrier() throws Exception {
         assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
         var list = new CopyOnWriteArrayList<String>();
         try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
@@ -1095,6 +1095,37 @@ class ThreadAPI {
                 var child = factory.newThread(() -> {
                     list.add("B");
                     Thread.yield();
+                    list.add("B");
+                });
+                child.start();
+                Thread.yield();
+                list.add("A");
+                try { child.join(); } catch (InterruptedException e) { }
+            });
+            thread.start();
+            thread.join();
+        }
+        assertEquals(List.of("A", "B", "A", "B"), list);
+    }
+
+    /**
+     * Test Thread.yield releases carrier thread when virtual thread holds a monitor.
+     */
+    @Test
+    @DisabledIf("LockingMode#isLegacy")
+    void testYieldReleasesCarrierWhenHoldingMonitor() throws Exception {
+        assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
+        var list = new CopyOnWriteArrayList<String>();
+        try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
+            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
+            var lock = new Object();
+            var thread = factory.newThread(() -> {
+                list.add("A");
+                var child = factory.newThread(() -> {
+                    list.add("B");
+                    synchronized (lock) {
+                        Thread.yield();
+                    }
                     list.add("B");
                 });
                 child.start();
@@ -1133,37 +1164,6 @@ class ThreadAPI {
             thread.join();
         }
         assertEquals(List.of("A", "A", "B"), list);
-    }
-
-    /**
-     * Test Thread.yield releases carrier when virtual thread holds a monitor.
-     */
-    @Test
-    @DisabledIf("LockingMode#isLegacy")
-    void testYieldWhenHoldingMonitor() throws Exception {
-        assumeTrue(VThreadScheduler.supportsCustomScheduler(), "No support for custom schedulers");
-        var list = new CopyOnWriteArrayList<String>();
-        try (ExecutorService scheduler = Executors.newFixedThreadPool(1)) {
-            ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler);
-            var lock = new Object();
-            var thread = factory.newThread(() -> {
-                list.add("A");
-                var child = factory.newThread(() -> {
-                    list.add("B");
-                    synchronized (lock) {
-                        Thread.yield();
-                    }
-                    list.add("B");
-                });
-                child.start();
-                Thread.yield();
-                list.add("A");
-                try { child.join(); } catch (InterruptedException e) { }
-            });
-            thread.start();
-            thread.join();
-        }
-        assertEquals(List.of("A", "B", "A", "B"), list);
     }
 
     /**

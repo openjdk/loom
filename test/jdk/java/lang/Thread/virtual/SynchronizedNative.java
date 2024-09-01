@@ -66,11 +66,10 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import jdk.test.lib.thread.VThreadPinner;
-import jdk.test.lib.thread.VThreadRunner;
+import jdk.test.lib.thread.VThreadRunner;   // ensureParallelism requires jdk.management
 import jdk.test.lib.thread.VThreadScheduler;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -78,23 +77,12 @@ import org.junit.jupiter.params.provider.MethodSource;
 import static org.junit.jupiter.api.Assertions.*;
 
 class SynchronizedNative {
-    private static int initialParallelism;
 
     @BeforeAll
     static void setup() throws Exception {
-        // need at least two carriers when main thread is a virtual thread
-        if (Thread.currentThread().isVirtual()) {
-            initialParallelism = VThreadRunner.ensureParallelism(2);
-        }
+        // need at least two carriers to test pinning
+        VThreadRunner.ensureParallelism(2);
         System.loadLibrary("SynchronizedNative");
-    }
-
-    @AfterAll
-    static void finish() {
-        // restore parallelism if needed
-        if (initialParallelism > 0) {
-            VThreadRunner.setParallelism(initialParallelism);
-        }
     }
 
     /**

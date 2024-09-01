@@ -153,10 +153,8 @@ class MonitorEnterExit {
 
     @BeforeAll
     static void setup() {
-        // need >=2 carriers for testing pinning when main thread is a virtual thread
-        if (Thread.currentThread().isVirtual()) {
-            VThreadRunner.ensureParallelism(2);
-        }
+        // need >=2 carriers for tests that pin
+        VThreadRunner.ensureParallelism(2);
     }
 
     /**
@@ -336,13 +334,7 @@ class MonitorEnterExit {
      */
     @Test
     void testContendedEnterWhenPinnedHeldByVirtualThread() throws Exception {
-        // need at least two carrier threads
-        int previousParallelism = VThreadRunner.ensureParallelism(2);
-        try {
-            VThreadRunner.run(this::testEnterWithContentionWhenPinned);
-        } finally {
-            VThreadRunner.setParallelism(previousParallelism);
-        }
+        VThreadRunner.run(this::testEnterWithContentionWhenPinned);
     }
 
     /**
