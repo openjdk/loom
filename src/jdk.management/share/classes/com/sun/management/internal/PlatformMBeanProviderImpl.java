@@ -168,18 +168,20 @@ public final class PlatformMBeanProviderImpl extends PlatformMBeanProvider {
          * VirtualThreadSchedulerMXBean.
          */
         initMBeanList.add(new PlatformComponent<VirtualThreadSchedulerMXBean>() {
-            private final Set<String> virtualThreadSchedulerMXBeanInterfaceNames =
+            private final Set<Class<? extends VirtualThreadSchedulerMXBean>> mbeanInterfaces =
+                    Set.of(VirtualThreadSchedulerMXBean.class);
+            private final Set<String> mbeanInterfaceNames =
                     Set.of(VirtualThreadSchedulerMXBean.class.getName());
             private VirtualThreadSchedulerMXBean impl;
 
             @Override
             public Set<Class<? extends VirtualThreadSchedulerMXBean>> mbeanInterfaces() {
-                return Set.of(VirtualThreadSchedulerMXBean.class);
+                return mbeanInterfaces;
             }
 
             @Override
             public Set<String> mbeanInterfaceNames() {
-                return virtualThreadSchedulerMXBeanInterfaceNames;
+                return mbeanInterfaceNames;
             }
 
             @Override
