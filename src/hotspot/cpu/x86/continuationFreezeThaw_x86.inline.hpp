@@ -315,25 +315,14 @@ inline intptr_t* ThawBase::push_resume_adapter(frame& top) {
   return sp;
 }
 
-inline intptr_t* ThawBase::push_resume_monitor_operation(stackChunkOop chunk) {
+inline intptr_t* ThawBase::push_cleanup_continuation() {
   frame enterSpecial = new_entry_frame();
   intptr_t* sp = enterSpecial.sp();
 
-  // First push the return barrier frame
-  sp -= frame::metadata_words;
-  sp[1] = (intptr_t)StubRoutines::cont_returnBarrier();
-  sp[0] = (intptr_t)enterSpecial.fp();
-
-  // Now push the ObjectWaiter*
-  sp -= frame::metadata_words;
-  sp[1] = (intptr_t)chunk->object_waiter(); // alignment
-  sp[0] = (intptr_t)chunk->object_waiter();
-
-  // Finally arrange to return to the resume_monitor_operation stub
-  sp[-1] = (intptr_t)StubRoutines::cont_resume_monitor_operation();
+  sp[-1] = (intptr_t)ContinuationEntry::cleanup_pc();
   sp[-2] = (intptr_t)enterSpecial.fp();
 
-  log_develop_trace(continuations, preempt)("push_resume_monitor_operation initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT, p2i(sp + 2 * frame::metadata_words), p2i(sp));
+  log_develop_trace(continuations, preempt)("push_cleanup_continuation initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT, p2i(sp + 2 * frame::metadata_words), p2i(sp));
   return sp;
 }
 

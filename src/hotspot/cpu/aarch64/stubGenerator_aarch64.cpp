@@ -7166,7 +7166,7 @@ class StubGenerator: public StubCodeGenerator {
     __ bind(preemption_cancelled);
     __ strb(zr, Address(rthread, JavaThread::preemption_cancelled_offset()));
     __ lea(rfp, Address(sp, checked_cast<int32_t>(ContinuationEntry::size())));
-    __ lea(rscratch1, ExternalAddress((address)&ContinuationEntry::_thaw_call_pc));
+    __ lea(rscratch1, ExternalAddress(ContinuationEntry::thaw_call_pc_address()));
     __ ldr(rscratch1, Address(rscratch1));
     __ br(rscratch1);
 
@@ -7185,51 +7185,6 @@ class StubGenerator: public StubCodeGenerator {
     // so that the comparison fails and the skip is not attempted in case the pc was indeed changed.
     __ movptr(r20, NULL_WORD);
 
-    __ leave();
-    __ ret(lr);
-
-    return start;
-  }
-
-  address generate_cont_resume_monitor_operation() {
-    if (!Continuations::enabled()) return nullptr;
-    StubCodeMark mark(this, "StubRoutines","Continuation resume monitor operation");
-    address start = __ pc();
-
-    const Register waiter_reg = c_rarg1;
-    __ ldr(waiter_reg, __ post(sp, 2 * wordSize));
-
-#ifdef ASSERT
-    { Label L;
-      __ cbnz(waiter_reg, L);
-      __ stop("ObjectMonitor to use is null");
-      __ bind(L);
-    }
-#endif // ASSERT
-
-    __ set_last_Java_frame(sp, rfp, lr, rscratch1);
-    __ mov(c_rarg0, rthread);
-    __ rt_call(CAST_FROM_FN_PTR(address, SharedRuntime::resume_monitor_operation));
-    __ reset_last_Java_frame(true);
-
-    Label failAcquire;
-    __ ldrb(rscratch1, Address(rthread, JavaThread::preempting_offset()));
-    __ cbnz(rscratch1, failAcquire);
-    // We have the lock now, just return to caller (we will actually hit the
-    // return barrier to thaw more frames)
-
-    // ThawBase::push_resume_monitor_operation set things up so that
-    // SP now points to {fp, lr}.
-    __ ldp(rfp, lr, Address(__ post(sp, 2 * wordSize)));
-    __ ret(lr);
-
-    __ bind(failAcquire);
-    __ strb(/*false*/zr, Address(rthread, JavaThread::preempting_offset()));
-    // Set sp to enterSpecial frame
-    __ ldr(rscratch1, Address(rthread, JavaThread::cont_entry_offset()));
-    __ mov(sp, rscratch1);
-    // Remove enterSpecial frame from the stack and return to Continuation.run()
-    SharedRuntime::continuation_enter_cleanup(_masm);
     __ leave();
     __ ret(lr);
 
@@ -8297,7 +8252,6 @@ class StubGenerator: public StubCodeGenerator {
     StubRoutines::_cont_returnBarrier = generate_cont_returnBarrier();
     StubRoutines::_cont_returnBarrierExc = generate_cont_returnBarrier_exception();
     StubRoutines::_cont_preempt_stub = generate_cont_preempt_stub();
-    StubRoutines::_cont_resume_monitor_operation = generate_cont_resume_monitor_operation();
     StubRoutines::_cont_resume_compiler_adapter = generate_cont_resume_compiler_adapter();
   }
 

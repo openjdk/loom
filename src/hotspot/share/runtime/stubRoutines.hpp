@@ -292,7 +292,6 @@ class StubRoutines: AllStatic {
   static address _cont_returnBarrier;
   static address _cont_returnBarrierExc;
   static address _cont_preempt_stub;
-  static address _cont_resume_monitor_operation;
   static address _cont_resume_compiler_adapter;
 
   // Vector Math Routines
@@ -502,7 +501,6 @@ class StubRoutines: AllStatic {
   static address cont_returnBarrier()  { return _cont_returnBarrier; }
   static address cont_returnBarrierExc(){return _cont_returnBarrierExc; }
   static address cont_preempt_stub()   { return _cont_preempt_stub; }
-  static address cont_resume_monitor_operation() { return _cont_resume_monitor_operation; }
   static address cont_resume_compiler_adapter()  { return _cont_resume_compiler_adapter; }
 
   static address upcall_stub_exception_handler() {

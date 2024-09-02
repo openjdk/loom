@@ -1956,15 +1956,6 @@ JRT_BLOCK_ENTRY(void, SharedRuntime::complete_monitor_locking_C(oopDesc* obj, Ba
   SharedRuntime::monitor_enter_helper(obj, lock, current);
 JRT_END
 
-JRT_BLOCK_ENTRY(void, SharedRuntime::resume_monitor_operation(JavaThread* current, ObjectWaiter* node))
-  assert(current == JavaThread::current(), "invariant");
-  ObjectMonitor* monitor = node->monitor();
-  assert(!monitor->is_owner(current), "invariant");
-
-  monitor->resume_operation(current, node);
-  assert(monitor->is_owner(current) || current->preempting(), "invariant");
-JRT_END
-
 void SharedRuntime::monitor_exit_helper(oopDesc* obj, BasicLock* lock, JavaThread* current) {
   assert(JavaThread::current() == current, "invariant");
   // Exit must be non-blocking, and therefore no exceptions can be thrown.

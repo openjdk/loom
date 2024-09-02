@@ -38,6 +38,7 @@ class ObjectMonitor;
 class ObjectMonitorContentionMark;
 class ParkEvent;
 class BasicLock;
+class ContinuationWrapper;
 
 // ObjectWaiter serves as a "proxy" or surrogate thread.
 // TODO-FIXME: Eliminate ObjectWaiter and use the thread-specific
@@ -386,7 +387,7 @@ class ObjectMonitor : public CHeapObj<mtObjectMonitor> {
   bool      spin_enter(JavaThread* current);
   void      enter_with_contention_mark(JavaThread* current, ObjectMonitorContentionMark& contention_mark);
   void      exit(JavaThread* current, bool not_suspended = true);
-  void      resume_operation(JavaThread* current, ObjectWaiter* node);
+  bool      resume_operation(JavaThread* current, ObjectWaiter* node, ContinuationWrapper& cont);
   void      wait(jlong millis, bool interruptible, TRAPS);
   void      notify(TRAPS);
   void      notifyAll(TRAPS);
@@ -411,7 +412,7 @@ class ObjectMonitor : public CHeapObj<mtObjectMonitor> {
 
   bool      VThreadMonitorEnter(JavaThread* current, ObjectWaiter* node = nullptr);
   void      VThreadWait(JavaThread* current, jlong millis);
-  bool      VThreadWaitReenter(JavaThread* current, ObjectWaiter* node);
+  bool      VThreadWaitReenter(JavaThread* current, ObjectWaiter* node, ContinuationWrapper& cont);
   void      VThreadEpilog(JavaThread* current, ObjectWaiter* node);
 
   enum class TryLockResult { Interference = -1, HasOwner = 0, Success = 1 };

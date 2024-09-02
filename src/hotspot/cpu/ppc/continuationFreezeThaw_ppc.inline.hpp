@@ -552,7 +552,7 @@ inline intptr_t* ThawBase::push_resume_adapter(frame& top, bool is_interpreted_f
   return nullptr;
 }
 
-inline intptr_t* ThawBase::push_resume_monitor_operation(stackChunkOop chunk) {
+inline intptr_t* ThawBase::push_cleanup_continuation() {
   Unimplemented();
   return nullptr;
 }

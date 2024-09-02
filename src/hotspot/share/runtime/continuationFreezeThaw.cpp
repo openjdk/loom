@@ -1923,7 +1923,7 @@ protected:
 
   intptr_t* handle_preempted_continuation(intptr_t* sp, int preempt_kind, bool fast_case);
   inline intptr_t* push_resume_adapter(frame& top);
-  inline intptr_t* push_resume_monitor_operation(stackChunkOop chunk);
+  inline intptr_t* push_cleanup_continuation();
   inline void fix_native_wrapper_return_pc_pd(frame& top);
   void throw_interrupted_exception(JavaThread* current, frame& top);
 
@@ -2199,7 +2199,15 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
   if (preempted_case) {
     if (chunk->object_waiter() != nullptr) {
       assert(chunk->current_pending_monitor() != nullptr || chunk->current_waiting_monitor() != nullptr, "");
-      return push_resume_monitor_operation(chunk);
+      ObjectWaiter* waiter = chunk->object_waiter();
+      ObjectMonitor* mon = waiter->monitor();
+
+      bool mon_acquired = mon->resume_operation(_thread, waiter, _cont);
+      assert(!mon_acquired || mon->is_owner(_thread), "invariant");
+      if (!mon_acquired) {
+        return push_cleanup_continuation();
+      }
+      chunk = _cont.tail();  // reload oop in case of safepoint in resume_operation
     }
     retry_fast_path = true;
     relativize_chunk_concurrently(chunk);
@@ -2213,7 +2221,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
   // First thaw after freeze. If there were oops in the stacklock
   // during freeze, restore them now.
   if (chunk->lockstack_size() > 0) {
-    assert(kind == Continuation::thaw_top || preempted_case, "");
+    assert(kind == Continuation::thaw_top, "");
     int lockStackSize = chunk->lockstack_size();
     assert(lockStackSize > 0, "should be");
 
@@ -2995,10 +3003,6 @@ static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont,
       }
 #endif
     }
-  } else if (pc0 == StubRoutines::cont_resume_monitor_operation()) {
-    // Redoing monitor operation after being preempted case. We skip
-    // the adapter + data pushed into the stack (see push_resume_monitor_operation()).
-    use_cont_entry = true;
   }
 
   set_anchor(thread, use_cont_entry ? cont.entrySP() : sp0, use_cont_entry ? cont.entryPC() : nullptr);

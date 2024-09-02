@@ -1172,6 +1172,7 @@ static void gen_continuation_enter(MacroAssembler* masm,
   __ post_call_nop();
 
   __ bind(exit);
+  ContinuationEntry::_cleanup_offset = __ pc() - start;
   continuation_enter_cleanup(masm);
   __ leave();
   __ ret(lr);
