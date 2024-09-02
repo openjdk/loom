@@ -186,7 +186,6 @@ address StubRoutines::_cont_thaw          = nullptr;
 address StubRoutines::_cont_returnBarrier = nullptr;
 address StubRoutines::_cont_returnBarrierExc = nullptr;
 address StubRoutines::_cont_preempt_stub = nullptr;
-address StubRoutines::_cont_resume_compiler_adapter = nullptr;
 
 address StubRoutines::_upcall_stub_exception_handler = nullptr;
 

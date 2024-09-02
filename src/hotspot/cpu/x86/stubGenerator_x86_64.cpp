@@ -3829,24 +3829,6 @@ address StubGenerator::generate_cont_preempt_stub() {
   return start;
 }
 
-address StubGenerator::generate_cont_resume_compiler_adapter() {
-  if (!Continuations::enabled()) return nullptr;
-  StubCodeMark mark(this, "StubRoutines", "Continuation resume compiler adapter");
-  address start = __ pc();
-
-  // The safepoint blob handler expects that rbx, being a callee saved register, will be preserved
-  // during the VM call. It is used to check if the return pc back to Java was modified in the runtime.
-  // If it wasn't, the return pc is modified so on return the poll instruction is skipped. Saving this
-  // additional value of rbx during freeze will complicate too much the code, so we just zero it here
-  // so that the comparison fails and the skip is not attempted in case the pc was indeed changed.
-  __ movptr(rbx, NULL_WORD);
-
-  __ pop(rbp);
-  __ ret(0);
-
-  return start;
-}
-
 // exception handler for upcall stubs
 address StubGenerator::generate_upcall_stub_exception_handler() {
   StubCodeMark mark(this, "StubRoutines", "upcall stub exception handler");
@@ -3998,7 +3980,6 @@ void StubGenerator::generate_continuation_stubs() {
   StubRoutines::_cont_returnBarrier = generate_cont_returnBarrier();
   StubRoutines::_cont_returnBarrierExc = generate_cont_returnBarrier_exception();
   StubRoutines::_cont_preempt_stub = generate_cont_preempt_stub();
-  StubRoutines::_cont_resume_compiler_adapter = generate_cont_resume_compiler_adapter();
 }
 
 void StubGenerator::generate_final_stubs() {

@@ -181,7 +181,7 @@ static void verify_continuation(oop continuation) { Continuation::debug_verify_c
 static void do_deopt_after_thaw(JavaThread* thread);
 static bool do_verify_after_thaw(JavaThread* thread, stackChunkOop chunk, outputStream* st);
 static void log_frames(JavaThread* thread);
-static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont, intptr_t* sp);
+static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont, intptr_t* sp, bool preempted);
 static void print_frame_layout(const frame& f, bool callee_complete, outputStream* st = tty);
 
 #define assert_pfl(p, ...) \
@@ -2814,11 +2814,12 @@ static inline intptr_t* thaw_internal(JavaThread* thread, const Continuation::th
   clear_anchor(thread);
 #endif
 
+  DEBUG_ONLY(bool preempted = cont.is_preempted();)
   Thaw<ConfigT> thw(thread, cont);
   intptr_t* const sp = thw.thaw(kind);
   assert(is_aligned(sp, frame::frame_alignment), "");
 
-  DEBUG_ONLY(log_frames_after_thaw(thread, cont, sp);)
+  DEBUG_ONLY(log_frames_after_thaw(thread, cont, sp, preempted);)
 
   CONT_JFR_ONLY(thw.jfr_info().post_jfr_event(&event, cont.continuation(), thread);)
 
@@ -2960,48 +2961,53 @@ static void log_frames(JavaThread* thread) {
   ls.print_cr("======= end frames =========");
 }
 
-static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont, intptr_t* sp) {
+static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont, intptr_t* sp, bool preempted) {
   intptr_t* sp0 = sp;
   address pc0 = *(address*)(sp - frame::sender_sp_ret_address_offset());
   bool use_cont_entry = false;
 
   // Preemption cases need to use and adjusted version of sp.
-  if (pc0 == Interpreter::cont_resume_interpreter_adapter() ||
-      pc0 == StubRoutines::cont_resume_compiler_adapter()) {
-    // Resuming after being preempted case. We skip the adapter pushed
-    // into the stack (see push_preempt_rerun_adapter()).
-    sp0 += frame::metadata_words;
-
-    if (pc0 == StubRoutines::cont_resume_compiler_adapter()) {
-      address pc1 = *(address*)(sp0 - frame::sender_sp_ret_address_offset());
-      if (pc1 == SharedRuntime::native_frame_resume_entry()) {
-        // When top is the compiled native wrapper (Object.wait()) the pc
-        // would have been modified from its original value to return to
-        // the correct place. But that means we won't find the oopMap for
-        // that fixed pc when getting the sender which will trigger asserts.
-        // So just start walking the frames from the sender instead.
-        CodeBlob* cb = CodeCache::find_blob(pc1);
-        assert(cb->as_nmethod()->method()->is_object_wait0(), "");
-        sp0 += cb->frame_size();
-        if (sp0 == cont.entrySP()) {
-          // sp0[-1] will be the return barrier pc. This is a stub, i.e. associated
-          // codeblob has _frame_size = 0. Force using cont.entryPC() to avoid
-          // asserts while trying to get the sender frame.
-          use_cont_entry = true;
+  if (preempted) {
+    if (sp0 == cont.entrySP()) {
+      // Still preempted (monitor not acquired) so no frames were thawed.
+      assert(cont.is_preempted(), "");
+      use_cont_entry = true;
+    } else {
+      // Resuming after being preempted.
+      assert(!cont.is_preempted(), "");
+      if (pc0 == Interpreter::cont_resume_interpreter_adapter()) {
+        // Interpreter case:
+        // We skip the adapter pushed into the stack (see push_resume_adapter()).
+        sp0 += frame::metadata_words;
+      } else {
+        // Compiled case:
+#if defined (AMD64)
+        if (pc0 == SharedRuntime::native_frame_resume_entry()) {
+          // For x64, when top is the compiled native wrapper (Object.wait())
+          // the pc would have been modified from its original value to return
+          // to the correct place. But that means we won't find the oopMap for
+          // that fixed pc when getting the sender which will trigger asserts.
+          // So just start walking the frames from the sender instead.
+          CodeBlob* cb = CodeCache::find_blob(pc0);
+          assert(cb->as_nmethod()->method()->is_object_wait0(), "");
+          sp0 += cb->frame_size();
+          if (sp0 == cont.entrySP()) {
+            // sp0[-1] will be the return barrier pc. This is a stub, i.e. associated
+            // codeblob has _frame_size = 0. Force using cont.entryPC() to avoid
+            // asserts while trying to get the sender frame.
+            use_cont_entry = true;
+          }
         }
-      }
-#if defined (AARCH64) || defined (RISCV64)
-      else {
-        // Monitorenter case returning to c2 runtime stub requires extra
-        // adjustment on aarch64 and riscv64 (see push_resume_adapter()).
-        address pc1 = *(address*)(sp0 - frame::sender_sp_ret_address_offset());
-        CodeBlob* cb = CodeCache::find_blob(pc1);
+#elif defined (AARCH64) || defined (RISCV64)
+        CodeBlob* cb = CodeCache::find_blob(pc0);
         assert(cb != nullptr, "should be either c1 or c2 runtime stub");
         if (cb->frame_size() == 2) {
+          // Returning to c2 runtime stub requires extra adjustment on aarch64
+          // and riscv64 (see push_resume_adapter()).
           sp0 += frame::metadata_words;
         }
-      }
 #endif
+      }
     }
   }
 

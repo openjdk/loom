@@ -302,16 +302,18 @@ inline intptr_t* ThawBase::push_resume_adapter(frame& top) {
   assert(sp[-2] == link_addr, "wrong link address: " INTPTR_FORMAT " != " INTPTR_FORMAT, sp[-2], link_addr);
 #endif
 
-  intptr_t* fp = sp - frame::sender_sp_offset;
-  address pc = top.is_interpreted_frame() ? Interpreter::cont_resume_interpreter_adapter()
-                                          : StubRoutines::cont_resume_compiler_adapter();
+  // Nothing to do for compiled case.
+  if (top.is_interpreted_frame()) {
+    intptr_t* fp = sp - frame::sender_sp_offset;
+    address pc = Interpreter::cont_resume_interpreter_adapter();
 
-  sp -= frame::metadata_words;
-  *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
-  *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
+    sp -= frame::metadata_words;
+    *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
+    *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
 
-  log_develop_trace(continuations, preempt)("push_resume_%s_adapter() initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT,
-    top.is_interpreted_frame() ? "interpreter" : "compiler", p2i(sp + frame::metadata_words), p2i(sp), p2i(fp));
+    log_develop_trace(continuations, preempt)("push_resume_adapter(): initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT
+                                              " fp: " INTPTR_FORMAT, p2i(sp + frame::metadata_words), p2i(sp), p2i(fp));
+  }
   return sp;
 }
 

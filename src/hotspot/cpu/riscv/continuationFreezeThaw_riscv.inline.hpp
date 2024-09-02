@@ -323,34 +323,31 @@ inline intptr_t* ThawBase::push_resume_adapter(frame& top) {
   assert(sp[-2] == link_addr + 16, "wrong link address: " INTPTR_FORMAT " != " INTPTR_FORMAT, sp[-2], link_addr + 16);
 #endif
 
-  bool interpreted = top.is_interpreted_frame();
-  if (!interpreted && cb->frame_size() == 2) {
+  if (top.is_interpreted_frame()) {
+    intptr_t* fp = sp - frame::sender_sp_offset;
+    address pc = Interpreter::cont_resume_interpreter_adapter();
+
+    sp -= frame::metadata_words;
+    *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
+    *(intptr_t**)(sp - 2) = fp;
+
+    log_develop_trace(continuations, preempt)("push_resume_adapter(): initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT
+                                              " fp: " INTPTR_FORMAT, p2i(sp + frame::metadata_words), p2i(sp), p2i(fp));
+  } else if (cb->frame_size() == 2) {
     // C2 runtime stub case. For riscv64 the real size of the c2 runtime stub is 2 words bigger
     // than what we think, i.e. size is 4. This is because the _last_Java_sp is not set to the
     // sp right before making the call to the VM, but rather it is artificially set 2 words above
     // this real sp so that we can store the return address at last_Java_sp[-1], and keep this
     // property where we can retrieve the last_Java_pc from the last_Java_sp. But that means that
     // once we return to the runtime stub, the code will adjust sp according to this real size.
-    // So we must adjust the frame size back here. We just copy ra/fp again. These 2 top words
-    // will be the ones popped in generate_cont_resume_compiler_adapter(). The other 2 words
-    // will just be discarded once back in the runtime stub (add sp, sp, #0x10).
+    // So we must adjust the frame size back here and we copy ra/fp again.
     sp -= 2;
     sp[-2] = sp[0];
     sp[-1] = sp[1];
+
+    log_develop_trace(continuations, preempt)("adjusted sp for c2 runtime stub, initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT
+                                              " fp: " INTPTR_FORMAT, p2i(sp + frame::metadata_words), p2i(sp), sp[-2]);
   }
-
-  intptr_t* fp = sp - frame::sender_sp_offset;
-  address pc = interpreted ? Interpreter::cont_resume_interpreter_adapter()
-                           : StubRoutines::cont_resume_compiler_adapter();
-
-  sp -= frame::metadata_words;
-  *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
-  *(intptr_t**)(sp - 2) = fp;
-
-  log_develop_trace(continuations, preempt)(
-    "push_resume_%s_adapter() initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT " fp: " INTPTR_FORMAT,
-    interpreted ? "interpreter" : "compiler", p2i(sp + frame::metadata_words), p2i(sp), p2i(fp));
-
   return sp;
 }
 

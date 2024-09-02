@@ -7173,24 +7173,6 @@ class StubGenerator: public StubCodeGenerator {
     return start;
   }
 
-  address generate_cont_resume_compiler_adapter() {
-    if (!Continuations::enabled()) return nullptr;
-    StubCodeMark mark(this, "StubRoutines", "Continuation resume compiler adapter");
-    address start = __ pc();
-
-    // The safepoint blob handler expects that r20, being a callee saved register, will be preserved
-    // during the VM call. It is used to check if the return pc back to Java was modified in the runtime.
-    // If it wasn't, the return pc is modified so on return the poll instruction is skipped. Saving this
-    // additional value of r20 during freeze will complicate too much the code, so we just zero it here
-    // so that the comparison fails and the skip is not attempted in case the pc was indeed changed.
-    __ movptr(r20, NULL_WORD);
-
-    __ leave();
-    __ ret(lr);
-
-    return start;
-  }
-
   // In sun.security.util.math.intpoly.IntegerPolynomial1305, integers
   // are represented as long[5], with BITS_PER_LIMB = 26.
   // Pack five 26-bit limbs into three 64-bit registers.
@@ -8252,7 +8234,6 @@ class StubGenerator: public StubCodeGenerator {
     StubRoutines::_cont_returnBarrier = generate_cont_returnBarrier();
     StubRoutines::_cont_returnBarrierExc = generate_cont_returnBarrier_exception();
     StubRoutines::_cont_preempt_stub = generate_cont_preempt_stub();
-    StubRoutines::_cont_resume_compiler_adapter = generate_cont_resume_compiler_adapter();
   }
 
   void generate_final_stubs() {
