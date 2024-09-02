@@ -32,28 +32,20 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
+import jdk.internal.misc.Unsafe;
 import sun.nio.ch.Poller;
 
 /**
  * The implementation for the jcmd Thread.vthread_summary diagnostic command.
  */
 public class VThreadSummary {
+    private static final Unsafe U = Unsafe.getUnsafe();
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
     // maximum number of thread containers to print
     private static final int MAX_THREAD_CONTAINERS = 256;
 
-    // set to true if I/O poller in use
-    private static volatile boolean pollerInitialized;
-
     private VThreadSummary() { }
-
-    /**
-     * Invoked by the poller I/O mechanism when it initializes.
-     */
-    public static void pollerInitialized() {
-        pollerInitialized = true;
-    }
 
     /**
      * Invoked by the VM to print virtual thread summary information.
@@ -71,7 +63,7 @@ public class VThreadSummary {
         sb.append(System.lineSeparator());
 
         // print I/O pollers if initialized
-        if (pollerInitialized) {
+        if (!U.shouldBeInitialized(Poller.class)) {
             printPollers(sb);
         }
 
