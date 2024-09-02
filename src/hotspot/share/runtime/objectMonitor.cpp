@@ -1744,6 +1744,7 @@ static void vthread_monitor_waited_event(JavaThread *current, ObjectWaiter* node
       post_monitor_wait_event(event, node->_monitor, node->_notifier_tid, timeout, timed_out);
     }
     if (JvmtiExport::should_post_monitor_waited()) {
+      ThreadOnMonitorWaitedEvent tmwe(current);
       JvmtiExport::vthread_post_monitor_waited(current, node->_monitor, timed_out);
     }
   JRT_BLOCK_END

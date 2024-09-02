@@ -458,6 +458,7 @@ JavaThread::JavaThread(MEMFLAGS flags) :
   _is_disable_suspend(false),
   _VTMS_transition_mark(false),
   _pending_jvmti_unmount_event(false),
+  _on_monitor_waited_event(false),
   _contended_entered_monitor(nullptr),
 #ifdef ASSERT
   _is_VTMS_transition_disabler(false),
