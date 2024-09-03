@@ -743,19 +743,19 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
 
         /**
          * {@return a new Joiner object that yields a stream of all subtasks when all
-         * subtasks complete successfully, or throws if any subtask fails}
-         * If any subtask fails then execution is cancelled.
+         * subtasks complete successfully}
+         * This method throws, and <a href="StructuredTaskScope.html#CancelExecution">
+         * execution is cancelled</a>, if any subtask fails.
          *
          * <p> If all subtasks complete successfully, the joiner's {@link Joiner#result()}
          * method returns a stream of all subtasks in the order that they were forked.
          * If any subtask failed then the {@code result} method throws the exception from
          * the first subtask to fail.
          *
-         * @apiNote This joiner is intended for cases where the results for all subtasks
-         * are required ("invoke all"); if any subtask fails then the results of other
-         * unfinished subtasks are no longer needed. A typical usage will be when the
-         * subtasks return results of the same type, the returned stream of forked
-         * subtasks can be used to get the results.
+         * @apiNote Joiners returned by this method are suited to cases where all subtasks
+         * return a result of the same type. Joiners returned by {@link
+         * #awaitAllSuccessfulOrThrow()} are suited to cases where the subtasks return
+         * results of different types.
          *
          * @param <T> the result type of subtasks
          */
@@ -764,18 +764,15 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         }
 
         /**
-         * {@return a new Joiner object that yields the result of a subtask that completed
-         * successfully, or throws if all subtasks fail} If any subtask completes
-         * successfully then execution is cancelled.
+         * {@return a new Joiner object that yields the result of any subtask that
+         * completed successfully}
+         * This method throws, and <a href="StructuredTaskScope.html#CancelExecution">
+         * execution is cancelled</a>, if all subtasks fail.
          *
          * <p> The joiner's {@link Joiner#result()} method returns the result of a subtask
          * that completed successfully. If all subtasks fail then the {@code result} method
          * throws the exception from one of the failed subtasks. The {@code result} method
          * throws {@code NoSuchElementException} if no subtasks were forked.
-         *
-         * @apiNote This joiner is intended for cases where the result of any subtask will
-         * do ("invoke any") and where the results of other unfinished subtasks are no
-         * longer needed.
          *
          * @param <T> the result type of subtasks
          */
@@ -784,18 +781,17 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         }
 
         /**
-         * {@return a new Joiner object that waits for all successful subtasks. It
-         * <a href="StructuredTaskScope.html#CancelExecution">cancels execution</a> if
-         * any subtask fails}
+         * {@return a new Joiner object that waits for subtasks to complete successfully}
+         * This method throws, and <a href="StructuredTaskScope.html#CancelExecution">
+         * execution is cancelled</a>, if any subtask fails.
          *
          * <p> The joiner's {@link Joiner#result() result} method returns {@code null}
          * if all subtasks complete successfully, or throws the exception from the first
          * subtask to fail.
          *
-         * @apiNote This joiner is intended for cases where the results for all subtasks
-         * are required ("invoke all"), and where the code {@linkplain #fork(Callable)
-         * forking} subtasks keeps a reference to the {@linkplain Subtask Subtask} objects.
-         * A typical usage will be when subtasks return results of different types.
+         * @apiNote Joiners returned by this method are suited to cases where subtasks
+         * return results of different types. Joiners returned by {@link #allSuccessfulOrThrow()}
+         * are suited to cases where the subtasks return a result of the same type.
          *
          * @param <T> the result type of subtasks
          */
@@ -804,11 +800,12 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         }
 
         /**
-         * {@return a new Joiner object that waits for all subtasks}
+         * {@return a new Joiner object that waits for all subtasks to complete}
+         * This method does not cancel execution if a subtask fails.
          *
          * <p> The joiner's {@link Joiner#result() result} method returns {@code null}.
          *
-         * @apiNote This joiner is intended for cases where subtasks make use of
+         * @apiNote This Joiner can be useful for cases where subtasks make use of
          * <em>side-effects</em> rather than return results or fail with exceptions.
          * The {@link #fork(Runnable) fork(Runnable)} method can be used to fork subtasks
          * that do not return a result.
@@ -826,9 +823,9 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         }
 
         /**
-         * {@return a new Joiner object that yields a stream of all subtasks, cancelling
-         * execution when evaluating a completed subtask with the given predicate returns
-         * {@code true}}
+         * {@return a new Joiner object that yields a stream of all subtasks when all
+         * subtasks complete or <a href="StructuredTaskScope.html#CancelExecution">
+         * execution is cancelled</a>}
          *
          * <p> The joiner's {@link Joiner#onComplete(Subtask)} method invokes the
          * predicate's {@link Predicate#test(Object) test} method with the subtask that
@@ -1149,6 +1146,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
             }
         }
 
+        // force owner to join
         state = ST_FORKED;
         return subtask;
     }
@@ -1203,7 +1201,6 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * @throws TimeoutException if a timeout is set and the timeout expires before or
      * while waiting
      * @throws InterruptedException if interrupted while waiting
-     * @since 24
      */
     public R join() throws InterruptedException {
         ensureOwner();
