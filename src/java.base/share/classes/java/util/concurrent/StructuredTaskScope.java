@@ -399,16 +399,6 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
-     * Throws IllegalStateException if the task scope is closed.
-     */
-    private void ensureOpen() {
-        assert Thread.currentThread() == flock.owner();
-        if (state == ST_CLOSED) {
-            throw new IllegalStateException("Task scope is closed");
-        }
-    }
-
-    /**
      * Throws IllegalStateException if the already joined or task scope is closed.
      */
     private void ensureNotJoined() {
@@ -631,8 +621,8 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * </ul>
      *
      * <p> In addition to the methods to create {@code Joiner} objects for common cases,
-     * the {@link #all(Predicate) all(Predicate)} method is defined to create a {@code
-     * Joiner} that yields a stream of all subtasks. It is created with a {@link
+     * the {@link #allUntil(Predicate) allUntil(Predicate)} method is defined to create a
+     * {@code Joiner} that yields a stream of all subtasks. It is created with a {@link
      * Predicate Predicate} that determines if execution should continue or be cancelled.
      * This {@code Joiner} can be built upon to create custom policies that cancel
      * execution based on some condition.
@@ -825,7 +815,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         /**
          * {@return a new Joiner object that yields a stream of all subtasks when all
          * subtasks complete or <a href="StructuredTaskScope.html#CancelExecution">
-         * execution is cancelled</a>}
+         * execution is cancelled</a> by a predicate}
          *
          * <p> The joiner's {@link Joiner#onComplete(Subtask)} method invokes the
          * predicate's {@link Predicate#test(Object) test} method with the subtask that
@@ -853,13 +843,13 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          *         }
          *     }
          *
-         *     var joinPolicy = Joiner.all(new CancelAfterTwoFailures<String>());
+         *     var joiner = Joiner.all(new CancelAfterTwoFailures<String>());
          * }
          *
          * @param isDone the predicate to evaluate completed subtasks
          * @param <T> the result type of subtasks
          */
-        static <T> Joiner<T, Stream<Subtask<T>>> all(Predicate<Subtask<? extends T>> isDone) {
+        static <T> Joiner<T, Stream<Subtask<T>>> allUntil(Predicate<Subtask<? extends T>> isDone) {
             return new AllSubtasks<>(isDone);
         }
     }
@@ -1227,49 +1217,6 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         } catch (Throwable e) {
             throw new FailedException(e);
         }
-    }
-
-    /**
-     * Cancels execution. This method allows the task scope owner to explicitly
-     * <a href="#CancelExecution">cancel execution</a>. If not already cancelled, this
-     * method {@linkplain Thread#interrupt() interrupts} the threads executing subtasks
-     * that have not completed, and prevents new threads from being started in the task
-     * scope.
-     *
-     * @apiNote This method is intended for cases where a task scope is created with a
-     * {@link Joiner Joiner} that doesn't cancel execution or where the code in the main
-     * task needs to cancel execution due to some exception or other condition in the main
-     * task. The following example accepts network connections indefinitely, forking a
-     * subtask to handle each connection. If the {@code accept()} method in the example
-     * throws then the main task cancels execution before joining and closing the scope.
-     * The {@link #close() close} method waits for the interrupted threads to finish.
-     *
-     * {@snippet lang=java :
-     *    // @link substring="awaitAll" target="Joiner#awaitAll()" :
-     *    try (var scope = StructuredTaskScope.open(Joiner.awaitAll())) {
-     *
-     *        try {
-     *            while (true) {
-     *                Socket peer = listener.accept();
-     *                // @link substring="fork" target="#fork(Runnable)" :
-     *                scope.fork(() -> handle(peer));
-     *            }
-     *        } finally {
-     *            scope.cancel();
-     *            scope.join();    // completes immediately
-     *        }
-     *
-     *   }
-     * }
-     *
-     * @throws IllegalStateException if this task scope is closed
-     * @throws WrongThreadException if the current thread is not the task scope owner
-     * @since 24
-     */
-    public void cancel() {
-        ensureOwner();
-        ensureOpen();
-        cancelExecution();
     }
 
     /**
