@@ -85,7 +85,8 @@ import jdk.internal.misc.ThreadFlock;
  *        // @link substring="get" target="Subtask#get()" :
  *        return new MyResult(subtask1.get(), subtask2.get());
  *
- *    }
+ *    // @link substring="close" target="#close()" :
+ *    } // close
  * }
  *
  * <p> If both subtasks complete successfully then the {@code join} method completes
@@ -146,8 +147,7 @@ import jdk.internal.misc.ThreadFlock;
  *        // throws if both subtasks fail
  *        String firstResult = scope.join();
  *
- *    // @link substring="close" target="#close()" :
- *    } // close
+ *    }
  * }
  *
  * <p> In the example, the main task forks the two subtasks, then waits in the {@code
@@ -179,7 +179,7 @@ import jdk.internal.misc.ThreadFlock;
  * for example, the exception is from the first subtask to fail.
  *
  * <p> Many of the details for how exceptions are handled will depend on usage. In some
- * cases it may be useful t add a {@code catch} block to catch {@code FailedException}.
+ * cases it may be useful to add a {@code catch} block to catch {@code FailedException}.
  * The exception handling may use {@code instanceof} with pattern matching to handle
  * specific causes.
  * {@snippet lang=java :
