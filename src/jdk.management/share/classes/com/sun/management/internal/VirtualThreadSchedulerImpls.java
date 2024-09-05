@@ -73,9 +73,9 @@ public class VirtualThreadSchedulerImpls {
         public String toString() {
             var sb = new StringBuilder("[parallelism=");
             sb.append(getParallelism());
-            append(sb, "pool-size", getPoolSize());
-            append(sb, "mount-virtual-threads", getMountedVirtualThreadCount());
-            append(sb, "queued-virtual-threads", getQueuedVirtualThreadCount());
+            append(sb, "size", getPoolSize());
+            append(sb, "mounted", getMountedVirtualThreadCount());
+            append(sb, "queued", getQueuedVirtualThreadCount());
             sb.append(']');
             return sb.toString();
         }
