@@ -72,6 +72,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 import jdk.internal.javac.Restricted;
+import jdk.internal.loader.NativeLibraries;
 import jdk.internal.logger.LoggerFinderLoader.TemporaryLoggerFinder;
 import jdk.internal.misc.Blocker;
 import jdk.internal.misc.CarrierThreadLocal;
@@ -2571,6 +2572,9 @@ public final class System {
             public int countPositives(byte[] bytes, int offset, int length) {
                 return StringCoding.countPositives(bytes, offset, length);
             }
+            public int countNonZeroAscii(String s) {
+                return StringCoding.countNonZeroAscii(s);
+            }
             public String newStringNoRepl(byte[] bytes, Charset cs) throws CharacterCodingException  {
                 return String.newStringNoRepl(bytes, cs);
             }
@@ -2640,6 +2644,10 @@ public final class System {
                 return new StringConcatHelper.Concat1(constants);
             }
 
+            public byte stringInitCoder() {
+                return String.COMPACT_STRINGS ? String.LATIN1 : String.UTF16;
+            }
+
             public int getCharsLatin1(long i, int index, byte[] buf) {
                 return StringLatin1.getChars(i, index, buf);
             }
@@ -2661,8 +2669,8 @@ public final class System {
             }
 
             @Override
-            public long findNative(ClassLoader loader, String entry) {
-                return ClassLoader.findNativeInternal(loader, entry);
+            public NativeLibraries nativeLibrariesFor(ClassLoader loader) {
+                return ClassLoader.nativeLibrariesFor(loader);
             }
 
             @Override
