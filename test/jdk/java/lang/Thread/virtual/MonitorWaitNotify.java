@@ -137,8 +137,7 @@ import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
 import jdk.test.lib.thread.VThreadScheduler;
-import jdk.test.lib.thread.VThreadRunner;
-import jdk.test.lib.thread.VThreadRunner;
+import jdk.test.lib.thread.VThreadRunner;   // ensureParallelism requires jdk.management
 import jdk.test.lib.thread.VThreadPinner;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
