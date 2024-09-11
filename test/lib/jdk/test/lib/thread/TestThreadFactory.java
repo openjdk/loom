@@ -19,22 +19,37 @@
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
  * questions.
- *
  */
 
-#ifndef SHARE_OOPS_ARRAY_INLINE_HPP
-#define SHARE_OOPS_ARRAY_INLINE_HPP
+package jdk.test.lib.thread;
 
-#include "oops/array.hpp"
+import java.util.concurrent.ThreadFactory;
 
-#include "memory/allocation.hpp"
-#include "memory/metaspace.hpp"
+/*
+    This factory is used to start new threads in tests.
+    It supports creation of virtual threads when jtreg test.thread.factory plugin is enabled.
+*/
 
-template <typename T>
-inline void* Array<T>::operator new(size_t size, ClassLoaderData* loader_data, int length, TRAPS) throw() {
-  size_t word_size = Array::size(length);
-  return (void*) Metaspace::allocate(loader_data, word_size,
-                                     MetaspaceObj::array_type(sizeof(T)), false, THREAD);
+public class TestThreadFactory {
+
+    private static ThreadFactory threadFactory = "Virtual".equals(System.getProperty("test.thread.factory"))
+            ? virtualThreadFactory() : platformThreadFactory();
+
+    public static Thread newThread(Runnable task) {
+        return threadFactory.newThread(task);
+    }
+
+    public static Thread newThread(Runnable task, String name) {
+        Thread t = threadFactory.newThread(task);
+        t.setName(name);
+        return t;
+    }
+
+    private static ThreadFactory platformThreadFactory() {
+        return Thread.ofPlatform().factory();
+    }
+
+    private static ThreadFactory virtualThreadFactory() {
+        return Thread.ofVirtual().factory();
+    }
 }
-
-#endif // SHARE_OOPS_ARRAY_INLINE_HPP
