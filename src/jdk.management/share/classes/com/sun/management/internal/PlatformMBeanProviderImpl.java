@@ -165,39 +165,43 @@ public final class PlatformMBeanProviderImpl extends PlatformMBeanProvider {
         });
 
         /**
-         * VirtualThreadSchedulerMXBean.
+         * VirtualThreadSchedulerMXBean registered when using JDK's virtual thread scheduler.
          */
-        initMBeanList.add(new PlatformComponent<VirtualThreadSchedulerMXBean>() {
-            private final Set<Class<? extends VirtualThreadSchedulerMXBean>> mbeanInterfaces =
-                    Set.of(VirtualThreadSchedulerMXBean.class);
-            private final Set<String> mbeanInterfaceNames =
-                    Set.of(VirtualThreadSchedulerMXBean.class.getName());
-            private VirtualThreadSchedulerMXBean impl;
+        PrivilegedAction<String> pa = () -> System.getProperty("jdk.virtualThreadScheduler.implClass");
+        String value = AccessController.doPrivileged(pa);
+        if (value == null) {
+            initMBeanList.add(new PlatformComponent<VirtualThreadSchedulerMXBean>() {
+                private final Set<Class<? extends VirtualThreadSchedulerMXBean>> mbeanInterfaces =
+                        Set.of(VirtualThreadSchedulerMXBean.class);
+                private final Set<String> mbeanInterfaceNames =
+                        Set.of(VirtualThreadSchedulerMXBean.class.getName());
+                private VirtualThreadSchedulerMXBean impl;
 
-            @Override
-            public Set<Class<? extends VirtualThreadSchedulerMXBean>> mbeanInterfaces() {
-                return mbeanInterfaces;
-            }
-
-            @Override
-            public Set<String> mbeanInterfaceNames() {
-                return mbeanInterfaceNames;
-            }
-
-            @Override
-            public String getObjectNamePattern() {
-                return "jdk.management:type=VirtualThreadScheduler";
-            }
-
-            @Override
-            public Map<String, VirtualThreadSchedulerMXBean> nameToMBeanMap() {
-                VirtualThreadSchedulerMXBean impl = this.impl;
-                if (impl == null) {
-                    this.impl = impl = VirtualThreadSchedulerImpls.create();
+                @Override
+                public Set<Class<? extends VirtualThreadSchedulerMXBean>> mbeanInterfaces() {
+                    return mbeanInterfaces;
                 }
-                return Map.of("jdk.management:type=VirtualThreadScheduler", impl);
-            }
-        });
+
+                @Override
+                public Set<String> mbeanInterfaceNames() {
+                    return mbeanInterfaceNames;
+                }
+
+                @Override
+                public String getObjectNamePattern() {
+                    return "jdk.management:type=VirtualThreadScheduler";
+                }
+
+                @Override
+                public Map<String, VirtualThreadSchedulerMXBean> nameToMBeanMap() {
+                    VirtualThreadSchedulerMXBean impl = this.impl;
+                    if (impl == null) {
+                        this.impl = impl = VirtualThreadSchedulerImpls.create();
+                    }
+                    return Map.of("jdk.management:type=VirtualThreadScheduler", impl);
+                }
+            });
+        }
 
         /**
          * OperatingSystemMXBean
