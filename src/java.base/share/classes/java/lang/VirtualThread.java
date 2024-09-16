@@ -167,6 +167,12 @@ final class VirtualThread extends BaseVirtualThread {
     // used to mark thread as ready to be unblocked
     private volatile boolean unblocked;
 
+    // true when on the list of virtual threads waiting to be unblocked
+    private volatile boolean onWaitingList;
+
+    // next virtual thread on the list of virtual threads waiting to be unblocked
+    private volatile VirtualThread next;
+
     // notified by Object.notify/notifyAll while waiting in Object.wait
     private volatile boolean notified;
 
@@ -183,12 +189,6 @@ final class VirtualThread extends BaseVirtualThread {
 
     // termination object when joining, created lazily if needed
     private volatile CountDownLatch termination;
-
-    // has the value 1 when on the list of virtual threads waiting to be unblocked
-    private volatile byte onWaitingList;
-
-    // next virtual thread on the list of virtual threads waiting to be unblocked
-    private volatile VirtualThread next;
 
     /**
      * Returns the default scheduler.
@@ -1476,8 +1476,8 @@ final class VirtualThread extends BaseVirtualThread {
         return U.compareAndSetInt(this, STATE, expectedValue, newValue);
     }
 
-    private boolean compareAndSetOnWaitingList(byte expectedValue, byte newValue) {
-        return U.compareAndSetByte(this, ON_WAITING_LIST, expectedValue, newValue);
+    private boolean compareAndSetOnWaitingList(boolean expectedValue, boolean newValue) {
+        return U.compareAndSetBoolean(this, ON_WAITING_LIST, expectedValue, newValue);
     }
 
     private void setParkPermit(boolean newValue) {
@@ -1646,12 +1646,12 @@ final class VirtualThread extends BaseVirtualThread {
         while (true) {
             VirtualThread vthread = takeVirtualThreadListToUnblock();
             while (vthread != null) {
-                assert vthread.onWaitingList == 1;
+                assert vthread.onWaitingList;
                 VirtualThread nextThread = vthread.next;
 
                 // remove from list and unblock
                 vthread.next = null;
-                boolean changed = vthread.compareAndSetOnWaitingList((byte) 1, (byte) 0);
+                boolean changed = vthread.compareAndSetOnWaitingList(true, false);
                 assert changed;
                 vthread.unblock();
 

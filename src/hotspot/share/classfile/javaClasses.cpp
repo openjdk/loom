@@ -2034,7 +2034,7 @@ int java_lang_VirtualThread::_waitTimeout_offset;
   macro(_continuation_offset,              k, "cont",               continuation_signature,      false); \
   macro(_state_offset,                     k, "state",              int_signature,               false); \
   macro(_next_offset,                      k, "next",               vthread_signature,           false); \
-  macro(_onWaitingList_offset,             k, "onWaitingList",      byte_signature,              false); \
+  macro(_onWaitingList_offset,             k, "onWaitingList",      bool_signature,              false); \
   macro(_notified_offset,                  k, "notified",           bool_signature,              false); \
   macro(_recheckInterval_offset,           k, "recheckInterval",    byte_signature,              false); \
   macro(_waitTimeout_offset,               k, "waitTimeout",        long_signature,              false);
@@ -2082,12 +2082,11 @@ void java_lang_VirtualThread::set_next(oop vthread, oop next_vthread) {
 }
 
 bool java_lang_VirtualThread::set_onWaitingList(oop vthread, OopHandle& list_head) {
-  uint8_t* addr = vthread->field_addr<uint8_t>(_onWaitingList_offset);
-  uint8_t value = Atomic::load(addr);
-  assert(value == 0x00 || value == 0x01, "invariant");
-  if (value == 0x00) {
-    value = Atomic::cmpxchg(addr, (uint8_t)0x00, (uint8_t)0x01);
-    if (value == 0x00) {
+  jboolean* addr = vthread->field_addr<jboolean>(_onWaitingList_offset);
+  jboolean vthread_on_list = Atomic::load(addr);
+  if (!vthread_on_list) {
+    vthread_on_list = Atomic::cmpxchg(addr, (jboolean)JNI_FALSE, (jboolean)JNI_TRUE);
+    if (!vthread_on_list) {
       for (;;) {
         oop head = list_head.resolve();
         java_lang_VirtualThread::set_next(vthread, head);
