@@ -98,8 +98,8 @@ inline JavaThread** frame::saved_thread_address(const frame& f) {
   assert(cb != nullptr && cb->is_runtime_stub(), "invalid frame");
 
   JavaThread** thread_addr;
-  if (cb == Runtime1::blob_for(Runtime1::monitorenter_id) ||
-      cb == Runtime1::blob_for(Runtime1::monitorenter_nofpu_id)) {
+  if (cb == Runtime1::blob_for(C1StubId::monitorenter_id) ||
+      cb == Runtime1::blob_for(C1StubId::monitorenter_nofpu_id)) {
     thread_addr = (JavaThread**)(f.sp() + Runtime1::runtime_blob_current_thread_offset(f));
   } else {
     // c2 only saves rbp in the stub frame so nothing to do.
