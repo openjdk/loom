@@ -326,18 +326,17 @@ final class VirtualThread extends BaseVirtualThread {
         boolean done = false;
         while (!done) {
             try {
-                // The scheduler's execute method is invoked in the context of the
-                // carrier thread. For the default scheduler this ensures that the
-                // current thread is a ForkJoinWorkerThread so the task will be pushed
-                // to the local queue. For other schedulers, it avoids deadlock that
-                // would arise due to platform and virtual threads contending for a
-                // lock on the scheduler's submission queue.
-                if (currentThread() instanceof VirtualThread vthread) {
-                    vthread.switchToCarrierThread();
+                // Pin the continuation to prevent the virtual thread from unmounting
+                // when submitting a task. For the default scheduler this ensures that
+                // the carrier doesn't change when pushing a task. For other schedulers
+                // it avoids deadlock that could arise due to carriers and virtual
+                // threads contending for a lock.
+                if (currentThread().isVirtual()) {
+                    Continuation.pin();
                     try {
                         scheduler.execute(runContinuation);
                     } finally {
-                        switchToVirtualThread(vthread);
+                        Continuation.unpin();
                     }
                 } else {
                     scheduler.execute(runContinuation);
