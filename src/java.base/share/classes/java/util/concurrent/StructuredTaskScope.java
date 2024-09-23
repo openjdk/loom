@@ -361,12 +361,8 @@ import jdk.internal.invoke.MhUtil;
 public class StructuredTaskScope<T, R> implements AutoCloseable {
     private static final VarHandle CANCELLED;
     static {
-        try {
-            MethodHandles.Lookup l = MethodHandles.lookup();
-            CANCELLED = l.findVarHandle(StructuredTaskScope.class,"cancelled", boolean.class);
-        } catch (Exception e) {
-            throw new ExceptionInInitializerError(e);
-        }
+        MethodHandles.Lookup l = MethodHandles.lookup();
+        CANCELLED = MhUtil.findVarHandle(l, "cancelled", boolean.class);
     }
 
     private final Joiner<? super T, ? extends R> joiner;
@@ -1414,16 +1410,13 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     private static final class AllSuccessful<T> implements Joiner<T, Stream<Subtask<T>>> {
         private static final VarHandle FIRST_EXCEPTION;
         static {
-            try {
-                MethodHandles.Lookup l = MethodHandles.lookup();
-                FIRST_EXCEPTION = l.findVarHandle(AllSuccessful.class, "firstException", Throwable.class);
-            } catch (Exception e) {
-                throw new ExceptionInInitializerError(e);
-            }
+            MethodHandles.Lookup l = MethodHandles.lookup();
+            FIRST_EXCEPTION = MhUtil.findVarHandle(l, "firstException", Throwable.class);
         }
+        private volatile Throwable firstException;
+
         // list of forked subtasks, only accessed by owner thread
         private final List<Subtask<T>> subtasks = new ArrayList<>();
-        private volatile Throwable firstException;
 
         @Override
         public boolean onFork(Subtask<? extends T> subtask) {
@@ -1459,13 +1452,9 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         private static final VarHandle FIRST_SUCCESS;
         private static final VarHandle FIRST_EXCEPTION;
         static {
-            try {
-                MethodHandles.Lookup l = MethodHandles.lookup();
-                FIRST_SUCCESS = l.findVarHandle(AnySuccessful.class, "firstSuccess", Subtask.class);
-                FIRST_EXCEPTION = l.findVarHandle(AnySuccessful.class, "firstException", Throwable.class);
-            } catch (Exception e) {
-                throw new ExceptionInInitializerError(e);
-            }
+            MethodHandles.Lookup l = MethodHandles.lookup();
+            FIRST_SUCCESS = MhUtil.findVarHandle(l, "firstSuccess", Subtask.class);
+            FIRST_EXCEPTION = MhUtil.findVarHandle(l, "firstException", Throwable.class);
         }
         private volatile Subtask<T> firstSuccess;
         private volatile Throwable firstException;
@@ -1507,12 +1496,8 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     private static final class AwaitSuccessful<T> implements Joiner<T, Void> {
         private static final VarHandle FIRST_EXCEPTION;
         static {
-            try {
-                MethodHandles.Lookup l = MethodHandles.lookup();
-                FIRST_EXCEPTION = l.findVarHandle(AwaitSuccessful.class, "firstException", Throwable.class);
-            } catch (Exception e) {
-                throw new ExceptionInInitializerError(e);
-            }
+            MethodHandles.Lookup l = MethodHandles.lookup();
+            FIRST_EXCEPTION = MhUtil.findVarHandle(l, "firstException", Throwable.class);
         }
         private volatile Throwable firstException;
 
