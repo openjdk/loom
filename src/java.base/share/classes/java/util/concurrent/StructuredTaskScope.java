@@ -40,6 +40,7 @@ import java.util.stream.Stream;
 import jdk.internal.javac.PreviewFeature;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.ThreadFlock;
+import jdk.internal.invoke.MhUtil;
 
 /**
  * An API for <em>structured concurrency</em>. {@code StructuredTaskScope} supports cases
