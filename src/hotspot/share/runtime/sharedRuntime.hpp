@@ -85,9 +85,9 @@ class SharedRuntime: AllStatic {
             id == SharedStubId::throw_StackOverflowError_id ||
             id == SharedStubId::throw_delayed_StackOverflowError_id);
   }
-#endif
-
-  static address             _native_frame_resume_entry;
+#endif   
+    
+  static int _object_wait_resume_offset;
 
   // cont_doYieldStub is not yet folded into the general model for
   // shared stub/blob handling. It is actually a specially generated
@@ -242,10 +242,9 @@ class SharedRuntime: AllStatic {
                                                      address faulting_pc,
                                                      ImplicitExceptionKind exception_kind);
 
-  static address native_frame_resume_entry() { return _native_frame_resume_entry; }
-  static void set_native_frame_resume_entry(address val) {
-    assert(_native_frame_resume_entry == nullptr, "");
-    _native_frame_resume_entry = val;
+  static int object_wait_resume_offset() { return _object_wait_resume_offset; }
+  static void set_object_wait_resume_offset(int offset) {
+    _object_wait_resume_offset = offset;
   }
 
   // Post-slow-path-allocation, pre-initializing-stores step for

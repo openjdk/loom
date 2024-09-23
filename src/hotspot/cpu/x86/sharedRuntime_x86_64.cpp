@@ -2374,7 +2374,6 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
   __ movl(Address(r15_thread, JavaThread::thread_state_offset()), _thread_in_Java);
   __ bind(after_transition);
 
-  int resume_wait_offset = 0;
   if (LockingMode != LM_LEGACY && method->is_object_wait0()) {
     // Check preemption for Object.wait()
     Label not_preempted;
@@ -2384,7 +2383,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     __ movptr(Address(r15_thread, JavaThread::preempt_alternate_return_offset()), NULL_WORD);
     __ jmp(rscratch1);
     __ bind(not_preempted);
-    resume_wait_offset = ((intptr_t)__ pc()) - start;
+    SharedRuntime::set_object_wait_resume_offset(((intptr_t)__ pc()) - the_pc);
   }
 
   Label reguard;
@@ -2605,10 +2604,6 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
                                             (is_static ? in_ByteSize(klass_offset) : in_ByteSize(receiver_offset)),
                                             in_ByteSize(lock_slot_offset*VMRegImpl::stack_slot_size),
                                             oop_maps);
-
-  if (LockingMode != LM_LEGACY && nm != nullptr && method->is_object_wait0()) {
-    SharedRuntime::set_native_frame_resume_entry(nm->code_begin() + resume_wait_offset);
-  }
 
   return nm;
 }

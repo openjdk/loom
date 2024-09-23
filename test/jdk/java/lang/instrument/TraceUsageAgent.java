@@ -47,7 +47,7 @@ public class TraceUsageAgent {
                     inst.addTransformer(transformer);
                 }
                 case "retransformClasses" -> {
-                    inst.retransformClasses(Integer.class);
+                    inst.retransformClasses(Object.class);
                 }
                 case "redefineModule" -> {
                     Module base = Object.class.getModule();

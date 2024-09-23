@@ -3000,15 +3000,16 @@ static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont,
         sp0 += frame::metadata_words;
       } else {
         // Compiled case:
+        CodeBlob* cb = CodeCache::find_blob(pc0);
+        assert(cb != nullptr, "");
 #if defined (AMD64)
-        if (pc0 == SharedRuntime::native_frame_resume_entry()) {
+        if (cb->is_nmethod()) {
+          assert(cb->as_nmethod()->method()->is_object_wait0(), "");
           // For x64, when top is the compiled native wrapper (Object.wait())
           // the pc would have been modified from its original value to return
           // to the correct place. But that means we won't find the oopMap for
           // that fixed pc when getting the sender which will trigger asserts.
           // So just start walking the frames from the sender instead.
-          CodeBlob* cb = CodeCache::find_blob(pc0);
-          assert(cb->as_nmethod()->method()->is_object_wait0(), "");
           sp0 += cb->frame_size();
           if (sp0 == cont.entrySP()) {
             // sp0[-1] will be the return barrier pc. This is a stub, i.e. associated
@@ -3018,9 +3019,8 @@ static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont,
           }
         }
 #elif defined (AARCH64) || defined (RISCV64)
-        CodeBlob* cb = CodeCache::find_blob(pc0);
-        assert(cb != nullptr, "should be either c1 or c2 runtime stub");
         if (cb->frame_size() == 2) {
+          assert(cb->is_runtime_stub(), "");
           // Returning to c2 runtime stub requires extra adjustment on aarch64
           // and riscv64 (see push_resume_adapter()).
           sp0 += frame::metadata_words;

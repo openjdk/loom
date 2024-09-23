@@ -99,7 +99,7 @@
   SHARED_STUBS_DO(SHARED_STUB_FIELD_DEFINE)
 #undef SHARED_STUB_FIELD_DEFINE
 
-address             SharedRuntime::_native_frame_resume_entry = nullptr;
+int                 SharedRuntime::_object_wait_resume_offset = 0;
 
 nmethod*            SharedRuntime::_cont_doYield_stub;
 

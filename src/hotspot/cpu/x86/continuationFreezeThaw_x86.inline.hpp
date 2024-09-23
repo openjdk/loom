@@ -283,7 +283,7 @@ inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
 
 inline void ThawBase::fix_native_wrapper_return_pc_pd(frame& top) {
   bool from_interpreted = top.is_interpreted_frame();
-  address resume_address = from_interpreted ? Interpreter::native_frame_resume_entry() : SharedRuntime::native_frame_resume_entry();
+  address resume_address = from_interpreted ? Interpreter::native_frame_resume_entry() : (top.pc() + SharedRuntime::object_wait_resume_offset());
   DEBUG_ONLY(Method* method = from_interpreted ? top.interpreter_frame_method() : CodeCache::find_blob(resume_address)->as_nmethod()->method();)
   assert(method->is_object_wait0(), "");
   ContinuationHelper::Frame::patch_pc(top, resume_address);
