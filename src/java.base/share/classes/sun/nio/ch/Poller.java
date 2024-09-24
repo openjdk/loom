@@ -274,9 +274,16 @@ public abstract class Poller {
         }
     }
 
+    /**
+     * Returns the number I/O operations currently registered with this poller.
+     */
+    public int registered() {
+        return map.size();
+    }
+
     @Override
     public String toString() {
-        return Objects.toIdentityString(this) + " [registered = " + map.size() + "]";
+        return Objects.toIdentityString(this) + " [registered = " + registered() + "]";
     }
 
     /**
