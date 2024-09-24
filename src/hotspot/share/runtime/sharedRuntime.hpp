@@ -86,8 +86,7 @@ class SharedRuntime: AllStatic {
             id == SharedStubId::throw_delayed_StackOverflowError_id);
   }
 #endif
-    
-    
+
   static address             _native_frame_resume_entry;
 
   // cont_doYieldStub is not yet folded into the general model for
