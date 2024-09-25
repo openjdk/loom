@@ -2227,6 +2227,9 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
         return push_cleanup_continuation();
       }
       chunk = _cont.tail();  // reload oop in case of safepoint in resume_operation
+    } else {
+      // Preemption cancelled case. We actually acquired the monitor after
+      // freezing all frames so nothing to do.
     }
     retry_fast_path = true;
     relativize_chunk_concurrently(chunk);
