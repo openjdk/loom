@@ -34,6 +34,7 @@
 #include "runtime/frame.inline.hpp"
 #include "runtime/objectMonitor.hpp"
 #include "runtime/stackValue.hpp"
+#include "runtime/synchronizer.hpp"
 #include "utilities/macros.hpp"
 
 #include CPU_HEADER_INLINE(continuationHelper)

@@ -57,6 +57,8 @@ JVM_ENTRY(void, CONT_unpin(JNIEnv* env, jclass cls)) {
 }
 JVM_END
 
+#ifdef LOOM_MONITOR_SUPPORT
+
 #if INCLUDE_JVMTI
 class JvmtiUnmountBeginMark : public StackObj {
   Handle _vthread;
@@ -117,7 +119,7 @@ static bool is_safe_vthread_to_preempt_for_jvmti(JavaThread* target, oop vthread
   }
   return true;
 }
-#endif
+#endif // INCLUDE_JVMTI
 
 static bool is_safe_vthread_to_preempt(JavaThread* target, oop vthread) {
   if (!java_lang_VirtualThread::is_instance(vthread) ||                               // inside transition
@@ -129,7 +131,6 @@ static bool is_safe_vthread_to_preempt(JavaThread* target, oop vthread) {
 
 typedef int (*FreezeContFnT)(JavaThread*, intptr_t*, int);
 
-#ifdef LOOM_MONITOR_SUPPORT
 int Continuation::try_preempt(JavaThread* target, oop continuation, int preempt_kind) {
   assert(target == JavaThread::current(), "no support for external preemption");
   assert(target->has_last_Java_frame(), "");
@@ -139,7 +140,7 @@ int Continuation::try_preempt(JavaThread* target, oop continuation, int preempt_
   assert(!is_continuation_preempted(continuation), "");
   assert(Continuation::continuation_scope(continuation) == java_lang_VirtualThread::vthread_scope(), "");
   assert(!target->has_pending_exception(), "");
-  assert(!target->is_suspended() || target->is_disable_suspend() || target->obj_locker_count() > 0, "");
+  assert(!target->is_suspended() JVMTI_ONLY(|| target->is_disable_suspend()) || target->obj_locker_count() > 0, "");
 
   if (LockingMode == LM_LEGACY) {
     return freeze_unsupported;
@@ -168,7 +169,7 @@ int Continuation::try_preempt(JavaThread* target, oop continuation, int preempt_
   }
   return res;
 }
-#endif
+#endif // LOOM_MONITOR_SUPPORT
 
 bool Continuation::is_continuation_preempted(oop cont) {
   return jdk_internal_vm_Continuation::is_preempted(cont);

@@ -2452,6 +2452,7 @@ intptr_t* ThawBase::handle_preempted_continuation(intptr_t* sp, int preempt_kind
   _cont.set_preempted(false);
 
 #if INCLUDE_JVMTI
+  assert(_thread->is_in_VTMS_transition(), "must be");
   bool is_vthread = Continuation::continuation_scope(_cont.continuation()) == java_lang_VirtualThread::vthread_scope();
   if (is_vthread) {
     if (JvmtiVTMSTransitionDisabler::VTMS_notify_jvmti_events()) {

@@ -1216,7 +1216,6 @@ bool ObjectMonitor::VThreadMonitorEnter(JavaThread* current, ObjectWaiter* waite
 
 bool ObjectMonitor::resume_operation(JavaThread* current, ObjectWaiter* node, ContinuationWrapper& cont) {
   assert(java_lang_VirtualThread::state(current->vthread()) == java_lang_VirtualThread::RUNNING, "wrong state for vthread");
-  assert(current->is_in_VTMS_transition(), "must be");
 
   if (node->is_wait() && !node->at_reenter()) {
     bool acquired_monitor = VThreadWaitReenter(current, node, cont);

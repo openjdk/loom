@@ -91,7 +91,11 @@ inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
   Unimplemented();
 }
 
-inline intptr_t* ThawBase::push_resume_adapter(frame top, bool is_interpreted_frame) {
+inline void ThawBase::fix_native_wrapper_return_pc_pd(frame& top) {
+  Unimplemented();
+}
+
+inline intptr_t* ThawBase::push_resume_adapter(frame& top) {
   Unimplemented();
   return nullptr;
 }

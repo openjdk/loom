@@ -639,7 +639,12 @@ void Runtime1::initialize_pd() {
 }
 
 uint Runtime1::runtime_blob_current_thread_offset(frame f) {
+#ifdef _LP64
   return r15_off / 2;
+#else
+  Unimplemented();
+  return 0;
+#endif
 }
 
 // Target: the entry point of the method that creates and posts the exception oop.

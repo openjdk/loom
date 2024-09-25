@@ -60,6 +60,9 @@
 #include "utilities/debug.hpp"
 #include "utilities/decoder.hpp"
 #include "utilities/formatBuffer.hpp"
+#ifdef COMPILER1
+#include "c1/c1_Runtime1.hpp"
+#endif
 
 RegisterMap::RegisterMap(JavaThread *thread, UpdateMap update_map, ProcessFrames process_frames, WalkContinuation walk_cont) {
   _thread         = thread;
@@ -497,6 +500,35 @@ jint frame::interpreter_frame_expression_stack_size() const {
   return (jint)stack_size;
 }
 
+#ifdef ASSERT
+static address get_register_address_in_stub(const frame& stub_fr, VMReg reg) {
+  RegisterMap map(nullptr,
+                  RegisterMap::UpdateMap::include,
+                  RegisterMap::ProcessFrames::skip,
+                  RegisterMap::WalkContinuation::skip);
+  stub_fr.oop_map()->update_register_map(&stub_fr, &map);
+  return map.location(reg, stub_fr.sp());
+}
+#endif
+
+JavaThread** frame::saved_thread_address(const frame& f) {
+  CodeBlob* cb = f.cb();
+  assert(cb != nullptr && cb->is_runtime_stub(), "invalid frame");
+
+  JavaThread** thread_addr;
+#ifdef COMPILER1
+  if (cb == Runtime1::blob_for(C1StubId::monitorenter_id) ||
+      cb == Runtime1::blob_for(C1StubId::monitorenter_nofpu_id)) {
+    thread_addr = (JavaThread**)(f.sp() + Runtime1::runtime_blob_current_thread_offset(f));
+  } else
+#endif
+  {
+    // c2 only saves rbp in the stub frame so nothing to do.
+    thread_addr = nullptr;
+  }
+  assert(get_register_address_in_stub(f, SharedRuntime::thread_register()) == (address)thread_addr, "wrong thread address");
+  return thread_addr;
+}
 
 // (frame::interpreter_frame_sender_sp accessor is in frame_<arch>.cpp)
 

@@ -252,7 +252,7 @@ void Runtime1::initialize_pd() {
 }
 
 uint Runtime1::runtime_blob_current_thread_offset(frame f) {
-  unimplemented();
+  Unimplemented();
   return 0;
 }
 

@@ -1178,6 +1178,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   // change thread state
   __ movl(Address(thread, JavaThread::thread_state_offset()), _thread_in_Java);
 
+#ifdef _LP64
   if (LockingMode != LM_LEGACY) {
     // Check preemption for Object.wait()
     Label not_preempted;
@@ -1192,6 +1193,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
     __ push(ltos);
     __ bind(not_preempted);
   }
+#endif // _LP64
 
   // reset_last_Java_frame
   __ reset_last_Java_frame(thread, true);
