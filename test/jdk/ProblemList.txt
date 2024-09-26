@@ -577,8 +577,6 @@ java/nio/channels/DatagramChannel/BasicMulticastTests.java      8144003 macosx-a
 java/nio/channels/DatagramChannel/MulticastSendReceiveTests.java 8144003 macosx-all
 java/nio/channels/DatagramChannel/Promiscuous.java              8144003 macosx-all
 
-java/nio/Buffer/LimitDirectMemory.java	                        8340728 generic-all
-
 ############################################################################
 
 # jdk_rmi
