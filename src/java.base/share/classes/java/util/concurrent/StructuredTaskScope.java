@@ -131,9 +131,9 @@ import jdk.internal.invoke.MhUtil;
  * subtasks to finish, even if execution is cancelled, so execution cannot continue beyond
  * the {@code close} method until the interrupted threads finish.
  *
- * <p> Now consider another example that also splits into two subtasks to concurrently
- * fetch resources. In this example, the code in the main task is only interested in the
- * result from the first subtask to complete successfully. The example uses {@link
+ * <p> Now consider another example that also splits into two subtasks. In this example,
+ * each subtask produces a {@code String} result and the main task is only interested in
+ * the result from the first subtask to complete successfully. The example uses {@link
  * Joiner#anySuccessfulResultOrThrow() Joiner.anySuccessfulResultOrThrow()} to
  * create a {@code Joiner} that makes available the result of the first subtask to
  * complete successfully. The type parameter in the example is "{@code String}" so that
@@ -142,8 +142,8 @@ import jdk.internal.invoke.MhUtil;
  *    // @link substring="open" target="#open(Policy)" :
  *    try (var scope = StructuredTaskScope.open(Joiner.<String>anySuccessfulResultOrThrow())) {
  *
- *        scope.fork(() -> query(left));  // @link substring="fork" target="#fork(Callable)"
- *        scope.fork(() -> query(right));
+ *        scope.fork(callable1);
+ *        scope.fork(callable2);
  *
  *        // throws if both subtasks fail
  *        String firstResult = scope.join();
@@ -257,8 +257,8 @@ import jdk.internal.invoke.MhUtil;
  *    // @link substring="withTimeout" target="Config#withTimeout(Duration)" :
  *                                              cf -> cf.withTimeout(timeout))) {
  *
- *        scope.fork(() -> query(left));
- *        scope.fork(() -> query(right));
+ *        scope.fork(callable1);
+ *        scope.fork(callable2);
  *
  *        List<String> result = scope.join()
  *                                   .map(Subtask::get)
