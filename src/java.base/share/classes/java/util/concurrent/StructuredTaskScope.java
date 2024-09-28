@@ -155,9 +155,9 @@ import jdk.internal.invoke.MhUtil;
  * join} method for either subtask to complete successfully or for both subtasks to fail.
  * If one of the subtasks completes successfully then the {@code Joiner} causes the other
  * subtask to be cancelled (this will interrupt the thread executing the subtask), and
- * the {@code join} method returns the result from the first subtask. Cancelling the other
- * subtask avoids the main task waiting for a result that it doesn't care about. If both
- * subtasks fail then the {@code join} method throws {@link FailedException} with the
+ * the {@code join} method returns the result from the successful subtask. Cancelling the
+ * other subtask avoids the main task waiting for a result that it doesn't care about. If
+ * both subtasks fail then the {@code join} method throws {@link FailedException} with the
  * exception from one of the subtasks as the {@linkplain Throwable#getCause() cause}.
  *
  * <p> Whether code uses the {@code Subtask} returned from {@code fork} will depend on
@@ -198,7 +198,7 @@ import jdk.internal.invoke.MhUtil;
  *
  *    }
  * }
- * In some cases it may not be useful to catch {@code FailedException} but instead leave
+ * In other cases it may not be useful to catch {@code FailedException} but instead leave
  * it to propagate to the configured {@linkplain Thread.UncaughtExceptionHandler uncaught
  * exception handler} for logging purposes.
  *
@@ -248,7 +248,7 @@ import jdk.internal.invoke.MhUtil;
  * starts when the new task scope is opened. If the timeout expires before the {@code join}
  * method has completed then <a href="#CancelExecution">execution is cancelled</a>. This
  * interrupts the threads executing the two subtasks and causes the {@link #join() join}
- * method to throw {@link FailedException} with {@link TimeoutException} as the cause.
+ * method to throw {@link TimeoutException}.
  * {@snippet lang=java :
  *    Duration timeout = Duration.ofSeconds(10);
  *
@@ -309,9 +309,9 @@ import jdk.internal.invoke.MhUtil;
  *     private static final ScopedValue<String> USERNAME = ScopedValue.newInstance();
  *
  *     // @link substring="callWhere" target="ScopedValue#where" :
- *     Result result = ScopedValue.where(USERNAME, "duke").call(() -> {
+ *     MyResult result = ScopedValue.where(USERNAME, "duke").call(() -> {
  *
- *         try (var scope = StructuredTaskScope.open(Joiner.awaitAllSuccessfulOrThrow())) {
+ *         try (var scope = StructuredTaskScope.open()) {
  *
  *             Subtask<String> subtask1 = scope.fork( .. );    // inherits binding
  *             Subtask<Integer> subtask2 = scope.fork( .. );   // inherits binding
@@ -965,14 +965,15 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * set the {@linkplain Config#withThreadFactory(ThreadFactory) ThreadFactory} or set
      * a {@linkplain Config#withTimeout(Duration) timeout}.
      *
-     * <p> If a {@linkplain Config#withThreadFactory(ThreadFactory) ThreadFactory} is set
-     * then the {@code ThreadFactory}'s {@link ThreadFactory#newThread(Runnable) newThread}
-     * method will be used to create threads when forking subtasks in this task scope.
+     * <p> If a {@code ThreadFactory} is set then its {@link ThreadFactory#newThread(Runnable)
+     * newThread} method will be called to create threads when {@linkplain #fork(Callable)
+     * forking} subtasks in this task scope. If a {@code ThreadFactory} is not set then
+     * forking subtasks will create an unnamed virtual thread for each subtask.
      *
      * <p> If a {@linkplain Config#withTimeout(Duration) timeout} is set then it starts
      * when the task scope is opened. If the timeout expires before the task scope has
      * {@linkplain #join() joined} then execution is cancelled and the {@code join} method
-     * throws {@link FailedException} with {@link TimeoutException} as the cause.
+     * throws {@link TimeoutException}.
      *
      * <p> The new task scope is owned by the current thread. Only code executing in this
      * thread can {@linkplain #fork(Callable) fork}, {@linkplain #join() join}, or
@@ -1184,7 +1185,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * @throws WrongThreadException if the current thread is not the task scope owner
      * @throws IllegalStateException if already joined or this task scope is closed
      * @throws FailedException if the <i>outcome</i> is an exception, thrown with the
-     * exception from {@link Joiner#result()} as the cause
+     * exception from {@link Joiner#result() Joiner.result()} as the cause
      * @throws TimeoutException if a timeout is set and the timeout expires before or
      * while waiting
      * @throws InterruptedException if interrupted while waiting
