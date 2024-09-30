@@ -484,6 +484,8 @@ class JavaThread: public Thread {
   // It's signed for error detection.
   intx _held_monitor_count;  // used by continuations for fast lock detection
   intx _jni_monitor_count;
+  ObjectMonitor* _unlocked_inflated_monitor;
+
   bool _preempting;
   bool _preemption_cancelled;
   bool _pending_interrupted_exception;
@@ -653,6 +655,12 @@ private:
 
   intx jni_monitor_count()  { return _jni_monitor_count;  }
   void clear_jni_monitor_count() { _jni_monitor_count = 0; }
+
+  // Support for SharedRuntime::monitor_exit_helper()
+  ObjectMonitor* unlocked_inflated_monitor() const { return _unlocked_inflated_monitor; }
+  void clear_unlocked_inflated_monitor() {
+    _unlocked_inflated_monitor = nullptr;
+  }
 
   inline bool is_vthread_mounted() const;
   inline const ContinuationEntry* vthread_continuation() const;
@@ -893,6 +901,7 @@ private:
   static ByteSize preempting_offset()         { return byte_offset_of(JavaThread, _preempting); }
   static ByteSize preemption_cancelled_offset()  { return byte_offset_of(JavaThread, _preemption_cancelled); }
   static ByteSize preempt_alternate_return_offset() { return byte_offset_of(JavaThread, _preempt_alternate_return); }
+  static ByteSize unlocked_inflated_monitor_offset() { return byte_offset_of(JavaThread, _unlocked_inflated_monitor); }
 
 #if INCLUDE_JVMTI
   static ByteSize is_in_VTMS_transition_offset()     { return byte_offset_of(JavaThread, _is_in_VTMS_transition); }

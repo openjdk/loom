@@ -181,9 +181,6 @@ final class VirtualThread extends BaseVirtualThread {
     private byte timedWaitNonce;
     private volatile Future<?> waitTimeoutTask;
 
-    // a positive value if "responsible thread" blocked on monitor enter, accessed by VM
-    private volatile byte recheckInterval;
-
     // carrier thread when mounted, accessed by VM
     private volatile Thread carrierThread;
 
@@ -635,16 +632,6 @@ final class VirtualThread extends BaseVirtualThread {
                 unblocked = false;
                 submitRunContinuation();
                 return;
-            }
-
-            // if thread is the designated responsible thread for a monitor then schedule
-            // it to wakeup so that it can check and recover. See objectMonitor.cpp.
-            int recheckInterval = this.recheckInterval;
-            if (recheckInterval > 0) {
-                assert recheckInterval >= 1 && recheckInterval <= 6;
-                // 4 ^ (recheckInterval - 1) = 1, 4, 16, ... 1024
-                long delay = 1 << (recheckInterval - 1) << (recheckInterval - 1);
-                schedule(this::unblock, delay, MILLISECONDS);
             }
             return;
         }
@@ -1200,17 +1187,8 @@ final class VirtualThread extends BaseVirtualThread {
                 // runnable, not mounted
                 return Thread.State.RUNNABLE;
             case UNBLOCKED:
-                // if designated responsible thread for monitor then thread is blocked
-                if (isResponsibleForMonitor()) {
-                    return Thread.State.BLOCKED;
-                } else {
-                    return Thread.State.RUNNABLE;
-                }
+                return Thread.State.RUNNABLE;
             case RUNNING:
-                // if designated responsible thread for monitor then thread is blocked
-                if (isResponsibleForMonitor()) {
-                    return Thread.State.BLOCKED;
-                }
                 // if mounted then return state of carrier thread
                 if (Thread.currentThread() != this) {
                     disableSuspendAndPreempt();
@@ -1250,14 +1228,6 @@ final class VirtualThread extends BaseVirtualThread {
             default:
                 throw new InternalError();
         }
-    }
-
-    /**
-     * Returns true if thread is the designated responsible thread for a monitor.
-     * See objectMonitor.cpp for details.
-     */
-    private boolean isResponsibleForMonitor() {
-        return (recheckInterval > 0);
     }
 
     @Override
@@ -1334,9 +1304,8 @@ final class VirtualThread extends BaseVirtualThread {
                 yield parkPermit && compareAndSetState(initialState, UNPARKED);
             }
             case BLOCKED -> {
-                // resubmit if unblocked while suspended or the responsible thread for a monitor
-                yield (unblocked || isResponsibleForMonitor())
-                        && compareAndSetState(BLOCKED, UNBLOCKED);
+                // resubmit if unblocked while suspended
+                yield unblocked && compareAndSetState(BLOCKED, UNBLOCKED);
             }
             case WAIT, TIMED_WAIT -> {
                 // resubmit if notified or interrupted while waiting (Object.wait)

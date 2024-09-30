@@ -581,8 +581,6 @@ class java_lang_VirtualThread : AllStatic {
   static oop next(oop vthread);
   static void set_next(oop vthread, oop next_vthread);
   static bool set_onWaitingList(oop vthread, OopHandle& list_head);
-  static jbyte recheckInterval(oop vthread);
-  static void set_recheckInterval(oop vthread, jbyte value);
   static jlong waitTimeout(oop vthread);
   static void set_waitTimeout(oop vthread, jlong value);
   static void set_notified(oop vthread, jboolean value);

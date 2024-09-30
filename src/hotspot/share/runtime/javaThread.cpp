@@ -498,6 +498,8 @@ JavaThread::JavaThread(MemTag mem_tag) :
   _cont_fastpath_thread_state(1),
   _held_monitor_count(0),
   _jni_monitor_count(0),
+  _unlocked_inflated_monitor(nullptr),
+
   _preempting(false),
   _preemption_cancelled(false),
   _pending_interrupted_exception(false),

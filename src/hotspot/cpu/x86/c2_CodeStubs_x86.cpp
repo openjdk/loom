@@ -89,59 +89,8 @@ void C2FastUnlockLightweightStub::emit(C2_MacroAssembler& masm) {
     __ movptr(Address(_thread, _t1), _obj);
 #endif
     __ addl(Address(_thread, JavaThread::lock_stack_top_offset()), oopSize);
-  }
-
-  { // Handle the unlock in runtime
-
-    __ bind(_slow_path);
-    // set ZF=0 to indicate failure
-    __ orl(_t1, 1);
+    // addl will always result in ZF = 0 (no overflows).
     __ jmp(slow_path_continuation());
-  }
-
-  { // Handle monitor medium path.
-
-    __ bind(_check_successor);
-
-    Label fix_zf_and_unlocked;
-    const Register monitor = _mark;
-
-#ifndef _LP64
-    __ jmpb(_slow_path);
-#else // _LP64
-    const ByteSize monitor_tag = in_ByteSize(UseObjectMonitorTable ? 0 : checked_cast<int>(markWord::monitor_value));
-    const Address succ_address(monitor, ObjectMonitor::succ_offset() - monitor_tag);
-    const Address owner_address(monitor, ObjectMonitor::owner_offset() - monitor_tag);
-
-    // successor null check.
-    __ cmpptr(succ_address, NULL_WORD);
-    __ jccb(Assembler::equal, _slow_path);
-
-    // Release lock.
-    __ movptr(owner_address, NULL_WORD);
-
-    // Fence.
-    // Instead of MFENCE we use a dummy locked add of 0 to the top-of-stack.
-    __ lock(); __ addl(Address(rsp, 0), 0);
-
-    // Recheck successor.
-    __ cmpptr(succ_address, NULL_WORD);
-    // Observed a successor after the release -> fence we have handed off the monitor
-    __ jccb(Assembler::notEqual, fix_zf_and_unlocked);
-
-    // Try to relock, if it fails the monitor has been handed over
-    // TODO: Caveat, this may fail due to deflation, which does
-    //       not handle the monitor handoff. Currently only works
-    //       due to the responsible thread.
-    __ xorptr(rax, rax);
-    __ movptr(_t2, Address(_thread, JavaThread::lock_id_offset()));
-    __ lock(); __ cmpxchgptr(_t2, owner_address);
-    __ jccb  (Assembler::equal, _slow_path);
-#endif
-
-    __ bind(fix_zf_and_unlocked);
-    __ xorl(rax, rax);
-    __ jmp(unlocked_continuation());
   }
 }
 

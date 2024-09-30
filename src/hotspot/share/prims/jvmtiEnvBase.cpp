@@ -787,7 +787,6 @@ JvmtiEnvBase::get_thread_state(oop thread_oop, JavaThread* jt) {
 jint
 JvmtiEnvBase::get_vthread_state(oop thread_oop, JavaThread* java_thread) {
   jint state = 0;
-  bool is_mon_responsible = java_lang_VirtualThread::recheckInterval(thread_oop) > 0;
   bool ext_suspended = JvmtiVTSuspender::is_vthread_suspended(thread_oop);
   jint interrupted = java_lang_Thread::interrupted(thread_oop);
 
@@ -800,8 +799,6 @@ JvmtiEnvBase::get_vthread_state(oop thread_oop, JavaThread* java_thread) {
 
     // This call can trigger a safepoint, so thread_oop must not be used after it.
     state = get_thread_state_base(ct_oop, java_thread) & ~filtered_bits;
-  } else if (is_mon_responsible) {
-    state = (jint) JavaThreadStatus::BLOCKED_ON_MONITOR_ENTER;
   } else {
     int vt_state = java_lang_VirtualThread::state(thread_oop);
     state = (jint)java_lang_VirtualThread::map_state_to_thread_status(vt_state);

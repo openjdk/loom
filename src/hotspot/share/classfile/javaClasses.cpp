@@ -2025,7 +2025,6 @@ int java_lang_VirtualThread::_state_offset;
 int java_lang_VirtualThread::_next_offset;
 int java_lang_VirtualThread::_onWaitingList_offset;
 int java_lang_VirtualThread::_notified_offset;
-int java_lang_VirtualThread::_recheckInterval_offset;
 int java_lang_VirtualThread::_waitTimeout_offset;
 
 #define VTHREAD_FIELDS_DO(macro) \
@@ -2036,7 +2035,6 @@ int java_lang_VirtualThread::_waitTimeout_offset;
   macro(_next_offset,                      k, "next",               vthread_signature,           false); \
   macro(_onWaitingList_offset,             k, "onWaitingList",      bool_signature,              false); \
   macro(_notified_offset,                  k, "notified",           bool_signature,              false); \
-  macro(_recheckInterval_offset,           k, "recheckInterval",    byte_signature,              false); \
   macro(_waitTimeout_offset,               k, "waitTimeout",        long_signature,              false);
 
 
@@ -2099,14 +2097,6 @@ bool java_lang_VirtualThread::set_onWaitingList(oop vthread, OopHandle& list_hea
 
 void java_lang_VirtualThread::set_notified(oop vthread, jboolean value) {
   vthread->bool_field_put_volatile(_notified_offset, value);
-}
-
-jbyte java_lang_VirtualThread::recheckInterval(oop vthread) {
-  return vthread->byte_field(_recheckInterval_offset);
-}
-
-void java_lang_VirtualThread::set_recheckInterval(oop vthread, jbyte value) {
-  vthread->release_byte_field_put(_recheckInterval_offset, value);
 }
 
 jlong java_lang_VirtualThread::waitTimeout(oop vthread) {
