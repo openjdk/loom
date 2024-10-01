@@ -631,7 +631,6 @@ final class VirtualThread extends BaseVirtualThread {
             if (unblocked && compareAndSetState(BLOCKED, UNBLOCKED)) {
                 unblocked = false;
                 submitRunContinuation();
-                return;
             }
             return;
         }
@@ -1183,10 +1182,9 @@ final class VirtualThread extends BaseVirtualThread {
                     return Thread.State.RUNNABLE;
                 }
             case UNPARKED:
+            case UNBLOCKED:
             case YIELDED:
                 // runnable, not mounted
-                return Thread.State.RUNNABLE;
-            case UNBLOCKED:
                 return Thread.State.RUNNABLE;
             case RUNNING:
                 // if mounted then return state of carrier thread
@@ -1207,9 +1205,10 @@ final class VirtualThread extends BaseVirtualThread {
                 return Thread.State.RUNNABLE;
             case PARKING:
             case TIMED_PARKING:
-            case YIELDING:
+            case BLOCKING:
             case WAITING:
             case TIMED_WAITING:
+            case YIELDING:
                 // runnable, in transition
                 return Thread.State.RUNNABLE;
             case PARKED:
@@ -1220,7 +1219,6 @@ final class VirtualThread extends BaseVirtualThread {
             case TIMED_PINNED:
             case TIMED_WAIT:
                 return State.TIMED_WAITING;
-            case BLOCKING:
             case BLOCKED:
                 return State.BLOCKED;
             case TERMINATED:
