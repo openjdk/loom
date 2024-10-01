@@ -396,7 +396,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
-     * Throws IllegalStateException if the already joined or task scope is closed.
+     * Throws IllegalStateException if already joined or task scope is closed.
      */
     private void ensureNotJoined() {
         assert Thread.currentThread() == flock.owner();
@@ -999,12 +999,12 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
         // schedule timeout
         Duration timeout = config.timeout();
         if (timeout != null) {
-            boolean done = false;
+            boolean scheduled = false;
             try {
                 scope.scheduleTimeout(timeout);
-                done = true;
+                scheduled = true;
             } finally {
-                if (!done) {
+                if (!scheduled) {
                     scope.close();  // pop if scheduling timeout failed
                 }
             }
