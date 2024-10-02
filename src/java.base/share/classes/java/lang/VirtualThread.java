@@ -161,11 +161,11 @@ final class VirtualThread extends BaseVirtualThread {
     // can be suspended from scheduling when unmounted
     private static final int SUSPENDED = 1 << 8;
 
-    // parking permit
+    // parking permit made available by LockSupport.unpark
     private volatile boolean parkPermit;
 
-    // used to mark thread as ready to be unblocked
-    private volatile boolean unblocked;
+    // blocking permit made available by unblocker thread when another thread exits monitor
+    private volatile boolean blockPermit;
 
     // true when on the list of virtual threads waiting to be unblocked
     private volatile boolean onWaitingList;
@@ -288,9 +288,11 @@ final class VirtualThread extends BaseVirtualThread {
             if (!compareAndSetState(initialState, RUNNING)) {
                 return;
             }
-            // consume parking permit when continuing after parking
+            // consume permit when continuing after parking or blocking
             if (initialState == UNPARKED) {
                 setParkPermit(false);
+            } if (initialState == UNBLOCKED) {
+                blockPermit = false;
             }
         } else {
             // not runnable
@@ -628,8 +630,7 @@ final class VirtualThread extends BaseVirtualThread {
             setState(BLOCKED);
 
             // may have been unblocked while blocking
-            if (unblocked && compareAndSetState(BLOCKED, UNBLOCKED)) {
-                unblocked = false;
+            if (blockPermit && compareAndSetState(BLOCKED, UNBLOCKED)) {
                 submitRunContinuation();
             }
             return;
@@ -653,8 +654,7 @@ final class VirtualThread extends BaseVirtualThread {
             // may have been notified while in transition to wait state
             if (notified && compareAndSetState(newState, BLOCKED)) {
                 // may have even been unblocked already
-                if (unblocked && compareAndSetState(BLOCKED, UNBLOCKED)) {
-                    unblocked = false;
+                if (blockPermit && compareAndSetState(BLOCKED, UNBLOCKED)) {
                     submitRunContinuation();
                 }
                 return;
@@ -943,9 +943,8 @@ final class VirtualThread extends BaseVirtualThread {
      */
     private void unblock() {
         assert !Thread.currentThread().isVirtual();
-        unblocked = true;
+        blockPermit = true;
         if (state() == BLOCKED && compareAndSetState(BLOCKED, UNBLOCKED)) {
-            unblocked = false;
             submitRunContinuation();
         }
     }
@@ -1214,13 +1213,13 @@ final class VirtualThread extends BaseVirtualThread {
             case PARKED:
             case PINNED:
             case WAIT:
-                return State.WAITING;
+                return Thread.State.WAITING;
             case TIMED_PARKED:
             case TIMED_PINNED:
             case TIMED_WAIT:
-                return State.TIMED_WAITING;
+                return Thread.State.TIMED_WAITING;
             case BLOCKED:
-                return State.BLOCKED;
+                return Thread.State.BLOCKED;
             case TERMINATED:
                 return Thread.State.TERMINATED;
             default:
@@ -1303,7 +1302,7 @@ final class VirtualThread extends BaseVirtualThread {
             }
             case BLOCKED -> {
                 // resubmit if unblocked while suspended
-                yield unblocked && compareAndSetState(BLOCKED, UNBLOCKED);
+                yield blockPermit && compareAndSetState(BLOCKED, UNBLOCKED);
             }
             case WAIT, TIMED_WAIT -> {
                 // resubmit if notified or interrupted while waiting (Object.wait)
