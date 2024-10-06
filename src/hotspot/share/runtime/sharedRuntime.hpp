@@ -85,9 +85,7 @@ class SharedRuntime: AllStatic {
             id == SharedStubId::throw_StackOverflowError_id ||
             id == SharedStubId::throw_delayed_StackOverflowError_id);
   }
-#endif   
-    
-  static int _object_wait_resume_offset;
+#endif
 
   // cont_doYieldStub is not yet folded into the general model for
   // shared stub/blob handling. It is actually a specially generated
@@ -241,11 +239,6 @@ class SharedRuntime: AllStatic {
   static address continuation_for_implicit_exception(JavaThread* current,
                                                      address faulting_pc,
                                                      ImplicitExceptionKind exception_kind);
-
-  static int object_wait_resume_offset() { return _object_wait_resume_offset; }
-  static void set_object_wait_resume_offset(int offset) {
-    _object_wait_resume_offset = offset;
-  }
 
   // Post-slow-path-allocation, pre-initializing-stores step for
   // implementing e.g. ReduceInitialCardMarks

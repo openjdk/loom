@@ -175,7 +175,7 @@ void TemplateInterpreterGenerator::generate_all() {
     Interpreter::_throw_StackOverflowError_entry             = generate_StackOverflowError_handler();
   }
 
-  { CodeletMark cm(_masm, "preemption rerun adapter");
+  { CodeletMark cm(_masm, "preemption resume adapter");
     Interpreter::_cont_resume_interpreter_adapter = generate_cont_resume_interpreter_adapter();
   }
 

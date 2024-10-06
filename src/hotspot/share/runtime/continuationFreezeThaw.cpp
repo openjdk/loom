@@ -1941,9 +1941,8 @@ protected:
   void patch_return(intptr_t* sp, bool is_last);
 
   intptr_t* handle_preempted_continuation(intptr_t* sp, int preempt_kind, bool fast_case);
-  inline intptr_t* push_resume_adapter(frame& top);
+  inline intptr_t* possibly_adjust_frame(frame& top);
   inline intptr_t* push_cleanup_continuation();
-  inline void fix_native_wrapper_return_pc_pd(frame& top);
   void throw_interrupted_exception(JavaThread* current, frame& top);
 
   void recurse_thaw(const frame& heap_frame, frame& caller, int num_frames, bool top_on_preempt_case);
@@ -2478,16 +2477,14 @@ intptr_t* ThawBase::handle_preempted_continuation(intptr_t* sp, int preempt_kind
       throw_interrupted_exception(_thread, top);
       _thread->set_pending_interrupted_exception(false);
     }
-    // Possibly update return pc on the top native wrapper frame so
-    // that we resume execution at the right instruction.
-    fix_native_wrapper_return_pc_pd(top);
   } else if (top.is_runtime_frame()) {
     // The continuation might now run on a different platform thread than the previous time so
     // we need to adjust the current thread saved in the stub frame before restoring registers.
     JavaThread** thread_addr = frame::saved_thread_address(top);
     if (thread_addr != nullptr) *thread_addr = _thread;
+    // Some platforms require the size of the runtime frame to be adjusted.
+    sp = possibly_adjust_frame(top);
   }
-  sp = push_resume_adapter(top);
   return sp;
 }
 
@@ -2841,7 +2838,6 @@ static inline intptr_t* thaw_internal(JavaThread* thread, const Continuation::th
   Thaw<ConfigT> thw(thread, cont);
   intptr_t* const sp = thw.thaw(kind);
   assert(is_aligned(sp, frame::frame_alignment), "");
-
   DEBUG_ONLY(log_frames_after_thaw(thread, cont, sp, preempted);)
 
   CONT_JFR_ONLY(thw.jfr_info().post_jfr_event(&event, cont.continuation(), thread);)
@@ -2989,49 +2985,24 @@ static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont,
   address pc0 = *(address*)(sp - frame::sender_sp_ret_address_offset());
   bool use_cont_entry = false;
 
-  // Preemption cases need to use and adjusted version of sp.
+  // Some preemption cases need to use and adjusted version of sp.
   if (preempted) {
     if (sp0 == cont.entrySP()) {
       // Still preempted (monitor not acquired) so no frames were thawed.
       assert(cont.is_preempted(), "");
       use_cont_entry = true;
-    } else {
-      // Resuming after being preempted.
-      assert(!cont.is_preempted(), "");
-      if (pc0 == Interpreter::cont_resume_interpreter_adapter()) {
-        // Interpreter case:
-        // We skip the adapter pushed into the stack (see push_resume_adapter()).
+    }
+#if defined (AARCH64) || defined (RISCV64)
+    else {
+      CodeBlob* cb = CodeCache::find_blob(pc0);
+      if (cb->frame_size() == 2) {
+        assert(cb->is_runtime_stub(), "");
+        // Returning to c2 runtime stub requires extra adjustment on aarch64
+        // and riscv64 (see possibly_adjust_frame()).
         sp0 += frame::metadata_words;
-      } else {
-        // Compiled case:
-        CodeBlob* cb = CodeCache::find_blob(pc0);
-        assert(cb != nullptr, "");
-#if defined (AMD64)
-        if (cb->is_nmethod()) {
-          assert(cb->as_nmethod()->method()->is_object_wait0(), "");
-          // For x64, when top is the compiled native wrapper (Object.wait())
-          // the pc would have been modified from its original value to return
-          // to the correct place. But that means we won't find the oopMap for
-          // that fixed pc when getting the sender which will trigger asserts.
-          // So just start walking the frames from the sender instead.
-          sp0 += cb->frame_size();
-          if (sp0 == cont.entrySP()) {
-            // sp0[-1] will be the return barrier pc. This is a stub, i.e. associated
-            // codeblob has _frame_size = 0. Force using cont.entryPC() to avoid
-            // asserts while trying to get the sender frame.
-            use_cont_entry = true;
-          }
-        }
-#elif defined (AARCH64) || defined (RISCV64)
-        if (cb->frame_size() == 2) {
-          assert(cb->is_runtime_stub(), "");
-          // Returning to c2 runtime stub requires extra adjustment on aarch64
-          // and riscv64 (see push_resume_adapter()).
-          sp0 += frame::metadata_words;
-        }
-#endif
       }
     }
+#endif
   }
 
   set_anchor(thread, use_cont_entry ? cont.entrySP() : sp0, use_cont_entry ? cont.entryPC() : nullptr);

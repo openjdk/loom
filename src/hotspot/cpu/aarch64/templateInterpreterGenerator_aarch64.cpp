@@ -610,8 +610,8 @@ address TemplateInterpreterGenerator::generate_cont_resume_interpreter_adapter()
   if (!Continuations::enabled()) return nullptr;
   address start = __ pc();
 
-  // Restore rfp first since we need it to restore rest of registers
-  __ leave();
+  __ restore_bcp();
+  __ restore_locals();
 
   // Restore constant pool cache
   __ ldr(rcpool, Address(rfp, frame::interpreter_frame_cache_offset * wordSize));
@@ -626,9 +626,8 @@ address TemplateInterpreterGenerator::generate_cont_resume_interpreter_adapter()
   __ ldr(rscratch1, Address(rfp, frame::interpreter_frame_extended_sp_offset * wordSize));
   __ lea(sp, Address(rfp, rscratch1, Address::lsl(LogBytesPerWord)));
 
-  // Prepare for adjustment on return to call_VM_leaf_base()
+  // Restore method
   __ ldr(rmethod, Address(rfp, frame::interpreter_frame_method_offset * wordSize));
-  __ stp(rscratch1, rmethod, Address(__ pre(sp, -2 * wordSize)));
 
   // Restore dispatch
   uint64_t offset;
@@ -1385,9 +1384,10 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   // pass JNIEnv
   __ add(c_rarg0, rthread, in_bytes(JavaThread::jni_environment_offset()));
 
-  // Set the last Java PC in the frame anchor to be the return address from
-  // the call to the native method: this will allow the debugger to
-  // generate an accurate stack trace.
+  // It is enough that the pc() points into the right code
+  // segment. It does not have to be the correct return pc.
+  // For convenience we use the pc we want to resume to in
+  // case of preemption on Object.wait.
   Label native_return;
   __ set_last_Java_frame(esp, rfp, native_return, rscratch1);
 
@@ -1480,9 +1480,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
     __ str(zr, Address(rthread, JavaThread::preempt_alternate_return_offset()));
     __ br(rscratch1);
     __ bind(native_return);
-    // On resume we need to set up stack as expected
-    __ push(dtos);
-    __ push(ltos);
+    __ restore_after_resume(true /* is_native */);
     __ bind(not_preempted);
   } else {
     // any pc will do so just use this one for LM_LEGACY to keep code together.

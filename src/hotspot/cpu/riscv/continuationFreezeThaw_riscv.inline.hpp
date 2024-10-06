@@ -299,42 +299,12 @@ inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
   patch_callee_link(f, fp);
 }
 
-inline void ThawBase::fix_native_wrapper_return_pc_pd(frame& top) {
-  // Nothing to do since the last pc saved before making the call to
-  // JVM_MonitorWait() was already set to the correct resume pc. Just
-  // do some sanity check.
-#ifdef ASSERT
-  Method* method = top.is_interpreted_frame() ? top.interpreter_frame_method() : CodeCache::find_blob(top.pc())->as_nmethod()->method();
-  assert(method->is_object_wait0(), "");
-#endif
-}
-
-inline intptr_t* ThawBase::push_resume_adapter(frame& top) {
+inline intptr_t* ThawBase::possibly_adjust_frame(frame& top) {
   intptr_t* sp = top.sp();
   CodeBlob* cb = top.cb();
 
-#ifdef ASSERT
-  RegisterMap map(JavaThread::current(),
-                  RegisterMap::UpdateMap::skip,
-                  RegisterMap::ProcessFrames::skip,
-                  RegisterMap::WalkContinuation::skip);
-  frame caller = top.sender(&map);
-  intptr_t link_addr = (intptr_t)ContinuationHelper::Frame::callee_link_address(caller);
-  assert(sp[-2] == link_addr + 16, "wrong link address: " INTPTR_FORMAT " != " INTPTR_FORMAT, sp[-2], link_addr + 16);
-#endif
-
-  if (top.is_interpreted_frame()) {
-    intptr_t* fp = sp - frame::sender_sp_offset;
-    address pc = Interpreter::cont_resume_interpreter_adapter();
-
-    sp -= frame::metadata_words;
-    *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
-    *(intptr_t**)(sp - 2) = fp;
-
-    log_develop_trace(continuations, preempt)("push_resume_adapter(): initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT
-                                              " fp: " INTPTR_FORMAT, p2i(sp + frame::metadata_words), p2i(sp), p2i(fp));
-  } else if (cb->frame_size() == 2) {
-    // C2 runtime stub case. For riscv64 the real size of the c2 runtime stub is 2 words bigger
+  if (cb->frame_size() == 2) {
+    // C2 runtime stub case. For aarch64 the real size of the c2 runtime stub is 2 words bigger
     // than what we think, i.e. size is 4. This is because the _last_Java_sp is not set to the
     // sp right before making the call to the VM, but rather it is artificially set 2 words above
     // this real sp so that we can store the return address at last_Java_sp[-1], and keep this

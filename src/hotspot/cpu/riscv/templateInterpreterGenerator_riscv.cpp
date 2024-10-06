@@ -543,8 +543,8 @@ address TemplateInterpreterGenerator::generate_cont_resume_interpreter_adapter()
   if (!Continuations::enabled()) return nullptr;
   address start = __ pc();
 
-  // Restore fp first since we need it to restore rest of registers
-  __ leave();
+  __ restore_bcp();
+  __ restore_locals();
 
   // Restore constant pool cache
   __ ld(xcpool, Address(fp, frame::interpreter_frame_cache_offset * wordSize));
@@ -559,11 +559,8 @@ address TemplateInterpreterGenerator::generate_cont_resume_interpreter_adapter()
   __ ld(t0, Address(fp, frame::interpreter_frame_extended_sp_offset * wordSize));
   __ shadd(sp, t0, fp, t0, LogBytesPerWord);
 
-  // Prepare for adjustment on return to call_VM_leaf_base()
+  // Restore method
   __ ld(xmethod, Address(fp, frame::interpreter_frame_method_offset * wordSize));
-  __ addi(sp, sp, -2 * wordSize);
-  __ sd(t0, Address(sp));
-  __ sd(xmethod, Address(sp, 8));
 
   // Restore dispatch
   __ la(xdispatch, ExternalAddress((address)Interpreter::dispatch_table()));
@@ -1165,9 +1162,10 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
   // pass JNIEnv
   __ add(c_rarg0, xthread, in_bytes(JavaThread::jni_environment_offset()));
 
-  // Set the last Java PC in the frame anchor to be the return address from
-  // the call to the native method: this will allow the debugger to
-  // generate an accurate stack trace.
+  // It is enough that the pc() points into the right code
+  // segment. It does not have to be the correct return pc.
+  // For convenience we use the pc we want to resume to in
+  // case of preemption on Object.wait.
   Label native_return;
   __ set_last_Java_frame(esp, fp, native_return, x30);
 
@@ -1269,9 +1267,7 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
     __ sd(zr, Address(xthread, JavaThread::preempt_alternate_return_offset()));
     __ jr(t0);
     __ bind(native_return);
-    // On resume we need to set up stack as expected
-    __ push(dtos);
-    __ push(ltos);
+    __ restore_after_resume(true /* is_native */);
     __ bind(not_preempted);
   } else {
     // any pc will do so just use this one for LM_LEGACY to keep code together.

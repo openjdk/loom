@@ -391,10 +391,6 @@ address TemplateInterpreterGenerator::generate_cont_resume_interpreter_adapter()
   if (!Continuations::enabled()) return nullptr;
   address start = __ pc();
 
-  __ pop(rbp);
-
-  // We will return to the intermediate call made in call_VM skipping the restoration
-  // of bcp and locals done in InterpreterMacroAssembler::call_VM_base, so fix them here.
   __ restore_bcp();
   __ restore_locals();
 
@@ -1053,7 +1049,10 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
 
    // It is enough that the pc() points into the right code
    // segment. It does not have to be the correct return pc.
-   __ set_last_Java_frame(rsp, rbp, (address) __ pc(), rscratch1);
+   // For convenience we use the pc we want to resume to in
+   // case of preemption on Object.wait.
+   Label native_return;
+   __ set_last_Java_frame(rsp, rbp, native_return, rscratch1);
 #endif // _LP64
 
   // change thread state
@@ -1187,11 +1186,12 @@ address TemplateInterpreterGenerator::generate_native_entry(bool synchronized) {
     __ jccb(Assembler::equal, not_preempted);
     __ movptr(Address(r15_thread, JavaThread::preempt_alternate_return_offset()), NULL_WORD);
     __ jmp(rscratch1);
-    Interpreter::_native_frame_resume_entry = __ pc();
-    // On resume we need to set up stack as expected
-    __ push(dtos);
-    __ push(ltos);
+    __ bind(native_return);
+    __ restore_after_resume(true /* is_native */);
     __ bind(not_preempted);
+  } else {
+    // any pc will do so just use this one for LM_LEGACY to keep code together.
+    __ bind(native_return);
   }
 #endif // _LP64
 

@@ -529,16 +529,6 @@ void MacroAssembler::call_VM_leaf_base(address entry_point, int num_args) {
   // restore stack pointer
   addq(rsp, frame::arg_reg_save_area_bytes);
 #endif
-
-  if (entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter)) {
-    Label not_preempted;
-    movptr(rscratch1, Address(r15_thread, JavaThread::preempt_alternate_return_offset()));
-    cmpptr(rscratch1, NULL_WORD);
-    jccb(Assembler::zero, not_preempted);
-    movptr(Address(r15_thread, JavaThread::preempt_alternate_return_offset()), NULL_WORD);
-    jmp(rscratch1);
-    bind(not_preempted);
-  }
 }
 
 void MacroAssembler::cmp64(Register src1, AddressLiteral src2, Register rscratch) {
@@ -3157,6 +3147,17 @@ void MacroAssembler::set_last_Java_frame(Register java_thread,
   }
   movptr(Address(java_thread, JavaThread::last_Java_sp_offset()), last_java_sp);
 }
+
+#ifdef _LP64
+void MacroAssembler::set_last_Java_frame(Register last_java_sp,
+                                         Register last_java_fp,
+                                         Label &L,
+                                         Register scratch) {
+  lea(scratch, L);
+  movptr(Address(r15_thread, JavaThread::last_Java_pc_offset()), scratch);
+  set_last_Java_frame(r15_thread, last_java_sp, last_java_fp, nullptr, scratch);
+}
+#endif
 
 void MacroAssembler::shlptr(Register dst, int imm8) {
   LP64_ONLY(shlq(dst, imm8)) NOT_LP64(shll(dst, imm8));

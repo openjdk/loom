@@ -547,11 +547,7 @@ inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, c
   // Keep top_frame_sp relativized.
 }
 
-inline void ThawBase::fix_native_wrapper_return_pc_pd(frame& top) {
-  Unimplemented();
-}
-
-inline intptr_t* ThawBase::push_resume_adapter(frame& top) {
+inline intptr_t* ThawBase::possibly_adjust_frame(frame& top) {
   Unimplemented();
   return nullptr;
 }

@@ -281,40 +281,9 @@ inline void ThawBase::patch_pd(frame& f, intptr_t* caller_sp) {
   patch_callee_link(f, fp);
 }
 
-inline void ThawBase::fix_native_wrapper_return_pc_pd(frame& top) {
-  bool from_interpreted = top.is_interpreted_frame();
-  address resume_address = from_interpreted ? Interpreter::native_frame_resume_entry() : (top.pc() + SharedRuntime::object_wait_resume_offset());
-  DEBUG_ONLY(Method* method = from_interpreted ? top.interpreter_frame_method() : CodeCache::find_blob(resume_address)->as_nmethod()->method();)
-  assert(method->is_object_wait0(), "");
-  ContinuationHelper::Frame::patch_pc(top, resume_address);
-}
-
-inline intptr_t* ThawBase::push_resume_adapter(frame& top) {
-  intptr_t* sp = top.sp();
-
-#ifdef ASSERT
-  RegisterMap map(JavaThread::current(),
-                  RegisterMap::UpdateMap::skip,
-                  RegisterMap::ProcessFrames::skip,
-                  RegisterMap::WalkContinuation::skip);
-  frame caller = top.sender(&map);
-  intptr_t link_addr = (intptr_t)ContinuationHelper::Frame::callee_link_address(caller);
-  assert(sp[-2] == link_addr, "wrong link address: " INTPTR_FORMAT " != " INTPTR_FORMAT, sp[-2], link_addr);
-#endif
-
-  // Nothing to do for compiled case.
-  if (top.is_interpreted_frame()) {
-    intptr_t* fp = sp - frame::sender_sp_offset;
-    address pc = Interpreter::cont_resume_interpreter_adapter();
-
-    sp -= frame::metadata_words;
-    *(address*)(sp - frame::sender_sp_ret_address_offset()) = pc;
-    *(intptr_t**)(sp - frame::sender_sp_offset) = fp;
-
-    log_develop_trace(continuations, preempt)("push_resume_adapter(): initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT
-                                              " fp: " INTPTR_FORMAT, p2i(sp + frame::metadata_words), p2i(sp), p2i(fp));
-  }
-  return sp;
+inline intptr_t* ThawBase::possibly_adjust_frame(frame& top) {
+  // Nothing to do
+  return top.sp();
 }
 
 inline intptr_t* ThawBase::push_cleanup_continuation() {

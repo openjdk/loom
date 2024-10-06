@@ -112,7 +112,6 @@ class TemplateInterpreter: public AbstractInterpreter {
   static address    _throw_StackOverflowError_entry;
 
   static address    _cont_resume_interpreter_adapter;
-  static address    _native_frame_resume_entry;
 
   static address    _remove_activation_entry;                   // continuation address if an exception is not handled by current frame
   static address    _remove_activation_preserving_args_entry;   // continuation address when current frame is being popped
@@ -158,7 +157,6 @@ class TemplateInterpreter: public AbstractInterpreter {
   static address    throw_StackOverflowError_entry()            { return _throw_StackOverflowError_entry; }
 
   static address    cont_resume_interpreter_adapter()           { return _cont_resume_interpreter_adapter; }
-  static address    native_frame_resume_entry()                 { return _native_frame_resume_entry; }
 
   // Code generation
 #ifndef PRODUCT

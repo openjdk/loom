@@ -776,6 +776,10 @@ static void pass_arg3(MacroAssembler* masm, Register arg) {
   }
 }
 
+static bool is_preemptable(address entry_point) {
+  return entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter);
+}
+
 void MacroAssembler::call_VM_base(Register oop_result,
                                   Register java_thread,
                                   Register last_java_sp,
@@ -811,7 +815,12 @@ void MacroAssembler::call_VM_base(Register oop_result,
   assert(last_java_sp != rfp, "can't use rfp");
 
   Label l;
-  set_last_Java_frame(last_java_sp, rfp, l, rscratch1);
+  if (is_preemptable(entry_point)) {
+    // skip setting last_pc since we already set it to desired value.
+    set_last_Java_frame(last_java_sp, rfp, noreg, rscratch1);
+  } else {
+    set_last_Java_frame(last_java_sp, rfp, l, rscratch1);
+  }
 
   // do the call, remove parameters
   MacroAssembler::call_VM_leaf_base(entry_point, number_of_arguments, &l);
@@ -1960,14 +1969,6 @@ void MacroAssembler::call_VM_leaf_base(address entry_point,
   blr(rscratch1);
   if (retaddr)
     bind(*retaddr);
-
-  if (entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter)) {
-    ldr(rscratch1, Address(rthread, JavaThread::preempt_alternate_return_offset()));
-    cbz(rscratch1, not_preempted);
-    str(zr, Address(rthread, JavaThread::preempt_alternate_return_offset()));
-    br(rscratch1);
-  }
-  bind(not_preempted);
 
   ldp(rscratch1, rmethod, Address(post(sp, 2 * wordSize)));
 }
