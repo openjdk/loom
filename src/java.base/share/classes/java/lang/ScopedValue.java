@@ -390,7 +390,7 @@ public final class ScopedValue<T> {
                     return (T) value;
                 }
             }
-            throw new NoSuchElementException();
+            throw new NoSuchElementException("No mapping present");
         }
 
         /**
@@ -574,7 +574,7 @@ public final class ScopedValue<T> {
     private T slowGet() {
         var value = findBinding();
         if (value == Snapshot.NIL) {
-            throw new NoSuchElementException();
+            throw new NoSuchElementException("ScopedValue not bound");
         }
         Cache.put(this, value);
         return (T)value;
