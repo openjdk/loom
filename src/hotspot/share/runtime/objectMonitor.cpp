@@ -252,7 +252,6 @@ ObjectMonitor::ObjectMonitor(oop object) :
   _metadata(0),
   _object(_oop_storage, object),
   _owner(nullptr),
-  _stack_locker(nullptr),
   _previous_owner_tid(0),
   _next_om(nullptr),
   _recursions(0),
@@ -263,7 +262,8 @@ ObjectMonitor::ObjectMonitor(oop object) :
   _contentions(0),
   _WaitSet(nullptr),
   _waiters(0),
-  _WaitSetLock(0)
+  _WaitSetLock(0),
+  _stack_locker(nullptr)
 { }
 
 ObjectMonitor::~ObjectMonitor() {

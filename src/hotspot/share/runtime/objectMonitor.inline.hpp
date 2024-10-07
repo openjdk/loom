@@ -39,7 +39,7 @@
 #include "utilities/checkedCast.hpp"
 #include "utilities/globalDefinitions.hpp"
 
-inline void* ObjectMonitor::owner_for(JavaThread* thread) const {
+inline void* ObjectMonitor::owner_for(JavaThread* thread) {
   int64_t tid = thread->lock_id();
   assert(tid >= 3 && tid < ThreadIdentifier::current(), "must be reasonable");
   return (void*)tid;
