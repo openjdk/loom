@@ -2844,6 +2844,7 @@ void Assembler::leal(Register dst, Address src) {
   emit_operand(dst, src, 0);
 }
 
+#ifdef _LP64
 void Assembler::lea(Register dst, Label& L) {
   assert(dst == r10, "invalid destination register");
   if (L.is_bound()) {
@@ -2863,6 +2864,7 @@ void Assembler::lea(Register dst, Label& L) {
     emit_int32(0);
   }
 }
+#endif
 
 void Assembler::lfence() {
   emit_int24(0x0F, (unsigned char)0xAE, (unsigned char)0xE8);

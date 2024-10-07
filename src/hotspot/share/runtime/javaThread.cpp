@@ -2009,6 +2009,8 @@ void JavaThread::trace_stack() {
 // Slow-path increment of the held monitor counts. JNI locking is always
 // this slow-path.
 void JavaThread::inc_held_monitor_count(intx i, bool jni) {
+#ifdef SUPPORT_MONITOR_COUNT
+
 #ifdef LOOM_MONITOR_SUPPORT
   if (LockingMode != LM_LEGACY) {
     // Nothing to do. Just do some sanity check.
@@ -2016,9 +2018,8 @@ void JavaThread::inc_held_monitor_count(intx i, bool jni) {
     assert(_jni_monitor_count == 0, "counter should not be used");
     return;
   }
-#endif
+#endif // LOOM_MONITOR_SUPPORT
 
-#ifdef SUPPORT_MONITOR_COUNT
   assert(_held_monitor_count >= 0, "Must always be non-negative: " INTX_FORMAT, _held_monitor_count);
   _held_monitor_count += i;
   if (jni) {
@@ -2027,12 +2028,14 @@ void JavaThread::inc_held_monitor_count(intx i, bool jni) {
   }
   assert(_held_monitor_count >= _jni_monitor_count, "Monitor count discrepancy detected - held count "
          INTX_FORMAT " is less than JNI count " INTX_FORMAT, _held_monitor_count, _jni_monitor_count);
-#endif
+#endif // SUPPORT_MONITOR_COUNT
 }
 
 // Slow-path decrement of the held monitor counts. JNI unlocking is always
 // this slow-path.
 void JavaThread::dec_held_monitor_count(intx i, bool jni) {
+#ifdef SUPPORT_MONITOR_COUNT
+
 #ifdef LOOM_MONITOR_SUPPORT
   if (LockingMode != LM_LEGACY) {
     // Nothing to do. Just do some sanity check.
@@ -2040,9 +2043,8 @@ void JavaThread::dec_held_monitor_count(intx i, bool jni) {
     assert(_jni_monitor_count == 0, "counter should not be used");
     return;
   }
-#endif
+#endif // LOOM_MONITOR_SUPPORT
 
-#ifdef SUPPORT_MONITOR_COUNT
   _held_monitor_count -= i;
   assert(_held_monitor_count >= 0, "Must always be non-negative: " INTX_FORMAT, _held_monitor_count);
   if (jni) {
@@ -2055,7 +2057,7 @@ void JavaThread::dec_held_monitor_count(intx i, bool jni) {
   // JNI count is directly set to zero.
   assert(_held_monitor_count >= _jni_monitor_count || is_exiting(), "Monitor count discrepancy detected - held count "
          INTX_FORMAT " is less than JNI count " INTX_FORMAT, _held_monitor_count, _jni_monitor_count);
-#endif
+#endif // SUPPORT_MONITOR_COUNT
 }
 
 frame JavaThread::vthread_last_frame() {
