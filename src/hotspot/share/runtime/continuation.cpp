@@ -64,14 +64,24 @@ class JvmtiUnmountBeginMark : public StackObj {
   Handle _vthread;
   JavaThread* _target;
   int _preempt_result;
+  bool _failed;
 
  public:
   JvmtiUnmountBeginMark(JavaThread* t) :
-    _vthread(t, t->vthread()), _target(t), _preempt_result(freeze_pinned_native) {
+    _vthread(t, t->vthread()), _target(t), _preempt_result(freeze_pinned_native), _failed(false) {
     assert(!_target->is_in_any_VTMS_transition(), "must be");
 
     if (JvmtiVTMSTransitionDisabler::VTMS_notify_jvmti_events()) {
       JvmtiVTMSTransitionDisabler::start_VTMS_transition((jthread)_vthread.raw_value(), /* is_mount */ false);
+
+      // Don't preempt if there is a pending popframe or earlyret operation. This can
+      // happen in start_VTMS_transition() so we need to check it here.
+      if (JvmtiExport::can_pop_frame() || JvmtiExport::can_force_early_return()) {
+        JvmtiThreadState* state = _target->jvmti_thread_state();
+        if (_target->has_pending_popframe() || (state != nullptr && state->is_earlyret_pending())) {
+          _failed = true;
+        }
+      }
     } else {
       _target->set_is_in_VTMS_transition(true);
       java_lang_Thread::set_is_in_VTMS_transition(_vthread(), true);
@@ -105,13 +115,10 @@ class JvmtiUnmountBeginMark : public StackObj {
     }
   }
   void set_preempt_result(int res) { _preempt_result = res; }
+  bool failed() { return _failed; }
 };
 
 static bool is_safe_vthread_to_preempt_for_jvmti(JavaThread* target, oop vthread) {
-  assert(!target->has_pending_popframe(), "should be true; no support for vthreads yet");
-  JvmtiThreadState* state = target->jvmti_thread_state();
-  assert(state == nullptr || !state->is_earlyret_pending(), "should be true; no support for vthreads yet");
-
   if (target->is_in_any_VTMS_transition()) {
     // We caught target at the end of a mount transition (is_in_VTMS_transition()) or at the
     // beginning or end of a temporary switch to carrier thread (is_in_tmp_VTMS_transition()).
@@ -122,7 +129,7 @@ static bool is_safe_vthread_to_preempt_for_jvmti(JavaThread* target, oop vthread
 #endif // INCLUDE_JVMTI
 
 static bool is_safe_vthread_to_preempt(JavaThread* target, oop vthread) {
-  if (!java_lang_VirtualThread::is_instance(vthread) ||                               // inside transition
+  if (!java_lang_VirtualThread::is_instance(vthread) ||                               // inside tmp transition
       java_lang_VirtualThread::state(vthread) != java_lang_VirtualThread::RUNNING) {  // inside transition
     return false;
   }
@@ -131,35 +138,36 @@ static bool is_safe_vthread_to_preempt(JavaThread* target, oop vthread) {
 
 typedef int (*FreezeContFnT)(JavaThread*, intptr_t*, int);
 
-int Continuation::try_preempt(JavaThread* target, oop continuation, int preempt_kind) {
+static void verify_preempt_preconditions(JavaThread* target, oop continuation) {
   assert(target == JavaThread::current(), "no support for external preemption");
   assert(target->has_last_Java_frame(), "");
   assert(!target->preempting(), "");
   assert(target->last_continuation() != nullptr, "");
   assert(target->last_continuation()->cont_oop(target) == continuation, "");
-  assert(!is_continuation_preempted(continuation), "");
+  assert(!Continuation::is_continuation_preempted(continuation), "");
   assert(Continuation::continuation_scope(continuation) == java_lang_VirtualThread::vthread_scope(), "");
   assert(!target->has_pending_exception(), "");
   assert(!target->is_suspended() JVMTI_ONLY(|| target->is_disable_suspend()) || target->obj_locker_count() > 0, "");
+}
+
+int Continuation::try_preempt(JavaThread* target, oop continuation, int preempt_kind) {
+  verify_preempt_preconditions(target, continuation);
 
   if (LockingMode == LM_LEGACY) {
     return freeze_unsupported;
   }
 
   if (preempt_kind == freeze_on_monitorenter && !target->is_on_monitorenter()) {
+    // ObjectLocker or jni_enter case. We can't preempt in these cases.
     return freeze_pinned_native;
   }
 
-  if (is_continuation_done(continuation)) {
-    return freeze_not_mounted;
-  }
-
-  // Continuation is mounted and it's not done so check if it's safe to preempt.
   if (!is_safe_vthread_to_preempt(target, target->vthread())) {
     return freeze_pinned_native;
   }
 
   JVMTI_ONLY(JvmtiUnmountBeginMark jubm(target);)
+  JVMTI_ONLY(if (jubm.failed()) return freeze_pinned_native;)
   target->set_preempting(true);
   int res = CAST_TO_FN_PTR(FreezeContFnT, freeze_preempt_entry())(target, target->last_Java_sp(), preempt_kind);
   log_trace(continuations, preempt)("try_preempt: %d", res);
