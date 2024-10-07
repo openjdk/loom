@@ -57,7 +57,7 @@ void C2_MacroAssembler::fast_lock(Register objectReg, Register boxReg, Register 
   Label count, no_count;
 
   assert(LockingMode != LM_LIGHTWEIGHT, "lightweight locking should use fast_lock_lightweight");
-  assert_different_registers(oop, box, tmp, disp_hdr, rscratch1);
+  assert_different_registers(oop, box, tmp, disp_hdr, rscratch2);
 
   // Load markWord from object into displaced_header.
   ldr(disp_hdr, Address(oop, oopDesc::mark_offset_in_bytes()));
@@ -69,15 +69,14 @@ void C2_MacroAssembler::fast_lock(Register objectReg, Register boxReg, Register 
     br(Assembler::NE, cont);
   }
 
+  // Check for existing monitor
+  tbnz(disp_hdr, exact_log2(markWord::monitor_value), object_has_monitor);
+
   if (LockingMode == LM_MONITOR) {
     tst(oop, oop); // Set NE to indicate 'failure' -> take slow-path. We know that oop != 0.
     b(cont);
   } else {
     assert(LockingMode == LM_LEGACY, "must be");
-
-    // Check for existing monitor
-    tbnz(disp_hdr, exact_log2(markWord::monitor_value), object_has_monitor);
-
     // Set tmp to be (markWord of object | UNLOCK_VALUE).
     orr(tmp, disp_hdr, markWord::unlocked_value);
 
@@ -143,7 +142,9 @@ void C2_MacroAssembler::fast_lock(Register objectReg, Register boxReg, Register 
   br(Assembler::NE, no_count);
 
   bind(count);
-  inc_held_monitor_count();
+  if (LockingMode == LM_LEGACY) {
+    inc_held_monitor_count();
+  }
 
   bind(no_count);
 }
@@ -163,30 +164,32 @@ void C2_MacroAssembler::fast_unlock(Register objectReg, Register boxReg, Registe
   assert(LockingMode != LM_LIGHTWEIGHT, "lightweight locking should use fast_unlock_lightweight");
   assert_different_registers(oop, box, tmp, disp_hdr);
 
-  if (LockingMode == LM_MONITOR) {
-    tst(oop, oop); // Set NE to indicate 'failure' -> take slow-path. We know that oop != 0.
-    b(cont);
-  } else {
-    assert(LockingMode == LM_LEGACY, "must be");
+  if (LockingMode == LM_LEGACY) {
+    // Find the lock address and load the displaced header from the stack.
+    ldr(disp_hdr, Address(box, BasicLock::displaced_header_offset_in_bytes()));
+
+    // If the displaced header is 0, we have a recursive unlock.
+    cmp(disp_hdr, zr);
+    br(Assembler::EQ, cont);
   }
-
-  // Find the lock address and load the displaced header from the stack.
-  ldr(disp_hdr, Address(box, BasicLock::displaced_header_offset_in_bytes()));
-
-  // If the displaced header is 0, we have a recursive unlock.
-  cmp(disp_hdr, zr);
-  br(Assembler::EQ, cont);
 
   // Handle existing monitor.
   ldr(tmp, Address(oop, oopDesc::mark_offset_in_bytes()));
   tbnz(tmp, exact_log2(markWord::monitor_value), object_has_monitor);
 
-  // Check if it is still a light weight lock, this is is true if we
-  // see the stack address of the basicLock in the markWord of the
-  // object.
-  cmpxchg(oop, box, disp_hdr, Assembler::xword, /*acquire*/ false,
-          /*release*/ true, /*weak*/ false, tmp);
-  b(cont);
+  if (LockingMode == LM_MONITOR) {
+    tst(oop, oop); // Set NE to indicate 'failure' -> take slow-path. We know that oop != 0.
+    b(cont);
+  } else {
+    assert(LockingMode == LM_LEGACY, "must be");
+    // Check if it is still a light weight lock, this is is true if we
+    // see the stack address of the basicLock in the markWord of the
+    // object.
+
+    cmpxchg(oop, box, disp_hdr, Assembler::xword, /*acquire*/ false,
+            /*release*/ true, /*weak*/ false, tmp);
+    b(cont);
+  }
 
   assert(oopDesc::mark_offset_in_bytes() == 0, "offset of _mark is not 0");
 
@@ -248,7 +251,9 @@ void C2_MacroAssembler::fast_unlock(Register objectReg, Register boxReg, Registe
   br(Assembler::NE, no_count);
 
   bind(count);
-  dec_held_monitor_count();
+  if (LockingMode == LM_LEGACY) {
+    dec_held_monitor_count();
+  }
 
   bind(no_count);
 }
@@ -256,7 +261,7 @@ void C2_MacroAssembler::fast_unlock(Register objectReg, Register boxReg, Registe
 void C2_MacroAssembler::fast_lock_lightweight(Register obj, Register box, Register t1,
                                               Register t2, Register t3) {
   assert(LockingMode == LM_LIGHTWEIGHT, "must be");
-  assert_different_registers(obj, box, t1, t2, t3);
+  assert_different_registers(obj, box, t1, t2, t3, rscratch2);
 
   // Handle inflated monitor.
   Label inflated;

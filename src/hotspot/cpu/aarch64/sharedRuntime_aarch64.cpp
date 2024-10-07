@@ -1842,6 +1842,8 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     // Slow path will re-enter here
     __ bind(lock_done);
   }
+
+
   // Finally just about ready to make the JNI call
 
   // get JNIEnv* which is first argument to native

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2024, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2017, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -107,9 +107,9 @@ class HandshakeState {
   bool possibly_can_process_handshake();
   bool can_process_handshake();
 
-  bool has_handshaker_operation();
+  bool have_non_self_executable_operation();
   HandshakeOperation* get_op_for_self(bool allow_suspend, bool check_async_exception);
-  HandshakeOperation* get_op_for_handshaker();
+  HandshakeOperation* get_op();
   void remove_op(HandshakeOperation* op);
 
   void set_active_handshaker(Thread* thread) { Atomic::store(&_active_handshaker, thread); }

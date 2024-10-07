@@ -1859,7 +1859,7 @@ class ReleaseJavaMonitorsClosure: public MonitorClosure {
   ReleaseJavaMonitorsClosure(JavaThread* thread) : _thread(thread) {}
   void do_monitor(ObjectMonitor* mid) {
     intx rec = mid->complete_exit(_thread);
-    _thread->dec_held_monitor_count((rec + 1));
+    _thread->dec_held_monitor_count(rec + 1);
   }
 };
 
@@ -1899,7 +1899,6 @@ const char* ObjectSynchronizer::inflate_cause_name(const InflateCause cause) {
     case inflate_cause_hash_code:      return "Monitor Hash Code";
     case inflate_cause_jni_enter:      return "JNI Monitor Enter";
     case inflate_cause_jni_exit:       return "JNI Monitor Exit";
-    case inflate_cause_cont_freeze:    return "Continuation Freeze";
     default:
       ShouldNotReachHere();
   }

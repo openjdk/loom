@@ -78,15 +78,15 @@ int C2FastUnlockLightweightStub::max_size() const {
 }
 
 void C2FastUnlockLightweightStub::emit(C2_MacroAssembler& masm) {
-  assert(_t1 == rax, "must be");
+  assert(_t == rax, "must be");
 
   { // Restore lock-stack and handle the unlock in runtime.
 
     __ bind(_push_and_slow_path);
 #ifdef ASSERT
     // The obj was only cleared in debug.
-    __ movl(_t1, Address(_thread, JavaThread::lock_stack_top_offset()));
-    __ movptr(Address(_thread, _t1), _obj);
+    __ movl(_t, Address(_thread, JavaThread::lock_stack_top_offset()));
+    __ movptr(Address(_thread, _t), _obj);
 #endif
     __ addl(Address(_thread, JavaThread::lock_stack_top_offset()), oopSize);
     // addl will always result in ZF = 0 (no overflows).

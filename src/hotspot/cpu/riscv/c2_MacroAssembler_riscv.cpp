@@ -73,15 +73,14 @@ void C2_MacroAssembler::fast_lock(Register objectReg, Register boxReg,
     bnez(tmp, slow_path);
   }
 
+  // Check for existing monitor
+  test_bit(tmp, disp_hdr, exact_log2(markWord::monitor_value));
+  bnez(tmp, object_has_monitor);
+
   if (LockingMode == LM_MONITOR) {
     j(slow_path);
   } else {
     assert(LockingMode == LM_LEGACY, "must be");
-
-    // Check for existing monitor
-    test_bit(tmp, disp_hdr, exact_log2(markWord::monitor_value));
-    bnez(tmp, object_has_monitor);
-
     // Set tmp to be (markWord of object | UNLOCK_VALUE).
     ori(tmp, disp_hdr, markWord::unlocked_value);
 
@@ -146,7 +145,9 @@ void C2_MacroAssembler::fast_lock(Register objectReg, Register boxReg,
 
   bind(locked);
   mv(flag, zr);
-  inc_held_monitor_count();
+  if (LockingMode == LM_LEGACY) {
+    inc_held_monitor_count();
+  }
 
 #ifdef ASSERT
   // Check that locked label is reached with flag == 0.
@@ -185,30 +186,32 @@ void C2_MacroAssembler::fast_unlock(Register objectReg, Register boxReg,
 
   mv(flag, 1);
 
-  if (LockingMode == LM_MONITOR) {
-    j(slow_path);
-  } else {
-    assert(LockingMode == LM_LEGACY, "must be");
+  if (LockingMode == LM_LEGACY) {
+    // Find the lock address and load the displaced header from the stack.
+    ld(disp_hdr, Address(box, BasicLock::displaced_header_offset_in_bytes()));
+
+    // If the displaced header is 0, we have a recursive unlock.
+    beqz(disp_hdr, unlocked);
   }
-
-  // Find the lock address and load the displaced header from the stack.
-  ld(disp_hdr, Address(box, BasicLock::displaced_header_offset_in_bytes()));
-
-  // If the displaced header is 0, we have a recursive unlock.
-  beqz(disp_hdr, unlocked);
 
   // Handle existing monitor.
   ld(tmp, Address(oop, oopDesc::mark_offset_in_bytes()));
   test_bit(t0, tmp, exact_log2(markWord::monitor_value));
   bnez(t0, object_has_monitor);
 
-  // Check if it is still a light weight lock, this is true if we
-  // see the stack address of the basicLock in the markWord of the
-  // object.
-  cmpxchg(/*memory address*/oop, /*expected value*/box, /*new value*/disp_hdr, Assembler::int64,
-          Assembler::relaxed, Assembler::rl, /*result*/tmp);
-  beq(box, tmp, unlocked); // box == tmp if cas succeeds
-  j(slow_path);
+  if (LockingMode == LM_MONITOR) {
+    j(slow_path);
+  } else {
+    assert(LockingMode == LM_LEGACY, "must be");
+    // Check if it is still a light weight lock, this is true if we
+    // see the stack address of the basicLock in the markWord of the
+    // object.
+
+    cmpxchg(/*memory address*/oop, /*expected value*/box, /*new value*/disp_hdr, Assembler::int64,
+            Assembler::relaxed, Assembler::rl, /*result*/tmp);
+    beq(box, tmp, unlocked); // box == tmp if cas succeeds
+    j(slow_path);
+  }
 
   assert(oopDesc::mark_offset_in_bytes() == 0, "offset of _mark is not 0");
 
@@ -258,7 +261,9 @@ void C2_MacroAssembler::fast_unlock(Register objectReg, Register boxReg,
 
   bind(unlocked);
   mv(flag, zr);
-  dec_held_monitor_count();
+  if (LockingMode == LM_LEGACY) {
+    dec_held_monitor_count();
+  }
 
 #ifdef ASSERT
   // Check that unlocked label is reached with flag == 0.

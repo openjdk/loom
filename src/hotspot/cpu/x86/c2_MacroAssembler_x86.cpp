@@ -281,16 +281,15 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
     jcc(Assembler::notZero, DONE_LABEL);
   }
 
+  movptr(tmpReg, Address(objReg, oopDesc::mark_offset_in_bytes()));          // [FETCH]
+  testptr(tmpReg, markWord::monitor_value); // inflated vs stack-locked|neutral
+  jcc(Assembler::notZero, IsInflated);
+
   if (LockingMode == LM_MONITOR) {
     // Clear ZF so that we take the slow path at the DONE label. objReg is known to be not 0.
     testptr(objReg, objReg);
   } else {
     assert(LockingMode == LM_LEGACY, "must be");
-
-    movptr(tmpReg, Address(objReg, oopDesc::mark_offset_in_bytes()));          // [FETCH]
-    testptr(tmpReg, markWord::monitor_value); // inflated vs stack-locked|neutral
-    jcc(Assembler::notZero, IsInflated);
-
     // Attempt stack-locking ...
     orptr (tmpReg, markWord::unlocked_value);
     movptr(Address(boxReg, 0), tmpReg);          // Anticipate successful CAS
@@ -382,10 +381,12 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
   jccb(Assembler::notZero, NO_COUNT); // jump if ZFlag == 0
 
   bind(COUNT);
+  if (LockingMode == LM_LEGACY) {
 #ifdef _LP64
-  // Count monitors in fast path
-  increment(Address(thread, JavaThread::held_monitor_count_offset()));
+    // Count monitors in fast path
+    increment(Address(thread, JavaThread::held_monitor_count_offset()));
 #endif
+  }
   xorl(tmpReg, tmpReg); // Set ZF == 1
 
   bind(NO_COUNT);
@@ -428,7 +429,7 @@ void C2_MacroAssembler::fast_lock(Register objReg, Register boxReg, Register tmp
 // A perfectly viable alternative is to elide the owner check except when
 // Xcheck:jni is enabled.
 
-void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register tmpReg, Register scrReg) {
+void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register tmpReg) {
   assert(LockingMode != LM_LIGHTWEIGHT, "lightweight locking should use fast_unlock_lightweight");
   assert(boxReg == rax, "");
   assert_different_registers(objReg, boxReg, tmpReg);
@@ -514,7 +515,7 @@ void C2_MacroAssembler::fast_unlock(Register objReg, Register boxReg, Register t
     movptr(tmpReg, Address (boxReg, 0));      // re-fetch
     lock();
     cmpxchgptr(tmpReg, Address(objReg, oopDesc::mark_offset_in_bytes())); // Uses RAX which is box
-     // Intentional fall-thru into DONE_LABEL
+    // Intentional fall-thru into DONE_LABEL
   }
 
   bind(DONE_LABEL);
@@ -699,26 +700,26 @@ void C2_MacroAssembler::fast_lock_lightweight(Register obj, Register box, Regist
   // C2 uses the value of ZF to determine the continuation.
 }
 
-void C2_MacroAssembler::fast_unlock_lightweight(Register obj, Register reg_rax, Register t1, Register t2, Register thread) {
+void C2_MacroAssembler::fast_unlock_lightweight(Register obj, Register reg_rax, Register t, Register thread) {
   assert(LockingMode == LM_LIGHTWEIGHT, "must be");
   assert(reg_rax == rax, "Used for CAS");
-  assert_different_registers(obj, reg_rax, t1, t2);
+  assert_different_registers(obj, reg_rax, t);
 
   // Handle inflated monitor.
   Label inflated, inflated_check_lock_stack;
   // Finish fast unlock successfully.  MUST jump with ZF == 1
   Label unlocked, slow_path;
 
-  const Register mark = t1;
-  const Register monitor = t1;
-  const Register top = UseObjectMonitorTable ? t1 : reg_rax;
+  const Register mark = t;
+  const Register monitor = t;
+  const Register top = UseObjectMonitorTable ? t : reg_rax;
   const Register box = reg_rax;
 
   Label dummy;
   C2FastUnlockLightweightStub* stub = nullptr;
 
   if (!Compile::current()->output()->in_scratch_emit_size()) {
-    stub = new (Compile::current()->comp_arena()) C2FastUnlockLightweightStub(obj, mark, reg_rax, t2, thread);
+    stub = new (Compile::current()->comp_arena()) C2FastUnlockLightweightStub(obj, mark, reg_rax, thread);
     Compile::current()->output()->add_stub(stub);
   }
 
@@ -839,7 +840,7 @@ void C2_MacroAssembler::fast_unlock_lightweight(Register obj, Register reg_rax, 
   }
 
   bind(unlocked);
-  xorl(t1, t1); // Fast Unlock ZF = 1
+  xorl(t, t); // Fast Unlock ZF = 1
 
 #ifdef ASSERT
   // Check that unlocked label is reached with ZF set.

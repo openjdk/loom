@@ -1961,7 +1961,7 @@ Address MacroAssembler::argument_address(RegisterOrConstant arg_slot,
 void MacroAssembler::call_VM_leaf_base(address entry_point,
                                        int number_of_arguments,
                                        Label *retaddr) {
-  Label not_preempted;
+  Label E, L;
 
   stp(rscratch1, rmethod, Address(pre(sp, -2 * wordSize)));
 
