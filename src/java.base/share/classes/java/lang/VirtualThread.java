@@ -1204,7 +1204,6 @@ final class VirtualThread extends BaseVirtualThread {
                 return Thread.State.RUNNABLE;
             case PARKING:
             case TIMED_PARKING:
-            case BLOCKING:
             case WAITING:
             case TIMED_WAITING:
             case YIELDING:
@@ -1218,6 +1217,7 @@ final class VirtualThread extends BaseVirtualThread {
             case TIMED_PINNED:
             case TIMED_WAIT:
                 return Thread.State.TIMED_WAITING;
+            case BLOCKING:
             case BLOCKED:
                 return Thread.State.BLOCKED;
             case TERMINATED:

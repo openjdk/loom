@@ -2120,7 +2120,6 @@ JavaThreadStatus java_lang_VirtualThread::map_state_to_thread_status(int state) 
     case UNPARKED:
     case YIELDING:
     case YIELDED:
-    case BLOCKING:
     case UNBLOCKED:
     case WAITING:
     case TIMED_WAITING:
@@ -2134,6 +2133,7 @@ JavaThreadStatus java_lang_VirtualThread::map_state_to_thread_status(int state) 
     case TIMED_PINNED:
       status = JavaThreadStatus::PARKED_TIMED;
       break;
+    case BLOCKING:
     case BLOCKED:
       status = JavaThreadStatus::BLOCKED_ON_MONITOR_ENTER;
       break;
