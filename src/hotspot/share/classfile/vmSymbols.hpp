@@ -418,7 +418,6 @@ class SerializeClosure;
   template(maxSize_name,                              "maxSize")                                  \
   template(reset_name,                                "reset")                                    \
   template(done_name,                                 "done")                                     \
-  template(preempted_name,                            "preempted")                                \
   template(mounted_name,                              "mounted")                                  \
   template(jfrTraceId_name,                           "jfrTraceId")                               \
   template(fp_name,                                   "fp")                                       \

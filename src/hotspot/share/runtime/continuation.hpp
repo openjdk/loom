@@ -60,14 +60,13 @@ enum freeze_result {
   freeze_unsupported = 7
 };
 
-enum freeze_kind {
-  freeze_self_from_java  = 0,
-  freeze_on_monitorenter = 1,
-  freeze_on_wait         = 2
-};
-
 class Continuation : AllStatic {
 public:
+
+  enum preempt_kind {
+    freeze_on_monitorenter = 1,
+    freeze_on_wait         = 2
+  };
 
   enum thaw_kind {
     thaw_top = 0,
@@ -92,16 +91,13 @@ public:
   static int prepare_thaw(JavaThread* thread, bool return_barrier);
   static address thaw_entry();
 
-  static int try_preempt(JavaThread* target, oop continuation, int preempt_kind) NOT_LOOM_MONITOR_SUPPORT({ return freeze_unsupported; });
+  static int try_preempt(JavaThread* target, oop continuation, preempt_kind preempt_kind) NOT_LOOM_MONITOR_SUPPORT({ return freeze_unsupported; });
 
   static ContinuationEntry* get_continuation_entry_for_continuation(JavaThread* thread, oop continuation);
   static ContinuationEntry* get_continuation_entry_for_sp(JavaThread* thread, intptr_t* const sp);
   static ContinuationEntry* get_continuation_entry_for_entry_frame(JavaThread* thread, const frame& f);
 
   static bool is_continuation_mounted(JavaThread* thread, oop continuation);
-  static bool is_continuation_preempted(oop cont);
-  static bool is_continuation_done(oop cont);
-
 
   static bool is_cont_barrier_frame(const frame& f);
   static bool is_return_barrier_entry(const address pc);

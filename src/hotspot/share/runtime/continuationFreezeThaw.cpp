@@ -202,7 +202,7 @@ static void verify_continuation(oop continuation) { }
 #endif
 
 static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoint);
-template<typename ConfigT, bool preempt> static inline int freeze_internal(JavaThread* thread, intptr_t* const sp, int freeze_kind = freeze_self_from_java);
+template<typename ConfigT, bool preempt> static inline int freeze_internal(JavaThread* thread, intptr_t* const sp);
 
 static inline int prepare_thaw_internal(JavaThread* thread, bool return_barrier);
 template<typename ConfigT> static inline intptr_t* thaw_internal(JavaThread* thread, const Continuation::thaw_kind kind);
@@ -259,8 +259,8 @@ public:
     return freeze_internal<SelfT, false>(thread, sp);
   }
 
-  static int freeze_preempt(JavaThread* thread, intptr_t* const sp, int preempt_kind) {
-    return freeze_internal<SelfT, true>(thread, sp, preempt_kind);
+  static int freeze_preempt(JavaThread* thread, intptr_t* const sp) {
+    return freeze_internal<SelfT, true>(thread, sp);
   }
 
   static intptr_t* thaw(JavaThread* thread, Continuation::thaw_kind kind) {
@@ -1440,8 +1440,6 @@ class StackChunkAllocator : public MemAllocator {
     return stackChunkOopDesc::cast(obj);
   }
 
-  bool is_preempt() const { return _thread != _target; }
-
 public:
   StackChunkAllocator(Klass* klass,
                       size_t word_size,
@@ -1702,7 +1700,7 @@ static int freeze_epilog(JavaThread* thread, ContinuationWrapper& cont, freeze_r
   return freeze_epilog(cont);
 }
 
-static int preempt_epilog(ContinuationWrapper& cont, freeze_result res, frame& old_last_frame, int freeze_kind) {
+static int preempt_epilog(ContinuationWrapper& cont, freeze_result res, frame& old_last_frame) {
   if (UNLIKELY(res != freeze_ok)) {
     verify_continuation(cont.continuation());
     log_develop_trace(continuations)("=== end of freeze (fail %d)", res);
@@ -1710,14 +1708,13 @@ static int preempt_epilog(ContinuationWrapper& cont, freeze_result res, frame& o
   }
 
   patch_return_pc_with_preempt_stub(old_last_frame);
-  cont.set_preempted(true);
-  cont.tail()->set_preempt_kind(freeze_kind);
+  cont.tail()->set_preempted(true);
 
   return freeze_epilog(cont);
 }
 
 template<typename ConfigT, bool preempt>
-static inline int freeze_internal(JavaThread* current, intptr_t* const sp, int freeze_kind) {
+static inline int freeze_internal(JavaThread* current, intptr_t* const sp) {
   assert(!current->has_pending_exception(), "");
 
 #ifdef ASSERT
@@ -1764,7 +1761,7 @@ static inline int freeze_internal(JavaThread* current, intptr_t* const sp, int f
   if (fast && freeze.size_if_fast_freeze_available() > 0) {
     freeze.freeze_fast_existing_chunk();
     CONT_JFR_ONLY(freeze.jfr_info().post_jfr_event(&event, oopCont, current);)
-    return !preempt ? freeze_epilog(cont) : preempt_epilog(cont, freeze_ok, freeze.last_frame(), freeze_kind);
+    return !preempt ? freeze_epilog(cont) : preempt_epilog(cont, freeze_ok, freeze.last_frame());
   }
 
   if (preempt) {
@@ -1774,7 +1771,7 @@ static inline int freeze_internal(JavaThread* current, intptr_t* const sp, int f
     freeze_result res = fast ? freeze.try_freeze_fast() : freeze.freeze_slow();
 
     CONT_JFR_ONLY(freeze.jfr_info().post_jfr_event(&event, oopCont, current);)
-    preempt_epilog(cont, res, freeze.last_frame(), freeze_kind);
+    preempt_epilog(cont, res, freeze.last_frame());
     return res;
   }
 
@@ -1915,6 +1912,7 @@ protected:
 
   intptr_t* _fastpath;
   bool _barriers;
+  bool _preempted_case;
   intptr_t* _top_unextended_sp_before_thaw;
   int _align_size;
   DEBUG_ONLY(intptr_t* _top_stack_address);
@@ -1940,7 +1938,7 @@ protected:
   inline void prefetch_chunk_pd(void* start, int size_words);
   void patch_return(intptr_t* sp, bool is_last);
 
-  intptr_t* handle_preempted_continuation(intptr_t* sp, int preempt_kind, bool fast_case);
+  intptr_t* handle_preempted_continuation(intptr_t* sp, Continuation::preempt_kind preempt_kind, bool fast_case);
   inline intptr_t* possibly_adjust_frame(frame& top);
   inline intptr_t* push_cleanup_continuation();
   void throw_interrupted_exception(JavaThread* current, frame& top);
@@ -2210,15 +2208,16 @@ static inline void relativize_chunk_concurrently(stackChunkOop chunk) {
 
 template <typename ConfigT>
 NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::thaw_kind kind) {
-  int preempt_kind;
+  Continuation::preempt_kind preempt_kind;
   bool retry_fast_path = false;
 
-  bool preempted_case = _cont.is_preempted();
-  if (preempted_case) {
+  _preempted_case = chunk->preempted();
+  if (_preempted_case) {
     if (chunk->object_waiter() != nullptr) {
       assert(chunk->current_pending_monitor() != nullptr || chunk->current_waiting_monitor() != nullptr, "");
       ObjectWaiter* waiter = chunk->object_waiter();
       ObjectMonitor* mon = waiter->monitor();
+      preempt_kind = waiter->is_wait() ? Continuation::freeze_on_wait : Continuation::freeze_on_monitorenter;
 
       bool mon_acquired = mon->resume_operation(_thread, waiter, _cont);
       assert(!mon_acquired || mon->is_owner(_thread), "invariant");
@@ -2227,14 +2226,14 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
       }
       chunk = _cont.tail();  // reload oop in case of safepoint in resume_operation
     } else {
-      // Preemption cancelled case. We actually acquired the monitor after
-      // freezing all frames so nothing to do.
+      // Preemption cancelled in moniterenter case. We actually acquired
+      // the monitor after freezing all frames so nothing to do.
+      preempt_kind = Continuation::freeze_on_monitorenter;
     }
-    retry_fast_path = true;
+    // Call this first to avoid racing with GC threads later when modifying the flags.
     relativize_chunk_concurrently(chunk);
-    // Clear FLAGS_PREEMPTED after relativize_derived_pointers_concurrently()
-    // is called to avoid racing with GC threads while modifying the flags.
-    preempt_kind = chunk->get_and_clear_preempt_kind();
+    chunk->set_preempted(false);
+    retry_fast_path = true;
   } else {
     relativize_chunk_concurrently(chunk);
   }
@@ -2259,7 +2258,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
   // and FLAGS_PREEMPTED flags from the stackChunk.
   if (retry_fast_path && can_thaw_fast(chunk)) {
     intptr_t* sp = thaw_fast(chunk);
-    if (preempted_case) {
+    if (_preempted_case) {
       return handle_preempted_continuation(sp, preempt_kind, true /* fast_case */);
     }
     return sp;
@@ -2297,7 +2296,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
   }
 
   frame caller; // the thawed caller on the stack
-  recurse_thaw(heap_frame, caller, num_frames, preempted_case);
+  recurse_thaw(heap_frame, caller, num_frames, _preempted_case);
   finish_thaw(caller); // caller is now the topmost thawed frame
   _cont.write();
 
@@ -2309,7 +2308,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
 
   intptr_t* sp = caller.sp();
 
-  if (preempted_case) {
+  if (_preempted_case) {
     return handle_preempted_continuation(sp, preempt_kind, false /* fast_case */);
   }
   return sp;
@@ -2442,13 +2441,10 @@ void ThawBase::clear_bitmap_bits(address start, address end) {
   assert(effective_end == end || !chunk->bitmap().at(chunk->bit_index_for(effective_end)), "bit should not be set");
 }
 
-intptr_t* ThawBase::handle_preempted_continuation(intptr_t* sp, int preempt_kind, bool fast_case) {
-  assert(preempt_kind == freeze_on_wait || preempt_kind == freeze_on_monitorenter, "");
+intptr_t* ThawBase::handle_preempted_continuation(intptr_t* sp, Continuation::preempt_kind preempt_kind, bool fast_case) {
+  assert(preempt_kind == Continuation::freeze_on_wait || preempt_kind == Continuation::freeze_on_monitorenter, "");
   frame top(sp);
   assert(top.pc() == *(address*)(sp - frame::sender_sp_ret_address_offset()), "");
-
-  assert(_cont.is_preempted(), "must be");
-  _cont.set_preempted(false);
 
 #if INCLUDE_JVMTI
   assert(_thread->is_in_VTMS_transition(), "must be");
@@ -2472,7 +2468,7 @@ intptr_t* ThawBase::handle_preempted_continuation(intptr_t* sp, int preempt_kind
     patch_pd(top, sp + fsize);
   }
 
-  if (preempt_kind == freeze_on_wait) {
+  if (preempt_kind == Continuation::freeze_on_wait) {
     if (_thread->pending_interrupted_exception()) {
       throw_interrupted_exception(_thread, top);
       _thread->set_pending_interrupted_exception(false);
@@ -2561,7 +2557,7 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
 
 void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int num_frames, bool stub_caller) {
   assert(hf.is_compiled_frame(), "");
-  assert(_cont.is_preempted() || !stub_caller, "stub caller not at preemption");
+  assert(_preempted_case || !stub_caller, "stub caller not at preemption");
 
   if (!stub_caller && UNLIKELY(seen_by_gc())) { // recurse_thaw_stub_frame already invoked our barriers with a full regmap
     _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>(_stream, SmallRegisterMap::instance());
@@ -2607,7 +2603,7 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
   if (hf.is_deoptimized_frame()) {
     maybe_set_fastpath(f.sp());
   } else if (_thread->is_interp_only_mode()
-              || (_cont.is_preempted() && f.cb()->as_nmethod()->is_marked_for_deoptimization())) {
+              || (_preempted_case && f.cb()->as_nmethod()->is_marked_for_deoptimization())) {
     // The caller of the safepoint stub when the continuation is preempted is not at a call instruction, and so
     // cannot rely on nmethod patching for deopt.
 
@@ -2704,7 +2700,7 @@ void ThawBase::recurse_thaw_stub_frame(const frame& hf, frame& caller, int num_f
 
 void ThawBase::recurse_thaw_native_frame(const frame& hf, frame& caller, int num_frames) {
   assert(hf.is_native_frame(), "");
-  assert(_cont.is_preempted() && hf.cb()->as_nmethod()->method()->is_object_wait0(), "");
+  assert(_preempted_case && hf.cb()->as_nmethod()->method()->is_object_wait0(), "");
 
   if (UNLIKELY(seen_by_gc())) { // recurse_thaw_stub_frame already invoked our barriers with a full regmap
     _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>(_stream, SmallRegisterMap::instance());
@@ -2834,7 +2830,7 @@ static inline intptr_t* thaw_internal(JavaThread* thread, const Continuation::th
   clear_anchor(thread);
 #endif
 
-  DEBUG_ONLY(bool preempted = cont.is_preempted();)
+  DEBUG_ONLY(bool preempted = cont.tail()->preempted();)
   Thaw<ConfigT> thw(thread, cont);
   intptr_t* const sp = thw.thaw(kind);
   assert(is_aligned(sp, frame::frame_alignment), "");
@@ -2989,7 +2985,7 @@ static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont,
   if (preempted) {
     if (sp0 == cont.entrySP()) {
       // Still preempted (monitor not acquired) so no frames were thawed.
-      assert(cont.is_preempted(), "");
+      assert(cont.tail()->preempted(), "");
       use_cont_entry = true;
     }
 #if defined (AARCH64) || defined (RISCV64)

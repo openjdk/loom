@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, 2024, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -115,7 +115,6 @@ public:
   void set_tail(stackChunkOop chunk) { _tail = chunk; }
 
   inline bool is_preempted();
-  inline void set_preempted(bool value);
   inline void read();
   inline void write();
 
@@ -162,10 +161,6 @@ inline ContinuationWrapper::ContinuationWrapper(oop continuation)
 
 inline bool ContinuationWrapper::is_preempted() {
   return jdk_internal_vm_Continuation::is_preempted(_continuation);
-}
-
-inline void ContinuationWrapper::set_preempted(bool value) {
-  jdk_internal_vm_Continuation::set_preempted(_continuation, value);
 }
 
 inline void ContinuationWrapper::read() {

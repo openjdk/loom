@@ -169,33 +169,20 @@ inline void stackChunkOopDesc::set_flag(uint8_t flag, bool value) {
   uint32_t flags = this->flags();
   set_flags((uint8_t)(value ? flags |= flag : flags &= ~flag));
 }
-inline void stackChunkOopDesc::clear_flags(uint8_t flag) {
-  uint32_t flags = this->flags();
-  set_flags((uint8_t)(flags &= ~flag));
-}
 inline void stackChunkOopDesc::clear_flags() {
   set_flags(0);
 }
 
 inline bool stackChunkOopDesc::has_mixed_frames() const { return is_flag(FLAG_HAS_INTERPRETED_FRAMES); }
 inline void stackChunkOopDesc::set_has_mixed_frames(bool value) {
-  assert((flags() & ~(FLAG_HAS_INTERPRETED_FRAMES | FLAGS_PREEMPTED)) == 0, "other flags should not be set");
+  assert((flags() & ~(FLAG_HAS_INTERPRETED_FRAMES | FLAG_PREEMPTED)) == 0, "other flags should not be set");
   set_flag(FLAG_HAS_INTERPRETED_FRAMES, value);
 }
 
-inline void stackChunkOopDesc::set_preempt_kind(int freeze_kind) {
-  assert((flags() & FLAGS_PREEMPTED) == 0, "");
-  assert(freeze_kind == freeze_on_monitorenter || freeze_kind == freeze_on_wait, "");
-  uint8_t flag = freeze_kind == freeze_on_monitorenter ? FLAG_PREEMPTED_MONITORENTER : FLAG_PREEMPTED_WAIT;
-  set_flag(flag, true);
-}
-
-inline int stackChunkOopDesc::get_and_clear_preempt_kind() {
-  assert((is_flag(FLAG_PREEMPTED_MONITORENTER) && !is_flag(FLAG_PREEMPTED_WAIT))
-         || (is_flag(FLAG_PREEMPTED_WAIT) && !is_flag(FLAG_PREEMPTED_MONITORENTER)), "");
-  int kind = is_flag(FLAG_PREEMPTED_MONITORENTER) ? freeze_on_monitorenter : freeze_on_wait;
-  clear_flags(FLAGS_PREEMPTED);
-  return kind;
+inline bool stackChunkOopDesc::preempted() const { return is_flag(FLAG_PREEMPTED); }
+inline void stackChunkOopDesc::set_preempted(bool value) {
+  assert(preempted() != value, "");
+  set_flag(FLAG_PREEMPTED, value);
 }
 
 inline ObjectMonitor* stackChunkOopDesc::current_pending_monitor() const {

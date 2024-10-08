@@ -136,7 +136,7 @@ static bool is_safe_vthread_to_preempt(JavaThread* target, oop vthread) {
   return JVMTI_ONLY(is_safe_vthread_to_preempt_for_jvmti(target, vthread)) NOT_JVMTI(true);
 }
 
-typedef int (*FreezeContFnT)(JavaThread*, intptr_t*, int);
+typedef int (*FreezeContFnT)(JavaThread*, intptr_t*);
 
 static void verify_preempt_preconditions(JavaThread* target, oop continuation) {
   assert(target == JavaThread::current(), "no support for external preemption");
@@ -144,13 +144,12 @@ static void verify_preempt_preconditions(JavaThread* target, oop continuation) {
   assert(!target->preempting(), "");
   assert(target->last_continuation() != nullptr, "");
   assert(target->last_continuation()->cont_oop(target) == continuation, "");
-  assert(!Continuation::is_continuation_preempted(continuation), "");
   assert(Continuation::continuation_scope(continuation) == java_lang_VirtualThread::vthread_scope(), "");
   assert(!target->has_pending_exception(), "");
   assert(!target->is_suspended() JVMTI_ONLY(|| target->is_disable_suspend()) || target->obj_locker_count() > 0, "");
 }
 
-int Continuation::try_preempt(JavaThread* target, oop continuation, int preempt_kind) {
+int Continuation::try_preempt(JavaThread* target, oop continuation, preempt_kind preempt_kind) {
   verify_preempt_preconditions(target, continuation);
 
   if (LockingMode == LM_LEGACY) {
@@ -169,7 +168,7 @@ int Continuation::try_preempt(JavaThread* target, oop continuation, int preempt_
   JVMTI_ONLY(JvmtiUnmountBeginMark jubm(target);)
   JVMTI_ONLY(if (jubm.failed()) return freeze_pinned_native;)
   target->set_preempting(true);
-  int res = CAST_TO_FN_PTR(FreezeContFnT, freeze_preempt_entry())(target, target->last_Java_sp(), preempt_kind);
+  int res = CAST_TO_FN_PTR(FreezeContFnT, freeze_preempt_entry())(target, target->last_Java_sp());
   log_trace(continuations, preempt)("try_preempt: %d", res);
   JVMTI_ONLY(jubm.set_preempt_result(res);)
   if (res != freeze_ok) {
@@ -178,14 +177,6 @@ int Continuation::try_preempt(JavaThread* target, oop continuation, int preempt_
   return res;
 }
 #endif // LOOM_MONITOR_SUPPORT
-
-bool Continuation::is_continuation_preempted(oop cont) {
-  return jdk_internal_vm_Continuation::is_preempted(cont);
-}
-
-bool Continuation::is_continuation_done(oop cont) {
-  return jdk_internal_vm_Continuation::done(cont);
-}
 
 #ifndef PRODUCT
 static jlong java_tid(JavaThread* thread) {

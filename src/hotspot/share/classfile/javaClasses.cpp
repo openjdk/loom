@@ -2154,7 +2154,9 @@ JavaThreadStatus java_lang_VirtualThread::map_state_to_thread_status(int state) 
 
 bool java_lang_VirtualThread::is_preempted(oop vthread) {
   oop continuation = java_lang_VirtualThread::continuation(vthread);
-  return jdk_internal_vm_Continuation::is_preempted(continuation);
+  assert(continuation != nullptr, "vthread with no continuation");
+  stackChunkOop chunk = jdk_internal_vm_Continuation::tail(continuation);
+  return chunk != nullptr && chunk->preempted();
 }
 
 #if INCLUDE_CDS
