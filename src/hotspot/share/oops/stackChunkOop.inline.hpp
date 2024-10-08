@@ -35,7 +35,6 @@
 #include "memory/universe.hpp"
 #include "oops/access.inline.hpp"
 #include "oops/instanceStackChunkKlass.inline.hpp"
-#include "runtime/continuation.hpp"
 #include "runtime/continuationJavaClasses.inline.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/globals.hpp"

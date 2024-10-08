@@ -26,7 +26,6 @@
 #define SHARE_VM_RUNTIME_CONTINUATION_HPP
 
 #include "jni.h"
-#include "classfile/javaClasses.hpp"
 #include "memory/allStatic.hpp"
 #include "oops/oopsHierarchy.hpp"
 

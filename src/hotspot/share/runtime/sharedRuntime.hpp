@@ -36,7 +36,6 @@
 class AdapterHandlerEntry;
 class AdapterFingerPrint;
 class vframeStream;
-class ObjectWaiter;
 
 // Runtime is the base class for various runtime interfaces
 // (InterpreterRuntime, CompilerRuntime, etc.). It provides
