@@ -1587,7 +1587,7 @@ void InterpreterMacroAssembler::call_VM_preemptable(Register oop_result,
 
   // Make VM call. In case of preemption set last_pc to
   // the one we want to resume to.
-  la(t0, not_preempted);
+  la(t0, resume_pc);
   sd(t0, Address(xthread, JavaThread::last_Java_pc_offset()));
   call_VM_base(oop_result, noreg, noreg, entry_point, 1, false /*check_exceptions*/);
 
