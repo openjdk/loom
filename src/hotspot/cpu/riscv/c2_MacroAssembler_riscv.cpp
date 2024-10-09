@@ -45,7 +45,7 @@
 #define BIND(label) bind(label); BLOCK_COMMENT(#label ":")
 
 void C2_MacroAssembler::fast_lock(Register objectReg, Register boxReg,
-                                  Register tmp1Reg, Register tmp2Reg, Register tmp3Reg) {
+                                  Register tmp1Reg, Register tmp2Reg, Register tmp3Reg, Register tmp4Reg) {
   // Use cr register to indicate the fast_lock result: zero for success; non-zero for failure.
   Register flag = t1;
   Register oop = objectReg;
@@ -123,7 +123,7 @@ void C2_MacroAssembler::fast_lock(Register objectReg, Register boxReg,
   //
   // Try to CAS m->owner from null to current thread id.
   add(tmp, disp_hdr, (in_bytes(ObjectMonitor::owner_offset()) - markWord::monitor_value));
-  Register tid = disp_hdr;
+  Register tid = tmp4Reg;
   ld(tid, Address(xthread, JavaThread::lock_id_offset()));
   cmpxchg(/*memory address*/tmp, /*expected value*/zr, /*new value*/tid, Assembler::int64,
           Assembler::aq, Assembler::rl, /*result*/tmp3Reg); // cas succeeds if tmp3Reg == zr(expected)
@@ -140,8 +140,6 @@ void C2_MacroAssembler::fast_lock(Register objectReg, Register boxReg,
   bne(tmp3Reg, tid, slow_path); // Check for recursive locking
 
   // Recursive lock case
-  // Reload markWord from object into displaced_header.
-  ld(disp_hdr, Address(oop, oopDesc::mark_offset_in_bytes()));
   increment(Address(disp_hdr, in_bytes(ObjectMonitor::recursions_offset()) - markWord::monitor_value), 1, tmp2Reg, tmp3Reg);
 
   bind(locked);
@@ -401,14 +399,15 @@ void C2_MacroAssembler::fast_lock_lightweight(Register obj, Register box,
     // Compute owner address.
     la(tmp2_owner_addr, owner_address);
 
-    // CAS owner (null => current thread).
-    ld(tmp4, Address(xthread, JavaThread::lock_id_offset()));
-    cmpxchg(/*addr*/ tmp2_owner_addr, /*expected*/ zr, /*new*/ tmp4, Assembler::int64,
+    // CAS owner (null => current thread id).
+    Register tid = tmp4;
+    ld(tid, Address(xthread, JavaThread::lock_id_offset()));
+    cmpxchg(/*addr*/ tmp2_owner_addr, /*expected*/ zr, /*new*/ tid, Assembler::int64,
             /*acquire*/ Assembler::aq, /*release*/ Assembler::relaxed, /*result*/ tmp3_owner);
     beqz(tmp3_owner, monitor_locked);
 
     // Check if recursive.
-    bne(tmp3_owner, tmp4, slow_path);
+    bne(tmp3_owner, tid, slow_path);
 
     // Recursive.
     increment(recursions_address, 1, tmp2, tmp3);
