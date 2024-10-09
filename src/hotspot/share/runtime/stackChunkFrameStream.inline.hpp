@@ -215,7 +215,7 @@ template <ChunkFrames frame_kind>
 template <typename RegisterMapT>
 inline void StackChunkFrameStream<frame_kind>::next(RegisterMapT* map, bool stop) {
   update_reg_map(map);
-  bool safepoint = is_stub();
+  bool is_runtime_stub = is_stub();
   if (frame_kind == ChunkFrames::Mixed) {
     if (is_interpreted()) {
       next_for_interpreter_frame();
@@ -239,7 +239,8 @@ inline void StackChunkFrameStream<frame_kind>::next(RegisterMapT* map, bool stop
 
   get_cb();
   update_reg_map_pd(map);
-  if (safepoint && cb() != nullptr) { // there's no post-call nop and no fast oopmap lookup
+  if (is_runtime_stub && cb() != nullptr) { // there's no post-call nop and no fast oopmap lookup
+    // caller could have been deoptimized so use orig_pc()
     _oopmap = cb()->oop_map_for_return_address(orig_pc());
   }
 }

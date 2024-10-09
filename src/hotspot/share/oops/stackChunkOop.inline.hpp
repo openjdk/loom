@@ -255,10 +255,11 @@ inline void stackChunkOopDesc::iterate_stack(StackChunkFrameClosureType* closure
     closure->do_frame(f, map);
 
     f.next(&full_map);
-    if (f.is_done()) return;
+    assert(!f.is_done(), "");
+    assert(f.is_compiled(), "");
 
     should_continue = closure->do_frame(f, &full_map);
-    f.next(&map);
+    f.next(map);
   }
   assert(!f.is_stub(), "");
 
