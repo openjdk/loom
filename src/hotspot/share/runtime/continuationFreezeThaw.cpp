@@ -202,7 +202,7 @@ static void verify_continuation(oop continuation) { }
 #endif
 
 static freeze_result is_pinned0(JavaThread* thread, oop cont_scope, bool safepoint);
-template<typename ConfigT, bool preempt> static inline int freeze_internal(JavaThread* thread, intptr_t* const sp);
+template<typename ConfigT, bool preempt> static inline int freeze_internal(JavaThread* current, intptr_t* const sp);
 
 static inline int prepare_thaw_internal(JavaThread* thread, bool return_barrier);
 template<typename ConfigT> static inline intptr_t* thaw_internal(JavaThread* thread, const Continuation::thaw_kind kind);
@@ -233,7 +233,7 @@ static JRT_LEAF(intptr_t*, thaw(JavaThread* thread, int kind))
   // undo the NoSafepointVerifier here and rely on handling by ContinuationWrapper.
   // JRT_ENTRY instead?
   ResetNoHandleMark rnhm;
-  debug_only(PauseNoSafepointVerifier pnsv(&__nsv);)
+  DEBUG_ONLY(PauseNoSafepointVerifier pnsv(&__nsv);)
 
   // we might modify the code cache via BarrierSetNMethod::nmethod_entry_barrier
   MACOS_AARCH64_ONLY(ThreadWXEnable __wx(WXWrite, thread));
@@ -369,10 +369,9 @@ protected:
 
   intptr_t* _bottom_address;
 
+  // Used for preemption only
   const bool _preempt;
-  // Used on preemption only
   frame _last_frame;
-  oop _monitorenter_obj;
 
   // Used to support freezing with held monitors
   int _monitors_in_lockstack;
@@ -764,7 +763,7 @@ void FreezeBase::freeze_fast_copy(stackChunkOop chunk, int chunk_start_sp CONT_J
 
   // set chunk->pc to the return address of the topmost frame in the chunk
   if (_preempt) {
-    // On aarch64, the return pc of the top frame won't necessarily be at sp[-1].
+    // On aarch64/riscv64, the return pc of the top frame won't necessarily be at sp[-1].
     // Also, on x64, if the top frame is the native wrapper frame, sp[-1] will not
     // be the pc we used when creating the oopmap. Get the top's frame last pc from
     // the anchor instead.
@@ -1157,9 +1156,8 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_interpreted_frame(frame& f, fr
 
   log_develop_trace(continuations)("recurse_freeze_interpreted_frame %s _size: %d fsize: %d argsize: %d",
     frame_method->name_and_sig_as_C_string(), _freeze_size, fsize, argsize);
-  // we'd rather not yield inside methods annotated with @JvmtiMountTransition. In the preempt case
-  // we already checked it is safe to do so in Continuation::is_safe_vthread_to_preempt().
-  assert(!ContinuationHelper::Frame::frame_method(f)->jvmti_mount_transition() || _preempt, "");
+  // we'd rather not yield inside methods annotated with @JvmtiMountTransition
+  assert(!ContinuationHelper::Frame::frame_method(f)->jvmti_mount_transition(), "");
 
   freeze_result result = recurse_freeze_java_frame<ContinuationHelper::InterpretedFrame>(f, caller, fsize, argsize);
   if (UNLIKELY(result > freeze_ok_bottom)) {
@@ -1213,9 +1211,8 @@ freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller,
                              ContinuationHelper::Frame::frame_method(f) != nullptr ?
                              ContinuationHelper::Frame::frame_method(f)->name_and_sig_as_C_string() : "",
                              _freeze_size, fsize, argsize);
-  // we'd rather not yield inside methods annotated with @JvmtiMountTransition. In the preempt case
-  // we already checked it is safe to do so in Continuation::is_safe_vthread_to_preempt().
-  assert(!ContinuationHelper::Frame::frame_method(f)->jvmti_mount_transition() || _preempt, "");
+  // we'd rather not yield inside methods annotated with @JvmtiMountTransition
+  assert(!ContinuationHelper::Frame::frame_method(f)->jvmti_mount_transition(), "");
 
   freeze_result result = recurse_freeze_java_frame<ContinuationHelper::CompiledFrame>(f, caller, fsize, argsize);
   if (UNLIKELY(result > freeze_ok_bottom)) {
@@ -1244,7 +1241,6 @@ freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller,
 
   DEBUG_ONLY(after_freeze_java_frame(hf, is_bottom_frame);)
   caller = hf;
-
   return freeze_ok;
 }
 
@@ -1264,10 +1260,8 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_stub_frame(frame& f, frame& ca
     return result;
   }
 
-  bool is_bottom_frame = result == freeze_ok_bottom;
-  assert(!caller.is_empty() || (is_bottom_frame && !_cont.is_empty()), "");
-
-  DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, 0, is_bottom_frame);)
+  assert(result == freeze_ok, "should have caller");
+  DEBUG_ONLY(before_freeze_java_frame(f, caller, fsize, 0, false /*is_bottom_frame*/);)
 
   frame hf = new_heap_frame<ContinuationHelper::StubFrame>(f, caller);
   intptr_t* heap_frame_top = ContinuationHelper::StubFrame::frame_top(hf);
@@ -1278,9 +1272,9 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_stub_frame(frame& f, frame& ca
     _total_align_size += frame::align_wiggle;
   }
 
-  patch(f, hf, caller, is_bottom_frame);
+  patch(f, hf, caller, false /*is_bottom_frame*/);
 
-  DEBUG_ONLY(after_freeze_java_frame(hf, is_bottom_frame);)
+  DEBUG_ONLY(after_freeze_java_frame(hf, false /*is_bottom_frame*/);)
 
   caller = hf;
   return freeze_ok;
@@ -1402,7 +1396,6 @@ class StackChunkAllocator : public MemAllocator {
   int                                          _argsize_md;
   ContinuationWrapper&                         _continuation_wrapper;
   JvmtiSampledObjectAllocEventCollector* const _jvmti_event_collector;
-  JavaThread* const                            _target;
   mutable bool                                 _took_slow_path;
 
   // Does the minimal amount of initialization needed for a TLAB allocation.
@@ -1447,14 +1440,12 @@ public:
                       size_t stack_size,
                       int argsize_md,
                       ContinuationWrapper& continuation_wrapper,
-                      JvmtiSampledObjectAllocEventCollector* jvmti_event_collector,
-                      JavaThread* target)
+                      JvmtiSampledObjectAllocEventCollector* jvmti_event_collector)
     : MemAllocator(klass, word_size, thread),
       _stack_size(stack_size),
       _argsize_md(argsize_md),
       _continuation_wrapper(continuation_wrapper),
       _jvmti_event_collector(jvmti_event_collector),
-      _target(target),
       _took_slow_path(false) {}
 
   // Provides it's own, specialized allocation which skips instrumentation
@@ -1508,7 +1499,7 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size, int argsize_md)
   // instrumentation have been deferred. This property is important for
   // some GCs, as this ensures that the allocated object is in the young
   // generation / newly allocated memory.
-  StackChunkAllocator allocator(klass, size_in_words, current, stack_size, argsize_md, _cont, _jvmti_event_collector, _thread);
+  StackChunkAllocator allocator(klass, size_in_words, current, stack_size, argsize_md, _cont, _jvmti_event_collector);
   stackChunkOop chunk = allocator.allocate();
 
   if (chunk == nullptr) {
@@ -1856,7 +1847,7 @@ static int thaw_size(stackChunkOop chunk) {
   int size = chunk->max_thawing_size();
   size += frame::metadata_words; // For the top pc+fp in push_return_frame or top = stack_sp - frame::metadata_words in thaw_fast
   size += 2*frame::align_wiggle; // in case of alignments at the top and bottom
-  size += frame::metadata_words; // for preemption case (see push_preempt_rerun_adapter)
+  size += frame::metadata_words; // for preemption case (see possibly_adjust_frame)
   return size;
 }
 
@@ -2238,8 +2229,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
     relativize_chunk_concurrently(chunk);
   }
 
-  // First thaw after freeze. If there were oops in the stacklock
-  // during freeze, restore them now.
+  // On first thaw after freeze restore oops to the lockstack if any.
   if (chunk->lockstack_size() > 0) {
     assert(kind == Continuation::thaw_top, "");
     int lockStackSize = chunk->lockstack_size();
@@ -2255,7 +2245,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
   }
 
   // Retry the fast path now that we possibly cleared the FLAG_HAS_LOCKSTACK
-  // and FLAGS_PREEMPTED flags from the stackChunk.
+  // and FLAG_PREEMPTED flags from the stackChunk.
   if (retry_fast_path && can_thaw_fast(chunk)) {
     intptr_t* sp = thaw_fast(chunk);
     if (_preempted_case) {
@@ -2281,8 +2271,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
 
   DEBUG_ONLY(_frames = 0;)
   _align_size = 0;
-  bool is_return_barrier = kind != Continuation::thaw_top;
-  int num_frames = (is_return_barrier ? 1 : 2);
+  int num_frames = kind == Continuation::thaw_top ? 2 : 1;
 
   _stream = StackChunkFrameStream<ChunkFrames::Mixed>(chunk);
   _top_unextended_sp_before_thaw = _stream.unextended_sp();
@@ -2603,7 +2592,7 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
   if (hf.is_deoptimized_frame()) {
     maybe_set_fastpath(f.sp());
   } else if (_thread->is_interp_only_mode()
-              || (_preempted_case && f.cb()->as_nmethod()->is_marked_for_deoptimization())) {
+              || (stub_caller && f.cb()->as_nmethod()->is_marked_for_deoptimization())) {
     // The caller of the safepoint stub when the continuation is preempted is not at a call instruction, and so
     // cannot rely on nmethod patching for deopt.
 
@@ -2632,43 +2621,30 @@ void ThawBase::recurse_thaw_compiled_frame(const frame& hf, frame& caller, int n
 
 void ThawBase::recurse_thaw_stub_frame(const frame& hf, frame& caller, int num_frames) {
   DEBUG_ONLY(_frames++;)
-  bool is_bottom_frame = false;
 
   if (UNLIKELY(seen_by_gc())) {
-    // Process the stub's caller here since we might need the full map (if the stub was
-    // generated on a poll on return we shouldn't need a full map).
+    // Process the stub's caller here since we might need the full map.
     RegisterMap map(nullptr,
                     RegisterMap::UpdateMap::include,
                     RegisterMap::ProcessFrames::skip,
                     RegisterMap::WalkContinuation::skip);
     map.set_include_argument_oops(false);
     _stream.next(&map);
-    if (!_stream.is_done()) {
-      _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>(_stream, &map);
-    }
+    assert(!_stream.is_done(), "");
+    _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>(_stream, &map);
   } else {
     _stream.next(SmallRegisterMap::instance);
+    assert(!_stream.is_done(), "");
   }
 
-  if (_stream.is_done()) {
-    finalize_thaw(caller, 0);
-    is_bottom_frame = true;
-  } else {
-    frame f = _stream.to_frame();
-    if (f.is_interpreted_frame()) {
-      recurse_thaw_interpreted_frame(f, caller, num_frames);
-    } else {
-      recurse_thaw_compiled_frame(f, caller, num_frames, true);
-    }
-  }
+  recurse_thaw_compiled_frame(_stream.to_frame(), caller, num_frames, true);
 
-  assert(!is_bottom_frame || !_cont.is_empty(), "");
+  assert(caller.is_compiled_frame(), "");
   assert(caller.sp() == caller.unextended_sp(), "");
-  assert(!caller.is_native_frame() || (is_bottom_frame && Continuation::is_continuation_enterSpecial(caller)), "caller should't be native except for enterSpecial case");
 
-  DEBUG_ONLY(before_thaw_java_frame(hf, caller, is_bottom_frame, num_frames);)
+  DEBUG_ONLY(before_thaw_java_frame(hf, caller, false /*is_bottom_frame*/, num_frames);)
 
-  if ((!is_bottom_frame && caller.is_interpreted_frame()) || (is_bottom_frame && Interpreter::contains(_cont.tail()->pc()))) {
+  if (caller.is_interpreted_frame()) {
     _align_size += frame::align_wiggle; // we add one whether or not we've aligned because we add it in recurse_freeze_stub_frame
   }
 
@@ -2680,21 +2656,19 @@ void ThawBase::recurse_thaw_stub_frame(const frame& hf, frame& caller, int num_f
   copy_from_chunk(heap_frame_top - frame::metadata_words, stack_frame_top - frame::metadata_words,
                   fsize + frame::metadata_words);
 
-  patch(f, caller, is_bottom_frame);
+  patch(f, caller, false /*is_bottom_frame*/);
 
-  if (!is_bottom_frame) {
-    // can only fix caller once this frame is thawed (due to callee saved regs)
-    RegisterMap map(nullptr,
-                    RegisterMap::UpdateMap::include,
-                    RegisterMap::ProcessFrames::skip,
-                    RegisterMap::WalkContinuation::skip);
-    map.set_include_argument_oops(false);
-    f.oop_map()->update_register_map(&f, &map);
-    ContinuationHelper::update_register_map_with_callee(caller, &map);
-    _cont.tail()->fix_thawed_frame(caller, &map);
-  }
+  // can only fix caller once this frame is thawed (due to callee saved regs)
+  RegisterMap map(nullptr,
+                  RegisterMap::UpdateMap::include,
+                  RegisterMap::ProcessFrames::skip,
+                  RegisterMap::WalkContinuation::skip);
+  map.set_include_argument_oops(false);
+  f.oop_map()->update_register_map(&f, &map);
+  ContinuationHelper::update_register_map_with_callee(caller, &map);
+  _cont.tail()->fix_thawed_frame(caller, &map);
 
-  DEBUG_ONLY(after_thaw_java_frame(f, is_bottom_frame);)
+  DEBUG_ONLY(after_thaw_java_frame(f, false /*is_bottom_frame*/);)
   caller = f;
 }
 
@@ -2714,7 +2688,7 @@ void ThawBase::recurse_thaw_native_frame(const frame& hf, frame& caller, int num
   assert(caller.sp() == caller.unextended_sp(), "");
 
   if (caller.is_interpreted_frame()) {
-    _align_size += frame::align_wiggle; // we add one whether or not we've aligned because we add it in recurse_freeze_compiled_frame
+    _align_size += frame::align_wiggle; // we add one whether or not we've aligned because we add it in recurse_freeze_native_frame
   }
 
   // new_stack_frame must construct the resulting frame using hf.pc() rather than hf.raw_pc() because the frame is not
@@ -2932,7 +2906,7 @@ static bool do_verify_after_thaw(JavaThread* thread, stackChunkOop chunk, output
 }
 
 static void log_frames(JavaThread* thread) {
-  const static int show_entry_callers = 100;
+  const static int show_entry_callers = 3;
   LogTarget(Trace, continuations) lt;
   if (!lt.develop_is_enabled()) {
     return;
