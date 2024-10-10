@@ -40,9 +40,13 @@
 #include "utilities/globalDefinitions.hpp"
 
 inline void* ObjectMonitor::owner_for(JavaThread* thread) {
+#ifdef _LP64
   int64_t tid = thread->lock_id();
   assert(tid >= 3 && tid < ThreadIdentifier::current(), "must be reasonable");
   return (void*)tid;
+#else
+  return thread;
+#endif
 }
 
 inline bool ObjectMonitor::is_entered(JavaThread* current) const {
