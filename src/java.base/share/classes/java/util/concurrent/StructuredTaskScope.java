@@ -1491,7 +1491,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
-     * A joiner that that waits for all successful subtasks. If any subtask fails the
+     * A joiner that that waits for all successful subtasks. If any subtask fails then
      * execution is cancelled.
      */
     private static final class AwaitSuccessful<T> implements Joiner<T, Void> {
