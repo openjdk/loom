@@ -1036,8 +1036,8 @@ void DeadlockCycle::print_on_with(ThreadsList * t_list, outputStream* st) const 
         // that owns waitingToLockMonitor should be findable, but
         // if it is not findable, then the previous currentThread is
         // blocked permanently.
-        st->print_cr("%s UNKNOWN_owner_addr=" PTR_FORMAT, owner_desc,
-                  p2i(waitingToLockMonitor->owner()));
+        st->print_cr("%s UNKNOWN_owner_addr=" INT64_FORMAT, owner_desc,
+                     waitingToLockMonitor->owner());
         continue;
       }
     } else {

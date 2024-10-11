@@ -859,7 +859,7 @@ ObjectMonitor* LightweightSynchronizer::inflate_into_object_header(oop object, O
       bool own = inflating_thread != nullptr && inflating_thread->lock_stack().contains(object);
       if (own) {
         // Owned by inflating_thread.
-        monitor->set_owner_from(nullptr, inflating_thread);
+        monitor->set_owner(inflating_thread);
       } else {
         // Owned by somebody else.
         monitor->set_owner_anonymous();

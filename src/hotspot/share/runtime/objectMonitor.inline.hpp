@@ -39,14 +39,10 @@
 #include "utilities/checkedCast.hpp"
 #include "utilities/globalDefinitions.hpp"
 
-inline void* ObjectMonitor::owner_for(JavaThread* thread) {
-#ifdef _LP64
+inline int64_t ObjectMonitor::owner_for(JavaThread* thread) {
   int64_t tid = thread->lock_id();
   assert(tid >= 3 && tid < ThreadIdentifier::current(), "must be reasonable");
-  return (void*)tid;
-#else
-  return thread;
-#endif
+  return tid;
 }
 
 inline bool ObjectMonitor::is_entered(JavaThread* current) const {
@@ -101,17 +97,17 @@ inline int ObjectMonitor::waiters() const {
 }
 
 inline bool ObjectMonitor::has_owner() const {
-  void* owner = owner_raw();
-  return owner != nullptr && owner != DEFLATER_MARKER;
+  int64_t owner = owner_raw();
+  return owner != NO_OWNER && owner != DEFLATER_MARKER;
 }
 
 // Returns null if DEFLATER_MARKER is observed.
-inline void* ObjectMonitor::owner() const {
-  void* owner = owner_raw();
-  return owner != DEFLATER_MARKER ? owner : nullptr;
+inline int64_t ObjectMonitor::owner() const {
+  int64_t owner = owner_raw();
+  return owner != DEFLATER_MARKER ? owner : NO_OWNER;
 }
 
-inline void* ObjectMonitor::owner_raw() const {
+inline int64_t ObjectMonitor::owner_raw() const {
   return Atomic::load(&_owner);
 }
 
@@ -157,35 +153,35 @@ inline void ObjectMonitor::set_recursions(size_t recursions) {
 
 // Clear _owner field; current value must match old_value.
 inline void ObjectMonitor::release_clear_owner(JavaThread* old_owner) {
-  void* old_value = owner_for(old_owner);
+  int64_t old_value = owner_for(old_owner);
 #ifdef ASSERT
-  void* prev = Atomic::load(&_owner);
-  assert(prev == old_value, "unexpected prev owner=" INTPTR_FORMAT
-         ", expected=" INTPTR_FORMAT, p2i(prev), p2i(old_value));
+  int64_t prev = Atomic::load(&_owner);
+  assert(prev == old_value, "unexpected prev owner=" INT64_FORMAT
+         ", expected=" INT64_FORMAT, prev, old_value);
 #endif
-  Atomic::release_store(&_owner, (void*)nullptr);
+  Atomic::release_store(&_owner, NO_OWNER);
   log_trace(monitorinflation, owner)("release_clear_owner(): mid="
-                                     INTPTR_FORMAT ", old_value=" INTPTR_FORMAT,
-                                     p2i(this), p2i(old_value));
+                                     INTPTR_FORMAT ", old_value=" INT64_FORMAT,
+                                     p2i(this), old_value);
 }
 
 // Simply set _owner field to new_value; current value must match old_value.
 // (Simple means no memory sync needed.)
-inline void ObjectMonitor::set_owner_from_raw(void* old_value, void* new_value) {
+inline void ObjectMonitor::set_owner_from_raw(int64_t old_value, int64_t new_value) {
 #ifdef ASSERT
-  void* prev = Atomic::load(&_owner);
+  int64_t prev = Atomic::load(&_owner);
   assert((int64_t)prev < ThreadIdentifier::current(), "must be reasonable");
-  assert(prev == old_value, "unexpected prev owner=" INTPTR_FORMAT
-         ", expected=" INTPTR_FORMAT, p2i(prev), p2i(old_value));
+  assert(prev == old_value, "unexpected prev owner=" INT64_FORMAT
+         ", expected=" INT64_FORMAT, prev, old_value);
 #endif
   Atomic::store(&_owner, new_value);
   log_trace(monitorinflation, owner)("set_owner_from(): mid="
-                                     INTPTR_FORMAT ", old_value=" INTPTR_FORMAT
-                                     ", new_value=" INTPTR_FORMAT, p2i(this),
-                                     p2i(old_value), p2i(new_value));
+                                     INTPTR_FORMAT ", old_value=" INT64_FORMAT
+                                     ", new_value=" INT64_FORMAT, p2i(this),
+                                     old_value, new_value);
 }
 
-inline void ObjectMonitor::set_owner_from(void* old_value, JavaThread* current) {
+inline void ObjectMonitor::set_owner_from(int64_t old_value, JavaThread* current) {
   set_owner_from_raw(old_value, owner_for(current));
 }
 
@@ -194,34 +190,54 @@ inline void ObjectMonitor::set_owner_from_BasicLock(JavaThread* current) {
   BasicLock* basic_lock_p = stack_locker();
 
   set_stack_locker(nullptr); // first
-  assert(is_owner_anonymous(), "should be anon for now");
+  assert(is_owner_anonymous(), "");
 
   // Non-null owner field to non-null owner field is safe without
   // cmpxchg() as long as all readers can tolerate either flavor.
   Atomic::store(&_owner, owner_for(current));
   log_trace(monitorinflation, owner)("set_owner_from_BasicLock(): mid="
                                      INTPTR_FORMAT ", basic_lock_p="
-                                     INTPTR_FORMAT ", new_value=" INTPTR_FORMAT,
-                                     p2i(this), p2i(basic_lock_p), p2i(current));
+                                     INTPTR_FORMAT ", new_value=" INT64_FORMAT,
+                                     p2i(this), p2i(basic_lock_p), owner_for(current));
 }
 
 // Try to set _owner field to new_value if the current value matches
 // old_value. Otherwise, does not change the _owner field. Returns
 // the prior value of the _owner field.
-inline void* ObjectMonitor::try_set_owner_from_raw(void* old_value, void* new_value) {
+inline int64_t ObjectMonitor::try_set_owner_from_raw(int64_t old_value, int64_t new_value) {
   assert((int64_t)new_value < ThreadIdentifier::current(), "must be reasonable");
-  void* prev = Atomic::cmpxchg(&_owner, old_value, new_value);
+  int64_t prev = Atomic::cmpxchg(&_owner, old_value, new_value);
   if (prev == old_value) {
     log_trace(monitorinflation, owner)("try_set_owner_from(): mid="
-                                       INTPTR_FORMAT ", prev=" INTPTR_FORMAT
-                                       ", new=" INTPTR_FORMAT, p2i(this),
-                                       p2i(prev), p2i(new_value));
+                                       INTPTR_FORMAT ", prev=" INT64_FORMAT
+                                       ", new=" INT64_FORMAT, p2i(this),
+                                       prev, new_value);
   }
   return prev;
 }
 
-inline void* ObjectMonitor::try_set_owner_from(void* old_value, JavaThread* current) {
+inline int64_t ObjectMonitor::try_set_owner_from(int64_t old_value, JavaThread* current) {
   return try_set_owner_from_raw(old_value, owner_for(current));
+}
+
+inline bool ObjectMonitor::is_succesor(JavaThread* thread) {
+  return owner_for(thread) == Atomic::load(&_succ);
+}
+
+inline void ObjectMonitor::set_succesor(JavaThread* thread) {
+  Atomic::store(&_succ, owner_for(thread));
+}
+
+inline void ObjectMonitor::set_succesor(oop vthread) {
+  Atomic::store(&_succ, java_lang_Thread::thread_id(vthread));
+}
+
+inline void ObjectMonitor::clear_succesor() {
+  Atomic::store(&_succ, NO_OWNER);
+}
+
+inline bool ObjectMonitor::has_succesor() {
+  return Atomic::load(&_succ) != NO_OWNER;
 }
 
 // The _next_om field can be concurrently read and modified so we

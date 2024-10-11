@@ -147,7 +147,6 @@ class ObjectMonitor : public CHeapObj<mtObjectMonitor> {
   friend class ObjectSynchronizer;
   friend class ObjectWaiter;
   friend class VMStructs;
-  friend class MonitorList;
   JVMCI_ONLY(friend class JVMCIVMStructs;)
 
   static OopStorage* _oop_storage;
@@ -169,6 +168,9 @@ class ObjectMonitor : public CHeapObj<mtObjectMonitor> {
   // its cache line with _metadata.
   DEFINE_PAD_MINUS_SIZE(0, OM_CACHE_LINE_SIZE, sizeof(_metadata) +
                         sizeof(WeakHandle));
+
+  static const int64_t NO_OWNER = 0;
+  static const int64_t ANONYMOUS_OWNER = 1;
   // Used by async deflation as a marker in the _owner field.
   // Note that the choice of the two markers is peculiar:
   // - They need to represent values that cannot be pointers. In particular,
@@ -177,16 +179,9 @@ class ObjectMonitor : public CHeapObj<mtObjectMonitor> {
   //   and small values encode much better.
   // - We test for anonymous owner by testing for the lowest bit, therefore
   //   DEFLATER_MARKER must *not* have that bit set.
-  static const uintptr_t DEFLATER_MARKER_VALUE = 2;
-  #define DEFLATER_MARKER reinterpret_cast<void*>(DEFLATER_MARKER_VALUE)
- public:
-  // NOTE: Typed as uintptr_t so that we can pick it up in SA, via vmStructs.
-  static const uintptr_t ANONYMOUS_OWNER = 1;
+  static const int64_t DEFLATER_MARKER = 2;
 
- private:
-  static void* anon_owner_ptr() { return reinterpret_cast<void*>(ANONYMOUS_OWNER); }
-
-  void* volatile _owner;  // Either tid of owner, ANONYMOUS_OWNER or DEFLATER_MARKER_VALUE.
+  int64_t volatile _owner;  // Either tid of owner, ANONYMOUS_OWNER_MARKER or DEFLATER_MARKER.
   volatile uint64_t _previous_owner_tid;  // thread id of the previous owner of the monitor
   // Separate _owner and _next_om on different cache lines since
   // both can have busy multi-threaded access. _previous_owner_tid is only
@@ -201,7 +196,7 @@ class ObjectMonitor : public CHeapObj<mtObjectMonitor> {
                                       // acting as proxies for Threads.
 
   ObjectWaiter* volatile _cxq;      // LL of recently-arrived threads blocked on entry.
-  JavaThread* volatile _succ;       // Heir presumptive thread - used for futile wakeup throttling
+  int64_t volatile _succ;           // Heir presumptive thread - used for futile wakeup throttling
 
   volatile int _SpinDuration;
 
@@ -296,15 +291,11 @@ class ObjectMonitor : public CHeapObj<mtObjectMonitor> {
 
   // Returns true if this OM has an owner, false otherwise.
   bool      has_owner() const;
-  void*     owner() const;  // Returns null if DEFLATER_MARKER is observed.
-  bool      is_owner(JavaThread* thread) const { return owner() == owner_for(thread); }
-  bool      is_owner_anonymous() const { return owner_raw() == anon_owner_ptr(); }
-  bool      is_stack_locker(JavaThread* current);
-  BasicLock* stack_locker() const;
+  int64_t   owner() const;  // Returns null if DEFLATER_MARKER is observed.
+  int64_t   owner_raw() const;
 
-  static void* owner_for(JavaThread* thread);
+  static int64_t owner_for(JavaThread* thread);
 
-  void*     owner_raw() const;
   // Returns true if owner field == DEFLATER_MARKER and false otherwise.
   bool      owner_is_DEFLATER_MARKER() const;
   // Returns true if 'this' is being async deflated and false otherwise.
@@ -312,24 +303,38 @@ class ObjectMonitor : public CHeapObj<mtObjectMonitor> {
   // Clear _owner field; current value must match old_value.
   void      release_clear_owner(JavaThread* old_value);
   // Simply set _owner field to new_value; current value must match old_value.
-  void      set_owner_from_raw(void* old_value, void* new_value);
-  void      set_owner_from(void* old_value, JavaThread* current);
+  void      set_owner_from_raw(int64_t old_value, int64_t new_value);
+  void      set_owner_from(int64_t old_value, JavaThread* current);
   // Simply set _owner field to current; current value must match basic_lock_p.
   void      set_owner_from_BasicLock(JavaThread* current);
   // Try to set _owner field to new_value if the current value matches
   // old_value, using Atomic::cmpxchg(). Otherwise, does not change the
   // _owner field. Returns the prior value of the _owner field.
-  void*     try_set_owner_from_raw(void* old_value, void* new_value);
-  void*     try_set_owner_from(void* old_value, JavaThread* current);
+  int64_t   try_set_owner_from_raw(int64_t old_value, int64_t new_value);
+  int64_t   try_set_owner_from(int64_t old_value, JavaThread* current);
 
+  bool      is_succesor(JavaThread* thread);
+  void      set_succesor(JavaThread* thread);
+  void      set_succesor(oop vthread);
+  void      clear_succesor();
+  bool      has_succesor();
+
+  bool is_owner(JavaThread* thread) const { return owner() == owner_for(thread); }
+  void set_owner(JavaThread* thread) { set_owner_from(NO_OWNER, thread); }
+  bool try_set_owner(JavaThread* thread) {
+    return try_set_owner_from(NO_OWNER, thread) == NO_OWNER;
+  }
+
+  bool is_owner_anonymous() const { return owner_raw() == ANONYMOUS_OWNER; }
   void set_owner_anonymous() {
-    set_owner_from_raw(nullptr, anon_owner_ptr());
+    set_owner_from_raw(NO_OWNER, ANONYMOUS_OWNER);
   }
-
   void set_owner_from_anonymous(JavaThread* owner) {
-    set_owner_from(anon_owner_ptr(), owner);
+    set_owner_from(ANONYMOUS_OWNER, owner);
   }
 
+  bool is_stack_locker(JavaThread* current);
+  BasicLock* stack_locker() const;
   void set_stack_locker(BasicLock* locker);
 
   // Simply get _next_om field.

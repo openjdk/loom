@@ -447,7 +447,7 @@ bool ObjectSynchronizer::quick_enter_legacy(oop obj, BasicLock* lock, JavaThread
     // and last are the inflated Java Monitor (ObjectMonitor) checks.
     lock->set_displaced_header(markWord::unused_mark());
 
-    if (!m->has_owner() && m->try_set_owner_from(nullptr, current) == nullptr) {
+    if (!m->has_owner() && m->try_set_owner(current)) {
       assert(m->_recursions == 0, "invariant");
       current->inc_held_monitor_count();
       return true;
@@ -1541,7 +1541,7 @@ ObjectMonitor* ObjectSynchronizer::inflate_impl(JavaThread* inflating_thread, oo
       // that it has stack-locked -- as might happen in wait() -- directly
       // with CAS.  That is, we can avoid the xchg-nullptr .... ST idiom.
       if (inflating_thread != nullptr && inflating_thread->is_lock_owned((address)mark.locker())) {
-        m->set_owner_from(nullptr, inflating_thread);
+        m->set_owner(inflating_thread);
       } else {
         // Use ANONYMOUS_OWNER to indicate that the owner is the BasicLock on the stack,
         // and set the stack locker field in the monitor.
@@ -2070,7 +2070,7 @@ void ObjectSynchronizer::log_in_use_monitor_details(outputStream* out, bool log_
         const intptr_t hash = UseObjectMonitorTable ? monitor->hash() : monitor->header().hash();
         ResourceMark rm;
         out->print(INTPTR_FORMAT "  %d%d%d  " INTPTR_FORMAT "  %s", p2i(monitor),
-                   monitor->is_busy(), hash != 0, monitor->owner() != nullptr,
+                   monitor->is_busy(), hash != 0, monitor->has_owner(),
                    p2i(obj), obj == nullptr ? "" : obj->klass()->external_name());
         if (monitor->is_busy()) {
           out->print(" (%s)", monitor->is_busy_to_string(&ss));
