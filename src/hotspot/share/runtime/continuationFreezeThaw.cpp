@@ -1922,6 +1922,7 @@ protected:
   }
 
   void clear_chunk(stackChunkOop chunk);
+  template<bool check_stub>
   int remove_top_compiled_frame_from_chunk(stackChunkOop chunk, int &argsize);
   void copy_from_chunk(intptr_t* from, intptr_t* to, int size);
 
@@ -1981,6 +1982,7 @@ public:
   }
 
   inline intptr_t* thaw(Continuation::thaw_kind kind);
+  template<bool check_stub = false>
   NOINLINE intptr_t* thaw_fast(stackChunkOop chunk);
   NOINLINE intptr_t* thaw_slow(stackChunkOop chunk, Continuation::thaw_kind kind);
   inline void patch_caller_links(intptr_t* sp, intptr_t* bottom);
@@ -2031,6 +2033,7 @@ inline void ThawBase::clear_chunk(stackChunkOop chunk) {
   chunk->set_max_thawing_size(0);
 }
 
+template<bool check_stub>
 int ThawBase::remove_top_compiled_frame_from_chunk(stackChunkOop chunk, int &argsize) {
   bool empty = false;
   StackChunkFrameStream<ChunkFrames::CompiledOnly> f(chunk);
@@ -2040,24 +2043,31 @@ int ThawBase::remove_top_compiled_frame_from_chunk(stackChunkOop chunk, int &arg
 
   int frame_size = f.cb()->frame_size();
   argsize = f.stack_argsize();
-  bool is_stub = f.is_stub();
 
-  f.next(SmallRegisterMap::instance(), true /* stop */);
-  empty = f.is_done();
-  assert(!empty || argsize == chunk->argsize(), "");
-
-  assert(!is_stub || !empty, "runtime stub should have caller frame");
-  if (is_stub) {
+  assert(!f.is_stub() || check_stub, "");
+  if (check_stub && f.is_stub()) {
     // If we don't thaw the top compiled frame too, after restoring the saved
     // registers back in Java, we would hit the return barrier to thaw one more
     // frame effectively overwritting the restored registers during that call.
+    f.next(SmallRegisterMap::instance(), true /* stop */);
+    assert(!f.is_done(), "");
+
     f.get_cb();
+    assert(f.is_compiled(), "");
     frame_size += f.cb()->frame_size();
     argsize = f.stack_argsize();
-    f.next(SmallRegisterMap::instance, true /* stop */);
-    empty = f.is_done();
-    assert(!empty || argsize == chunk->argsize(), "");
+
+    if (f.cb()->as_nmethod()->is_marked_for_deoptimization()) {
+      // The caller of the runtime stub when the continuation is preempted is not at a
+      // Java call instruction, and so cannot rely on nmethod patching for deopt.
+      log_develop_trace(continuations)("Deoptimizing runtime stub caller");
+      f.to_frame().deoptimize(nullptr); // the null thread simply avoids the assertion in deoptimize which we're not set up for
+    }
   }
+
+  f.next(SmallRegisterMap::instance, true /* stop */);
+  empty = f.is_done();
+  assert(!empty || argsize == chunk->argsize(), "");
 
   if (empty) {
     clear_chunk(chunk);
@@ -2100,6 +2110,7 @@ void ThawBase::patch_return(intptr_t* sp, bool is_last) {
 }
 
 template <typename ConfigT>
+template<bool check_stub>
 NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
   assert(chunk == _cont.tail(), "");
   assert(!chunk->has_mixed_frames(), "");
@@ -2133,7 +2144,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_fast(stackChunkOop chunk) {
     empty = true;
   } else { // thaw a single frame
     partial = true;
-    thaw_size = remove_top_compiled_frame_from_chunk(chunk, argsize);
+    thaw_size = remove_top_compiled_frame_from_chunk<check_stub>(chunk, argsize);
     empty = chunk->is_empty();
   }
 
@@ -2247,7 +2258,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
   // Retry the fast path now that we possibly cleared the FLAG_HAS_LOCKSTACK
   // and FLAG_PREEMPTED flags from the stackChunk.
   if (retry_fast_path && can_thaw_fast(chunk)) {
-    intptr_t* sp = thaw_fast(chunk);
+    intptr_t* sp = thaw_fast<true>(chunk);
     if (_preempted_case) {
       return handle_preempted_continuation(sp, preempt_kind, true /* fast_case */);
     }
