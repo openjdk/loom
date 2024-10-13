@@ -345,8 +345,7 @@ void InterpreterMacroAssembler::call_VM_preemptable(Register oop_result,
 
   push_cont_fastpath();
 
-  // Make VM call. In case of preemption set last_pc to
-  // the one we want to resume to.
+  // Make VM call. In case of preemption set last_pc to the one we want to resume to.
   lea(rscratch1, resume_pc);
   push(rscratch1);
   MacroAssembler::call_VM_helper(oop_result, entry_point, 1, false /*check_exceptions*/);
@@ -354,13 +353,14 @@ void InterpreterMacroAssembler::call_VM_preemptable(Register oop_result,
 
   pop_cont_fastpath();
 
-  // Check if preempted
+  // Check if preempted.
   movptr(rscratch1, Address(r15_thread, JavaThread::preempt_alternate_return_offset()));
   cmpptr(rscratch1, NULL_WORD);
   jccb(Assembler::zero, not_preempted);
   movptr(Address(r15_thread, JavaThread::preempt_alternate_return_offset()), NULL_WORD);
   jmp(rscratch1);
 
+  // In case of preemption, this is where we will resume once we finally acquire the monitor.
   bind(resume_pc);
   restore_after_resume(false /* is_native */);
 
@@ -371,7 +371,7 @@ void InterpreterMacroAssembler::restore_after_resume(bool is_native) {
   lea(rscratch1, ExternalAddress(Interpreter::cont_resume_interpreter_adapter()));
   call(rscratch1);
   if (is_native) {
-    // On resume we need to set up stack as expected
+    // On resume we need to set up stack as expected.
     push(dtos);
     push(ltos);
   }

@@ -512,6 +512,9 @@ void ObjectMonitor::enter_with_contention_mark(JavaThread *current, ObjectMonito
       if (result == freeze_ok) {
         bool acquired = VThreadMonitorEnter(current);
         if (acquired) {
+          // We actually acquired the monitor while trying to add the vthread to the
+          // _cxq so cancel preemption. We will still go through the preempt stub
+          // but instead of unmounting we will call thaw to continue execution.
           current->set_preemption_cancelled(true);
           if (JvmtiExport::should_post_monitor_contended_entered()) {
             // We are going to call thaw again after this and finish the VMTS
@@ -1151,7 +1154,7 @@ bool ObjectMonitor::resume_operation(JavaThread* current, ObjectWaiter* node, Co
   oop vthread = current->vthread();
   if (is_succesor(current)) clear_succesor();
 
-  // Invariant: after clearing _succ a thread *must* retry _owner before parking.
+  // Invariant: after clearing _succ a thread *must* retry acquiring the monitor.
   OrderAccess::fence();
 
   if (TryLock(current) == TryLockResult::Success) {
@@ -1159,8 +1162,7 @@ bool ObjectMonitor::resume_operation(JavaThread* current, ObjectWaiter* node, Co
     return true;
   }
 
-  // The JT will read this variable on return to the resume_monitor_operation stub
-  // and will unmount (enterSpecial frame removed and return to Continuation.run()).
+  // We will return to Continuation.run() and unmount so set the right state.
   java_lang_VirtualThread::set_state(vthread, java_lang_VirtualThread::BLOCKING);
 
   return false;
@@ -1188,6 +1190,7 @@ void ObjectMonitor::VThreadEpilog(JavaThread* current, ObjectWaiter* node) {
   UnlinkAfterAcquire(current, node);
   delete node;
 
+  // Remove the ObjectWaiter* from the stackChunk.
   oop vthread = current->vthread();
   oop cont = java_lang_VirtualThread::continuation(vthread);
   stackChunkOop chunk  = jdk_internal_vm_Continuation::tail(cont);
@@ -1624,6 +1627,10 @@ static void vthread_monitor_waited_event(JavaThread *current, ObjectWaiter* node
       post_monitor_wait_event(event, node->_monitor, node->_notifier_tid, timeout, timed_out);
     }
     if (JvmtiExport::should_post_monitor_waited()) {
+      // We mark this call in case of an upcall to Java while posting the event.
+      // If somebody walks the stack in that case, processing the enterSpecial
+      // frame should not include processing callee arguments since there is no
+      // actual callee (see nmethod::preserve_callee_argument_oops()).
       ThreadOnMonitorWaitedEvent tmwe(current);
       JvmtiExport::vthread_post_monitor_waited(current, node->_monitor, timed_out);
     }
@@ -2004,7 +2011,7 @@ void ObjectMonitor::VThreadWait(JavaThread* current, jlong millis) {
   Thread::SpinRelease(&_WaitSetLock);
 
   node->_recursions = _recursions;   // record the old recursion count
-  _recursions = 0;                   // set the recursion level to be 1
+  _recursions = 0;                   // set the recursion level to be 0
   _waiters++;                        // increment the number of waiters
   exit(current);                     // exit the monitor
   guarantee(!is_owner(current), "invariant");
@@ -2013,8 +2020,7 @@ void ObjectMonitor::VThreadWait(JavaThread* current, jlong millis) {
   java_lang_VirtualThread::set_state(vthread, millis == 0 ? java_lang_VirtualThread::WAITING : java_lang_VirtualThread::TIMED_WAITING);
   java_lang_VirtualThread::set_waitTimeout(vthread, millis);
 
-  // Save the ObjectWaiter* in the chunk since we will need it
-  // when resuming execution.
+  // Save the ObjectWaiter* in the chunk since we will need it when resuming execution.
   oop cont = java_lang_VirtualThread::continuation(vthread);
   stackChunkOop chunk  = jdk_internal_vm_Continuation::tail(cont);
   chunk->set_object_waiter(node);
@@ -2022,8 +2028,8 @@ void ObjectMonitor::VThreadWait(JavaThread* current, jlong millis) {
 
 bool ObjectMonitor::VThreadWaitReenter(JavaThread* current, ObjectWaiter* node, ContinuationWrapper& cont) {
   // First time we run after being preempted on Object.wait().
-  // We need to check if we were interrupted or wait() timed-out
-  // and in that case remove ourselves from the _WaitSet queue.
+  // Check if we were interrupted or the wait timed-out, and in
+  // that case remove ourselves from the _WaitSet queue.
   if (node->TState == ObjectWaiter::TS_WAIT) {
     Thread::SpinAcquire(&_WaitSetLock, "WaitSet - unlink");
     if (node->TState == ObjectWaiter::TS_WAIT) {
@@ -2034,18 +2040,20 @@ bool ObjectMonitor::VThreadWaitReenter(JavaThread* current, ObjectWaiter* node, 
     Thread::SpinRelease(&_WaitSetLock);
   }
 
+  // If this was an interrupted case, set the _interrupted boolean so that
+  // once we re-acquire the monitor we know if we need to throw IE or not.
   ObjectWaiter::TStates state = node->TState;
   bool was_notified = state == ObjectWaiter::TS_ENTER || state == ObjectWaiter::TS_CXQ;
   assert(was_notified || state == ObjectWaiter::TS_RUN, "");
-
-  // save it so that once we re-acquire the monitor we know if we need to throw IE.
   node->_interrupted = !was_notified && current->is_interrupted(false);
 
+  // Post JFR and JVMTI events.
   EventJavaMonitorWait event;
   if (event.should_commit() || JvmtiExport::should_post_monitor_waited()) {
     vthread_monitor_waited_event(current, node, cont, &event, !was_notified && !node->_interrupted);
   }
 
+  // Mark that we are at reenter so that we don't call this method again.
   node->_at_reenter = true;
   assert(!is_owner(current), "invariant");
 

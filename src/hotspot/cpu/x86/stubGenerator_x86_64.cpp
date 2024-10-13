@@ -3799,7 +3799,7 @@ address StubGenerator::generate_cont_preempt_stub() {
 
   __ reset_last_Java_frame(true);
 
-  // reset _preempting flag
+  // Check and reset _preempting flag.
 #ifdef ASSERT
   { Label L;
     __ movbool(rscratch1, Address(r15_thread, JavaThread::preempting_offset()));
@@ -3811,7 +3811,7 @@ address StubGenerator::generate_cont_preempt_stub() {
 #endif
   __ movbool(Address(r15_thread, JavaThread::preempting_offset()), false);
 
-  // Set rsp to enterSpecial frame
+  // Set rsp to enterSpecial frame, i.e. remove all frames copied into the heap.
   __ movptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));
 
   Label preemption_cancelled;
@@ -3819,11 +3819,12 @@ address StubGenerator::generate_cont_preempt_stub() {
   __ testbool(rscratch1);
   __ jcc(Assembler::notZero, preemption_cancelled);
 
-  // Remove enterSpecial frame from the stack and return to Continuation.run()
+  // Remove enterSpecial frame from the stack and return to Continuation.run() to unmount.
   SharedRuntime::continuation_enter_cleanup(_masm);
   __ pop(rbp);
   __ ret(0);
 
+  // We acquired the monitor after freezing the frames so call thaw to continue execution.
   __ bind(preemption_cancelled);
   __ movbool(Address(r15_thread, JavaThread::preemption_cancelled_offset()), false);
   __ lea(rbp, Address(rsp, checked_cast<int32_t>(ContinuationEntry::size())));

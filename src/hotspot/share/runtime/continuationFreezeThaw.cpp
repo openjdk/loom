@@ -2216,6 +2216,8 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
   _preempted_case = chunk->preempted();
   if (_preempted_case) {
     if (chunk->object_waiter() != nullptr) {
+      // Mounted again after preemption. Resume the pending monitor operation,
+      // which will be either a monitorenter or Object.wait() call.
       assert(chunk->current_pending_monitor() != nullptr || chunk->current_waiting_monitor() != nullptr, "");
       ObjectWaiter* waiter = chunk->object_waiter();
       ObjectMonitor* mon = waiter->monitor();
@@ -2224,15 +2226,16 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
       bool mon_acquired = mon->resume_operation(_thread, waiter, _cont);
       assert(!mon_acquired || mon->is_owner(_thread), "invariant");
       if (!mon_acquired) {
+        // Failed to aquire monitor. Return to enterSpecial to unmount again.
         return push_cleanup_continuation();
       }
-      chunk = _cont.tail();  // reload oop in case of safepoint in resume_operation
+      chunk = _cont.tail();  // reload oop in case of safepoint in resume_operation (if posting JVMTI events).
     } else {
       // Preemption cancelled in moniterenter case. We actually acquired
       // the monitor after freezing all frames so nothing to do.
       preempt_kind = Continuation::freeze_on_monitorenter;
     }
-    // Call this first to avoid racing with GC threads later when modifying the flags.
+    // Call this first to avoid racing with GC threads later when modifying the chunk flags.
     relativize_chunk_concurrently(chunk);
     chunk->set_preempted(false);
     retry_fast_path = true;
@@ -2447,6 +2450,7 @@ intptr_t* ThawBase::handle_preempted_continuation(intptr_t* sp, Continuation::pr
   assert(top.pc() == *(address*)(sp - frame::sender_sp_ret_address_offset()), "");
 
 #if INCLUDE_JVMTI
+  // Finish the VTMS transition.
   assert(_thread->is_in_VTMS_transition(), "must be");
   bool is_vthread = Continuation::continuation_scope(_cont.continuation()) == java_lang_VirtualThread::vthread_scope();
   if (is_vthread) {
@@ -2469,6 +2473,7 @@ intptr_t* ThawBase::handle_preempted_continuation(intptr_t* sp, Continuation::pr
   }
 
   if (preempt_kind == Continuation::freeze_on_wait) {
+    // Check now if we need to throw IE exception.
     if (_thread->pending_interrupted_exception()) {
       throw_interrupted_exception(_thread, top);
       _thread->set_pending_interrupted_exception(false);

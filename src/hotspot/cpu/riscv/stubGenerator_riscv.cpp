@@ -3883,18 +3883,19 @@ class StubGenerator: public StubCodeGenerator {
     // reset the flag
     __ sb(zr, Address(xthread, JavaThread::preempting_offset()));
 
-    // Set sp to enterSpecial frame and then remove it from the stack
+    // Set sp to enterSpecial frame, i.e. remove all frames copied into the heap.
     __ ld(sp, Address(xthread, JavaThread::cont_entry_offset()));
 
     Label preemption_cancelled;
     __ lbu(t0, Address(xthread, JavaThread::preemption_cancelled_offset()));
     __ bnez(t0, preemption_cancelled);
 
-    // Remove enterSpecial frame from the stack and return to Continuation.run()
+    // Remove enterSpecial frame from the stack and return to Continuation.run() to unmount.
     SharedRuntime::continuation_enter_cleanup(_masm);
     __ leave();
     __ ret();
 
+    // We acquired the monitor after freezing the frames so call thaw to continue execution.
     __ bind(preemption_cancelled);
     __ sb(zr, Address(xthread, JavaThread::preemption_cancelled_offset()));
     __ la(fp, Address(sp, checked_cast<int32_t>(ContinuationEntry::size() + 2 * wordSize)));
