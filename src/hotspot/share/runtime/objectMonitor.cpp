@@ -1522,9 +1522,10 @@ void ObjectMonitor::ExitEpilog(JavaThread* current, ObjectWaiter* Wakee) {
   DTRACE_MONITOR_PROBE(contended__exit, this, object(), current);
 
   if (vthread == nullptr) {
-    // Platform thread case
+    // Platform thread case.
     Trigger->unpark();
-  } else if (java_lang_VirtualThread::set_onWaitingList(vthread, _vthread_cxq_head)) {
+  } else if (java_lang_VirtualThread::set_onWaitingList(vthread, vthread_cxq_head())) {
+    // Virtual thread case.
     Trigger->unpark();
   }
 
