@@ -1604,15 +1604,6 @@ static void jvmti_mount_end(JavaThread* current, ContinuationWrapper& cont, fram
 
   JRT_BLOCK
     current->rebind_to_jvmti_thread_state_of(vth());
-    {
-      MutexLocker mu(JvmtiThreadState_lock);
-      JvmtiThreadState* state = current->jvmti_thread_state();
-      if (state != NULL && state->is_pending_interp_only_mode()) {
-        JvmtiEventController::enter_interp_only_mode(state);
-      }
-    }
-    assert(current->is_in_VTMS_transition(), "sanity check");
-    assert(!current->is_in_tmp_VTMS_transition(), "sanity check");
     JvmtiVTMSTransitionDisabler::finish_VTMS_transition((jthread)vth.raw_value(), /* is_mount */ true);
 
     // If pending_jvmti_unmount_event() is true here we are in the preemption
