@@ -3880,9 +3880,6 @@ class StubGenerator: public StubCodeGenerator {
 
     __ reset_last_Java_frame(true);
 
-    // reset the flag
-    __ sb(zr, Address(xthread, JavaThread::preempting_offset()));
-
     // Set sp to enterSpecial frame, i.e. remove all frames copied into the heap.
     __ ld(sp, Address(xthread, JavaThread::cont_entry_offset()));
 

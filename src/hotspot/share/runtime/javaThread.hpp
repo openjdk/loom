@@ -30,6 +30,7 @@
 #include "memory/allocation.hpp"
 #include "oops/oop.hpp"
 #include "oops/oopHandle.hpp"
+#include "runtime/continuationEntry.hpp"
 #include "runtime/frame.hpp"
 #include "runtime/globals.hpp"
 #include "runtime/handshake.hpp"
@@ -51,7 +52,6 @@
 #endif
 
 class AsyncExceptionHandshake;
-class ContinuationEntry;
 class DeoptResourceMark;
 class InternalOOMEMark;
 class JNIHandleBlock;
@@ -160,17 +160,12 @@ class JavaThread: public Thread {
   // One-element thread local free list
   JNIHandleBlock* _free_handle_block;
 
-  // ID used as owner for inflated monitors. Same as the tid field of the current
-  // _vthread object, except during creation of the primordial and JNI attached
-  // thread cases where this field can have a temporal value.
+  // ID used as owner for inflated monitors. Same as the j.l.Thread.tid of the
+  // current _vthread object, except during creation of the primordial and JNI
+  // attached thread cases where this field can have a temporal value.
   int64_t _lock_id;
 
  public:
-  bool _on_monitorenter;
-
-  bool is_on_monitorenter() { return _on_monitorenter; }
-  void set_on_monitorenter(bool val) { _on_monitorenter = val; }
-
   void set_lock_id(int64_t tid) {
     assert(tid >= ThreadIdentifier::initial() && tid < ThreadIdentifier::current(), "invalid tid");
     _lock_id = tid;
@@ -486,25 +481,27 @@ class JavaThread: public Thread {
   intx _jni_monitor_count;
   ObjectMonitor* _unlocked_inflated_monitor;
 
-  bool _preempting;
+  // This is the field we poke in the interpreter and native
+  // wrapper (Object.wait) to check for preemption.
+  address _preempt_alternate_return;
+  // When preempting on monitorenter we could have acquired the
+  // monitor after freezing all vthread frames. In that case we
+  // set this field so that in the preempt stub we call thaw again
+  // instead of unmounting.
   bool _preemption_cancelled;
+  // For Object.wait() we set this field to know if we need to
+  // throw IE at the end of thawing before returning to Java.
   bool _pending_interrupted_exception;
-  address _preempt_alternate_return; // used when preempting a thread
-
-#ifdef ASSERT
-  intx _obj_locker_count;
 
  public:
-  intx obj_locker_count() { return _obj_locker_count; }
-  void inc_obj_locker_count() {
-    assert(_obj_locker_count >= 0, "Must always be greater than 0: " INTX_FORMAT, _obj_locker_count);
-    _obj_locker_count++;
-  }
-  void dec_obj_locker_count() {
-    _obj_locker_count--;
-    assert(_obj_locker_count >= 0, "Must always be greater than 0: " INTX_FORMAT, _obj_locker_count);
-  }
-#endif // ASSERT
+  bool preemption_cancelled()           { return _preemption_cancelled; }
+  void set_preemption_cancelled(bool b) { _preemption_cancelled = b; }
+
+  bool pending_interrupted_exception()           { return _pending_interrupted_exception; }
+  void set_pending_interrupted_exception(bool b) { _pending_interrupted_exception = b; }
+
+  bool preempting()           { return _preempt_alternate_return != nullptr; }
+  void set_preempt_alternate_return(address val) { _preempt_alternate_return = val; }
 
 private:
 
@@ -664,17 +661,6 @@ private:
 
   inline bool is_vthread_mounted() const;
   inline const ContinuationEntry* vthread_continuation() const;
-
-  bool preempting()           { return _preempting; }
-  void set_preempting(bool b) { _preempting = b; }
-
-  bool preemption_cancelled()           { return _preemption_cancelled; }
-  void set_preemption_cancelled(bool b) { _preemption_cancelled = b; }
-
-  bool pending_interrupted_exception()           { return _pending_interrupted_exception; }
-  void set_pending_interrupted_exception(bool b) { _pending_interrupted_exception = b; }
-
-  void set_preempt_alternate_return(address val) { _preempt_alternate_return = val; }
 
  private:
   DEBUG_ONLY(void verify_frame_info();)
@@ -898,7 +884,6 @@ private:
   static ByteSize cont_fastpath_offset()      { return byte_offset_of(JavaThread, _cont_fastpath); }
   static ByteSize held_monitor_count_offset() { return byte_offset_of(JavaThread, _held_monitor_count); }
   static ByteSize jni_monitor_count_offset()  { return byte_offset_of(JavaThread, _jni_monitor_count); }
-  static ByteSize preempting_offset()         { return byte_offset_of(JavaThread, _preempting); }
   static ByteSize preemption_cancelled_offset()  { return byte_offset_of(JavaThread, _preemption_cancelled); }
   static ByteSize preempt_alternate_return_offset() { return byte_offset_of(JavaThread, _preempt_alternate_return); }
   static ByteSize unlocked_inflated_monitor_offset() { return byte_offset_of(JavaThread, _unlocked_inflated_monitor); }
@@ -1321,13 +1306,14 @@ class JNIHandleMark : public StackObj {
   ~JNIHandleMark() { _thread->pop_jni_handle_block(); }
 };
 
-class ThreadOnMonitorEnter {
-  JavaThread* _thread;
+class NoPreemptMark {
+  ContinuationEntry* _ce;
+  bool _unpin;
  public:
-  ThreadOnMonitorEnter(JavaThread* thread) : _thread(thread) {
-    _thread->set_on_monitorenter(true);
+  NoPreemptMark(JavaThread* thread) : _ce(thread->last_continuation()), _unpin(false) {
+    if (_ce != nullptr) _unpin = _ce->pin();
   }
-  ~ThreadOnMonitorEnter() { _thread->set_on_monitorenter(false); }
+  ~NoPreemptMark() { if (_unpin) _ce->unpin(); }
 };
 
 class ThreadOnMonitorWaitedEvent {

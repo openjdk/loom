@@ -1247,7 +1247,6 @@ freeze_result FreezeBase::recurse_freeze_compiled_frame(frame& f, frame& caller,
 NOINLINE freeze_result FreezeBase::recurse_freeze_stub_frame(frame& f, frame& caller) {
   DEBUG_ONLY(frame fsender = sender(f);)
   assert(fsender.is_compiled_frame(), "sender should be compiled frame");
-  assert(_thread->is_on_monitorenter(), "");
 
   intptr_t* const stack_frame_top = ContinuationHelper::StubFrame::frame_top(f);
   const int fsize = f.cb()->frame_size();
@@ -1283,7 +1282,6 @@ NOINLINE freeze_result FreezeBase::recurse_freeze_stub_frame(frame& f, frame& ca
 NOINLINE freeze_result FreezeBase::recurse_freeze_native_frame(frame& f, frame& caller) {
   if (!f.cb()->as_nmethod()->method()->is_object_wait0()) {
     assert(f.cb()->as_nmethod()->method()->is_synchronized(), "");
-    assert(_thread->is_on_monitorenter(), "");
     // Synchronized native method case. Unlike the interpreter native wrapper, the compiled
     // native wrapper tries to acquire the monitor after marshalling the arguments from the
     // caller into the native convention. This is so that we have a valid oopMap in case of
