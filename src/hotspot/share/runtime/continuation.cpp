@@ -75,12 +75,18 @@ class JvmtiUnmountBeginMark : public StackObj {
       JvmtiVTMSTransitionDisabler::start_VTMS_transition((jthread)_vthread.raw_value(), /* is_mount */ false);
 
       // Don't preempt if there is a pending popframe or earlyret operation. This can
-      // happen in start_VTMS_transition() so we need to check it here.
+      // be installed in start_VTMS_transition() so we need to check it here.
       if (JvmtiExport::can_pop_frame() || JvmtiExport::can_force_early_return()) {
         JvmtiThreadState* state = _target->jvmti_thread_state();
         if (_target->has_pending_popframe() || (state != nullptr && state->is_earlyret_pending())) {
           _failed = true;
         }
+      }
+
+      // Don't preempt in case there is an async exception installed since
+      // we would incorrectly throw it during the unmount logic in the carrier.
+      if (_target->has_async_exception_condition()) {
+        _failed = false;
       }
     } else {
       _target->set_is_in_VTMS_transition(true);
@@ -146,19 +152,13 @@ static void verify_preempt_preconditions(JavaThread* target, oop continuation) {
   assert(target->last_continuation()->cont_oop(target) == continuation, "");
   assert(Continuation::continuation_scope(continuation) == java_lang_VirtualThread::vthread_scope(), "");
   assert(!target->has_pending_exception(), "");
-  assert(!target->is_suspended() JVMTI_ONLY(|| target->is_disable_suspend()) || target->obj_locker_count() > 0, "");
 }
 
-int Continuation::try_preempt(JavaThread* target, oop continuation, preempt_kind preempt_kind) {
+int Continuation::try_preempt(JavaThread* target, oop continuation) {
   verify_preempt_preconditions(target, continuation);
 
   if (LockingMode == LM_LEGACY) {
     return freeze_unsupported;
-  }
-
-  if (preempt_kind == freeze_on_monitorenter && !target->is_on_monitorenter()) {
-    // ObjectLocker or jni_enter case. We can't preempt in these cases.
-    return freeze_pinned_native;
   }
 
   if (!is_safe_vthread_to_preempt(target, target->vthread())) {
@@ -167,13 +167,9 @@ int Continuation::try_preempt(JavaThread* target, oop continuation, preempt_kind
 
   JVMTI_ONLY(JvmtiUnmountBeginMark jubm(target);)
   JVMTI_ONLY(if (jubm.failed()) return freeze_pinned_native;)
-  target->set_preempting(true);
   int res = CAST_TO_FN_PTR(FreezeContFnT, freeze_preempt_entry())(target, target->last_Java_sp());
   log_trace(continuations, preempt)("try_preempt: %d", res);
   JVMTI_ONLY(jubm.set_preempt_result(res);)
-  if (res != freeze_ok) {
-    target->set_preempting(false);
-  }
   return res;
 }
 #endif // LOOM_MONITOR_SUPPORT

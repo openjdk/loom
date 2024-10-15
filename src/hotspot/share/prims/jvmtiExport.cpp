@@ -2868,15 +2868,6 @@ void JvmtiExport::vthread_post_monitor_waited(JavaThread *current, ObjectMonitor
 
   // Finish the VTMS transition temporarily to post the event.
   current->rebind_to_jvmti_thread_state_of(vthread());
-  {
-    MutexLocker mu(JvmtiThreadState_lock);
-    JvmtiThreadState* state = current->jvmti_thread_state();
-    if (state != NULL && state->is_pending_interp_only_mode()) {
-      JvmtiEventController::enter_interp_only_mode(state);
-    }
-  }
-  assert(current->is_in_VTMS_transition(), "sanity check");
-  assert(!current->is_in_tmp_VTMS_transition(), "sanity check");
   JvmtiVTMSTransitionDisabler::finish_VTMS_transition((jthread)vthread.raw_value(), /* is_mount */ true);
 
   // Post event.

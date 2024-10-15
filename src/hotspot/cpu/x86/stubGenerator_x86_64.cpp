@@ -3785,31 +3785,7 @@ address StubGenerator::generate_cont_preempt_stub() {
   StubCodeMark mark(this, "StubRoutines","Continuation preempt stub");
   address start = __ pc();
 
-#ifdef ASSERT
-  __ push(rax);
-  { Label L;
-    __ get_thread(rax);
-    __ cmpptr(r15_thread, rax);
-    __ jcc(Assembler::equal, L);
-    __ stop("r15 should have been preserved across VM call");
-    __ bind(L);
-  }
-  __ pop(rax);
-#endif
-
   __ reset_last_Java_frame(true);
-
-  // Check and reset _preempting flag.
-#ifdef ASSERT
-  { Label L;
-    __ movbool(rscratch1, Address(r15_thread, JavaThread::preempting_offset()));
-    __ testbool(rscratch1);
-    __ jcc(Assembler::notZero, L);
-    __ stop("preempting flag should be set");
-    __ bind(L);
-  }
-#endif
-  __ movbool(Address(r15_thread, JavaThread::preempting_offset()), false);
 
   // Set rsp to enterSpecial frame, i.e. remove all frames copied into the heap.
   __ movptr(rsp, Address(r15_thread, JavaThread::cont_entry_offset()));

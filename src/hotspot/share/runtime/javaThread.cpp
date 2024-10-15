@@ -436,7 +436,6 @@ JavaThread::JavaThread(MemTag mem_tag) :
   _active_handles(nullptr),
   _free_handle_block(nullptr),
   _lock_id(0),
-  _on_monitorenter(false),
 
   _suspend_flags(0),
 
@@ -500,11 +499,9 @@ JavaThread::JavaThread(MemTag mem_tag) :
   _jni_monitor_count(0),
   _unlocked_inflated_monitor(nullptr),
 
-  _preempting(false),
+  _preempt_alternate_return(nullptr),
   _preemption_cancelled(false),
   _pending_interrupted_exception(false),
-  _preempt_alternate_return(nullptr),
-  DEBUG_ONLY(_obj_locker_count(0) COMMA)
 
   _handshake(this),
 
@@ -951,7 +948,6 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
     log_debug(jni)("JavaThread %s (tid: " UINTX_FORMAT ") with Objects still locked by JNI MonitorEnter.",
                    exit_type == JavaThread::normal_exit ? "exiting" : "detaching", os::current_thread_id());
   }
-  assert(obj_locker_count() == 0, "expected 0 but found: " INTX_FORMAT, obj_locker_count());
 
   // These things needs to be done while we are still a Java Thread. Make sure that thread
   // is in a consistent state, in case GC happens

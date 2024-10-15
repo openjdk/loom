@@ -151,7 +151,9 @@ class ObjectMonitor : public CHeapObj<mtObjectMonitor> {
 
   static OopStorage* _oop_storage;
 
+  // List of j.l.VirtualThread waiting to be unblocked by unblocker thread.
   static OopHandle _vthread_cxq_head;
+  // ParkEvent of unblocker thread.
   static ParkEvent* _vthread_unparker_ParkEvent;
 
   // The sync code expects the metadata field to be at offset zero (0).
@@ -209,7 +211,7 @@ class ObjectMonitor : public CHeapObj<mtObjectMonitor> {
   volatile int  _waiters;           // number of waiting threads
   volatile int _WaitSetLock;        // protects Wait Queue - simple spinlock
 
-  // used in LM_LEGACY mode to store BasicLock* in case of inflation by contending thread
+  // Used in LM_LEGACY mode to store BasicLock* in case of inflation by contending thread.
   BasicLock* volatile _stack_locker;
 
  public:

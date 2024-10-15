@@ -343,6 +343,16 @@ void InterpreterMacroAssembler::call_VM_preemptable(Register oop_result,
   assert(arg_1 == c_rarg1, "");
   Label resume_pc, not_preempted;
 
+#ifdef ASSERT
+  {
+    Label L;
+    cmpptr(Address(r15_thread, JavaThread::preempt_alternate_return_offset()), NULL_WORD);
+    jcc(Assembler::equal, L);
+    stop("Should not have alternate return address set");
+    bind(L);
+  }
+#endif /* ASSERT */
+
   push_cont_fastpath();
 
   // Make VM call. In case of preemption set last_pc to the one we want to resume to.

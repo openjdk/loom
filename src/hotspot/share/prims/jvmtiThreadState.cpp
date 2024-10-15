@@ -495,6 +495,7 @@ JvmtiVTMSTransitionDisabler::finish_VTMS_transition(jthread vthread, bool is_mou
   JavaThread* thread = JavaThread::current();
 
   assert(thread->is_in_VTMS_transition(), "sanity check");
+  assert(!thread->is_in_tmp_VTMS_transition(), "sanity check");
   thread->set_is_in_VTMS_transition(false);
   oop vt = JNIHandles::resolve_external_guard(vthread);
   java_lang_Thread::set_is_in_VTMS_transition(vt, false);

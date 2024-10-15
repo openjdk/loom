@@ -508,7 +508,7 @@ void ObjectMonitor::enter_with_contention_mark(JavaThread *current, ObjectMonito
 
     ContinuationEntry* ce = current->last_continuation();
     if (ce != nullptr && ce->is_virtual_thread()) {
-      int result = Continuation::try_preempt(current, ce->cont_oop(current), Continuation::freeze_on_monitorenter);
+      int result = Continuation::try_preempt(current, ce->cont_oop(current));
       if (result == freeze_ok) {
         bool acquired = VThreadMonitorEnter(current);
         if (acquired) {
@@ -1522,9 +1522,10 @@ void ObjectMonitor::ExitEpilog(JavaThread* current, ObjectWaiter* Wakee) {
   DTRACE_MONITOR_PROBE(contended__exit, this, object(), current);
 
   if (vthread == nullptr) {
-    // Platform thread case
+    // Platform thread case.
     Trigger->unpark();
-  } else if (java_lang_VirtualThread::set_onWaitingList(vthread, _vthread_cxq_head)) {
+  } else if (java_lang_VirtualThread::set_onWaitingList(vthread, vthread_cxq_head())) {
+    // Virtual thread case.
     Trigger->unpark();
   }
 
@@ -1679,7 +1680,7 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
 
   ContinuationEntry* ce = current->last_continuation();
   if (interruptible && ce != nullptr && ce->is_virtual_thread()) {
-    int result = Continuation::try_preempt(current, ce->cont_oop(current), Continuation::freeze_on_wait);
+    int result = Continuation::try_preempt(current, ce->cont_oop(current));
     if (result == freeze_ok) {
       VThreadWait(current, millis);
       current->set_current_waiting_monitor(nullptr);
