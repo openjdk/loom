@@ -23,11 +23,11 @@
 
 /*
  * @test id=default
- * @summary Test virtual threads using synchronized
+ * @summary Tests for object monitors that have been useful to find bugs
  * @library /test/lib
  * @requires vm.continuations & vm.opt.LockingMode != 1
  * @modules java.base/java.lang:+open
- * @run junit/othervm MonitorsTestALot
+ * @run junit/othervm MiscMonitorTests
  */
 
 /*
@@ -35,7 +35,7 @@
  * @library /test/lib
  * @requires vm.continuations & vm.opt.LockingMode != 1
  * @modules java.base/java.lang:+open
- * @run junit/othervm -Xint MonitorsTestALot
+ * @run junit/othervm -Xint MiscMonitorTests
  */
 
 /*
@@ -43,7 +43,7 @@
  * @library /test/lib
  * @requires vm.continuations & vm.opt.LockingMode != 1
  * @modules java.base/java.lang:+open
- * @run junit/othervm -Xcomp MonitorsTestALot
+ * @run junit/othervm -Xcomp MiscMonitorTests
  */
 
 /*
@@ -51,7 +51,7 @@
  * @library /test/lib
  * @requires vm.continuations & vm.opt.LockingMode != 1
  * @modules java.base/java.lang:+open
- * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=3 MonitorsTestALot
+ * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=3 MiscMonitorTests
  */
 
 /*
@@ -60,7 +60,7 @@
  * @library /test/lib
  * @requires vm.continuations & vm.opt.LockingMode != 1
  * @modules java.base/java.lang:+open
- * @run junit/othervm -Xcomp -XX:-TieredCompilation MonitorsTestALot
+ * @run junit/othervm -Xcomp -XX:-TieredCompilation MiscMonitorTests
  */
 
 /*
@@ -68,7 +68,7 @@
  * @requires vm.debug == true & vm.continuations & vm.opt.LockingMode != 1
  * @library /test/lib
  * @modules java.base/java.lang:+open
- * @run junit/othervm -XX:+UnlockDiagnosticVMOptions -XX:+FullGCALot -XX:FullGCALotInterval=1000 MonitorsTestALot
+ * @run junit/othervm -XX:+UnlockDiagnosticVMOptions -XX:+FullGCALot -XX:FullGCALotInterval=1000 MiscMonitorTests
  */
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -80,47 +80,51 @@ import jdk.test.lib.thread.VThreadScheduler;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
-class MonitorsTestALot {
+class MiscMonitorTests {
     static final int CARRIER_COUNT = Runtime.getRuntime().availableProcessors();
 
     /**
-     *  Test that yielding while holding monitors releases carrier.
+     * Test that yielding while holding monitors releases carrier.
      */
     @Test
     void testReleaseOnYield() throws Exception {
-        TestReleaseOnYield test = new TestReleaseOnYield();
-        test.runTest();
+        try (var test = new TestReleaseOnYield()) {
+            test.runTest();
+        }
     }
 
-    class TestReleaseOnYield extends TestBase {
-        Object globalLock = new Object();
+    private static class TestReleaseOnYield extends TestBase {
+        final Object lock = new Object();
         volatile boolean finish;
         volatile int counter;
 
-        public void runTest() throws Exception {
+        @Override
+        void runTest() throws Exception {
             int vthreadCount = CARRIER_COUNT;
 
             startVThreads(() -> foo(), vthreadCount, "Batch1");
             sleep(500);  // Give time for threads to reach Thread.yield
             startVThreads(() -> bar(), vthreadCount, "Batch2");
 
-            while (counter != vthreadCount) {}
+            while (counter != vthreadCount) {
+                Thread.onSpinWait();
+            }
             finish = true;
             joinVThreads();
         }
 
-        public void foo() {
+        void foo() {
             Object lock = new Object();
-            synchronized(lock) {
-                while(!finish) {
+            synchronized (lock) {
+                while (!finish) {
                     Thread.yield();
                 }
             }
             System.err.println("Exiting foo from thread " + Thread.currentThread().getName());
         }
 
-        public void bar() {
-            synchronized(globalLock) {
+        void bar() {
+            synchronized (lock) {
                 counter++;
             }
             System.err.println("Exiting bar from thread " + Thread.currentThread().getName());
@@ -128,55 +132,59 @@ class MonitorsTestALot {
     }
 
     /**
-     *  Test yielding while holding monitors with recursive locking releases carrier.
+     * Test yielding while holding monitors with recursive locking releases carrier.
      */
     @Test
     void testReleaseOnYieldRecursive() throws Exception {
-        TestReleaseOnYieldRecursive test = new TestReleaseOnYieldRecursive();
-        test.runTest();
+        try (var test = new TestReleaseOnYieldRecursive()) {
+            test.runTest();
+        }
     }
 
-    class TestReleaseOnYieldRecursive extends TestBase {
-        Object globalLock = new Object();
+    private static class TestReleaseOnYieldRecursive extends TestBase {
+        final Object lock = new Object();
         volatile boolean finish;
         volatile int counter;
 
-        public void runTest() throws Exception {
+        @Override
+        void runTest() throws Exception {
             int vthreadCount = CARRIER_COUNT;
 
             startVThreads(() -> foo(), vthreadCount, "Batch1");
             sleep(500);  // Give time for threads to reach Thread.yield
             startVThreads(() -> bar(), vthreadCount, "Batch2");
 
-            while (counter != 2 * vthreadCount) {}
+            while (counter != 2 * vthreadCount) {
+                Thread.onSpinWait();
+            }
             finish = true;
             joinVThreads();
         }
 
-        public void foo() {
+        void foo() {
            Object lock = new Object();
-            synchronized(lock) {
-                while(!finish) {
+            synchronized (lock) {
+                while (!finish) {
                     Thread.yield();
                 }
             }
             System.err.println("Exiting foo from thread " + Thread.currentThread().getName());
         }
 
-        public void bar() {
-            synchronized(globalLock) {
+        void bar() {
+            synchronized (lock) {
                 counter++;
             }
             recursive(10);
             System.err.println("Exiting bar from thread " + Thread.currentThread().getName());
         };
 
-        public void recursive(int count) {
-            synchronized(Thread.currentThread()) {
+        void recursive(int count) {
+            synchronized (Thread.currentThread()) {
                 if (count > 0) {
                     recursive(count - 1);
                 } else {
-                    synchronized(globalLock) {
+                    synchronized (lock) {
                         counter++;
                         Thread.yield();
                     }
@@ -186,32 +194,34 @@ class MonitorsTestALot {
     }
 
     /**
-     *  Test that contention on monitorenter releases carrier.
+     * Test that contention on monitorenter releases carrier.
      */
     @Test
     void testReleaseOnContention() throws Exception {
-        TestReleaseOnContention test = new TestReleaseOnContention();
-        test.runTest();
+        try (var test = new TestReleaseOnContention()) {
+            test.runTest();
+        }
     }
 
-    class TestReleaseOnContention extends TestBase {
-        Object globalLock = new Object();
+    private static class TestReleaseOnContention extends TestBase {
+        final Object lock = new Object();
         volatile boolean finish;
         volatile int counter;
 
-        public void runTest() throws Exception {
+        @Override
+        void runTest() throws Exception {
             int vthreadCount = CARRIER_COUNT * 8;
 
             startVThreads(() -> foo(), vthreadCount, "VThread");
-            sleep(500);  // Give time for threads to reach synchronized(globalLock)
+            sleep(500);  // Give time for threads to reach synchronized (lock)
 
             finish = true;
             joinVThreads();
         }
 
-        public void foo() {
-            synchronized(globalLock) {
-                while(!finish) {
+        void foo() {
+            synchronized (lock) {
+                while (!finish) {
                     Thread.yield();
                 }
             }
@@ -220,24 +230,26 @@ class MonitorsTestALot {
     }
 
     /**
-     *  Test contention on monitorenter with extra monitors on stack shared by all threads.
+     * Test contention on monitorenter with extra monitors on stack shared by all threads.
      */
     @Test
     void testContentionMultipleMonitors() throws Exception {
-        TestContentionMultipleMonitors test = new TestContentionMultipleMonitors();
-        test.runTest();
+        try (var test = new TestContentionMultipleMonitors()) {
+            test.runTest();
+        }
     }
 
-    class TestContentionMultipleMonitors extends TestBase {
-        int MONITOR_COUNT = 12;
-        Object[] globalLockArray = new Object[MONITOR_COUNT];
-        AtomicInteger workerCount = new AtomicInteger(0);
+    private static class TestContentionMultipleMonitors extends TestBase {
+        static int MONITOR_COUNT = 12;
+        final Object[] lockArray = new Object[MONITOR_COUNT];
+        final AtomicInteger workerCount = new AtomicInteger(0);
         volatile boolean finish;
 
-        public void runTest() throws Exception {
+        @Override
+        void runTest() throws Exception {
             int vthreadCount = CARRIER_COUNT * 8;
             for (int i = 0; i < MONITOR_COUNT; i++) {
-                globalLockArray[i] = new Object();
+                lockArray[i] = new Object();
             }
 
             startVThreads(() -> foo(), vthreadCount, "VThread");
@@ -248,10 +260,10 @@ class MonitorsTestALot {
             assertEquals(vthreadCount, workerCount.get());
         }
 
-        public void foo() {
+        void foo() {
             while (!finish) {
                 int lockNumber = ThreadLocalRandom.current().nextInt(0, MONITOR_COUNT - 1);
-                synchronized(globalLockArray[lockNumber]) {
+                synchronized (lockArray[lockNumber]) {
                     recursive1(lockNumber, lockNumber);
                 }
             }
@@ -273,7 +285,7 @@ class MonitorsTestALot {
         public void recursive2(int lockNumber) {
             if (lockNumber + 2 <= MONITOR_COUNT - 1) {
                 lockNumber += 2;
-                synchronized(globalLockArray[lockNumber]) {
+                synchronized (lockArray[lockNumber]) {
                     Thread.yield();
                     recursive2(lockNumber);
                 }
@@ -282,24 +294,26 @@ class MonitorsTestALot {
     }
 
     /**
-     *  Test contention on monitorenter with extra monitors on stack both local only and shared by all threads.
+     * Test contention on monitorenter with extra monitors on stack both local only and shared by all threads.
      */
     @Test
     void testContentionMultipleMonitors2() throws Exception {
-        TestContentionMultipleMonitors2 test = new TestContentionMultipleMonitors2();
-        test.runTest();
+        try (var test = new TestContentionMultipleMonitors2()) {
+            test.runTest();
+        }
     }
 
-    class TestContentionMultipleMonitors2 extends TestBase {
+    private static class TestContentionMultipleMonitors2 extends TestBase {
         int MONITOR_COUNT = 12;
-        Object[] globalLockArray = new Object[MONITOR_COUNT];
-        AtomicInteger workerCount = new AtomicInteger(0);
+        final Object[] lockArray = new Object[MONITOR_COUNT];
+        final AtomicInteger workerCount = new AtomicInteger(0);
         volatile boolean finish;
 
-        public void runTest() throws Exception {
+        @Override
+        void runTest() throws Exception {
             int vthreadCount = CARRIER_COUNT * 8;
             for (int i = 0; i < MONITOR_COUNT; i++) {
-                globalLockArray[i] = new Object();
+                lockArray[i] = new Object();
             }
 
             startVThreads(() -> foo(), vthreadCount, "VThread");
@@ -310,7 +324,7 @@ class MonitorsTestALot {
             assertEquals(vthreadCount, workerCount.get());
         }
 
-        public void foo() {
+        void foo() {
             Object[] myLockArray = new Object[MONITOR_COUNT];
             for (int i = 0; i < MONITOR_COUNT; i++) {
                 myLockArray[i] = new Object();
@@ -319,7 +333,7 @@ class MonitorsTestALot {
             while (!finish) {
                 int lockNumber = ThreadLocalRandom.current().nextInt(0, MONITOR_COUNT - 1);
                 synchronized (myLockArray[lockNumber]) {
-                    synchronized (globalLockArray[lockNumber]) {
+                    synchronized (lockArray[lockNumber]) {
                         recursive1(lockNumber, lockNumber, myLockArray);
                     }
                 }
@@ -346,7 +360,7 @@ class MonitorsTestALot {
                     if (Math.random() < 0.5) {
                         Thread.yield();
                     }
-                    synchronized (globalLockArray[lockNumber]) {
+                    synchronized (lockArray[lockNumber]) {
                         Thread.yield();
                         recursive2(lockNumber, myLockArray);
                     }
@@ -357,24 +371,26 @@ class MonitorsTestALot {
 
 
     /**
-     *  Test contention on monitorenter with synchronized methods.
+     * Test contention on monitorenter with synchronized methods.
      */
     @Test
     void testContentionWithSyncMethods() throws Exception {
-        TestContentionWithSyncMethods test = new TestContentionWithSyncMethods();
-        test.runTest();
+        try (var test = new TestContentionWithSyncMethods()) {
+            test.runTest();
+        }
     }
 
-    class TestContentionWithSyncMethods extends TestBase {
-        int MONITOR_COUNT = 12;
-        Object[] globalLockArray = new Object[MONITOR_COUNT];
-        AtomicInteger workerCount = new AtomicInteger(0);
+    private static class TestContentionWithSyncMethods extends TestBase {
+        static final int MONITOR_COUNT = 12;
+        final Object[] lockArray = new Object[MONITOR_COUNT];
+        final AtomicInteger workerCount = new AtomicInteger(0);
         volatile boolean finish;
 
-        public void runTest() throws Exception {
+        @Override
+        void runTest() throws Exception {
             int vthreadCount = CARRIER_COUNT * 8;
             for (int i = 0; i < MONITOR_COUNT; i++) {
-                globalLockArray[i] = new Object();
+                lockArray[i] = new Object();
             }
 
             startVThreads(() -> foo(), vthreadCount, "VThread");
@@ -385,13 +401,13 @@ class MonitorsTestALot {
             assertEquals(vthreadCount, workerCount.get());
         }
 
-        public void foo() {
+        void foo() {
             Object myLock = new Object();
 
             while (!finish) {
                 int lockNumber = ThreadLocalRandom.current().nextInt(0, MONITOR_COUNT - 1);
                 synchronized (myLock) {
-                    synchronized (globalLockArray[lockNumber]) {
+                    synchronized (lockArray[lockNumber]) {
                         recursive(lockNumber, myLock);
                     }
                 }
@@ -400,7 +416,7 @@ class MonitorsTestALot {
             System.err.println("Exiting foo from thread " + Thread.currentThread().getName());
         };
 
-        public synchronized void recursive(int depth, Object myLock) {
+        synchronized void recursive(int depth, Object myLock) {
             if (depth > 0) {
                 recursive(depth - 1, myLock);
             } else {
@@ -416,7 +432,7 @@ class MonitorsTestALot {
     }
 
     /**
-     *  Test wait/notify mechanism.
+     * Test wait/notify mechanism.
      */
     @Test
     void waitNotifyTest() throws Exception {
@@ -459,21 +475,21 @@ class MonitorsTestALot {
         }
     }
 
-    public class TestBase {
-        ExecutorService scheduler = Executors.newFixedThreadPool(CARRIER_COUNT);
-        List<Thread[]> vthreadList = new ArrayList<>();
+    private static abstract class TestBase implements AutoCloseable {
+        final ExecutorService scheduler = Executors.newFixedThreadPool(CARRIER_COUNT);
+        final List<Thread[]> vthreadList = new ArrayList<>();
 
-        public void runTest() throws Exception { throw new RuntimeException("should not be called"); }
+        abstract void runTest() throws Exception;
 
-        public void startVThreads(Runnable r, int batchSize, String name) {
-            Thread vthreads[] = new Thread[batchSize];
-            for (int i = 0; i < batchSize; i++) {
+        void startVThreads(Runnable r, int count, String name) {
+            Thread vthreads[] = new Thread[count];
+            for (int i = 0; i < count; i++) {
                 vthreads[i] = VThreadScheduler.virtualThreadBuilder(scheduler).name(name + "-" + i).start(r);
             }
             vthreadList.add(vthreads);
         }
 
-        public void joinVThreads() throws Exception {
+        void joinVThreads() throws Exception {
             for (Thread[] vthreads : vthreadList) {
                 for (Thread vthread : vthreads) {
                     vthread.join();
@@ -483,6 +499,11 @@ class MonitorsTestALot {
 
         void sleep(long ms) throws Exception {
             Thread.sleep(ms);
+        }
+
+        @Override
+        public void close() {
+            scheduler.close();
         }
     }
 }
