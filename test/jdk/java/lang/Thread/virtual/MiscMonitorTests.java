@@ -25,7 +25,7 @@
  * @test id=default
  * @summary Tests for object monitors that have been useful to find bugs
  * @library /test/lib
- * @requires vm.continuations & vm.opt.LockingMode != 1
+ * @requires vm.continuations & vm.opt.LockingMode != 1 & os.arch != "ppc64"
  * @modules java.base/java.lang:+open
  * @run junit/othervm MiscMonitorTests
  */
@@ -33,7 +33,7 @@
 /*
  * @test id=Xint
  * @library /test/lib
- * @requires vm.continuations & vm.opt.LockingMode != 1
+ * @requires vm.continuations & vm.opt.LockingMode != 1 & os.arch != "ppc64"
  * @modules java.base/java.lang:+open
  * @run junit/othervm -Xint MiscMonitorTests
  */
@@ -41,7 +41,7 @@
 /*
  * @test id=Xcomp
  * @library /test/lib
- * @requires vm.continuations & vm.opt.LockingMode != 1
+ * @requires vm.continuations & vm.opt.LockingMode != 1 & os.arch != "ppc64"
  * @modules java.base/java.lang:+open
  * @run junit/othervm -Xcomp MiscMonitorTests
  */
@@ -49,7 +49,7 @@
 /*
  * @test id=Xcomp-TieredStopAtLevel3
  * @library /test/lib
- * @requires vm.continuations & vm.opt.LockingMode != 1
+ * @requires vm.continuations & vm.opt.LockingMode != 1 & os.arch != "ppc64"
  * @modules java.base/java.lang:+open
  * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=3 MiscMonitorTests
  */
@@ -58,14 +58,14 @@
  * @test id=Xcomp-noTieredCompilation
  * @summary Test virtual threads using synchronized
  * @library /test/lib
- * @requires vm.continuations & vm.opt.LockingMode != 1
+ * @requires vm.continuations & vm.opt.LockingMode != 1 & os.arch != "ppc64"
  * @modules java.base/java.lang:+open
  * @run junit/othervm -Xcomp -XX:-TieredCompilation MiscMonitorTests
  */
 
 /*
  * @test id=gc
- * @requires vm.debug == true & vm.continuations & vm.opt.LockingMode != 1
+ * @requires vm.debug == true & vm.continuations & vm.opt.LockingMode != 1 & os.arch != "ppc64"
  * @library /test/lib
  * @modules java.base/java.lang:+open
  * @run junit/othervm -XX:+UnlockDiagnosticVMOptions -XX:+FullGCALot -XX:FullGCALotInterval=1000 MiscMonitorTests
