@@ -1189,6 +1189,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * @throws TimeoutException if a timeout is set and the timeout expires before or
      * while waiting
      * @throws InterruptedException if interrupted while waiting
+     * @since 24
      */
     public R join() throws InterruptedException {
         ensureOwner();
