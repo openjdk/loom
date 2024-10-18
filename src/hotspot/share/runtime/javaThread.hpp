@@ -662,8 +662,8 @@ private:
 
   void inc_held_monitor_count(intx i = 1, bool jni = false);
   void dec_held_monitor_count(intx i = 1, bool jni = false);
-  intx held_monitor_count() { return _held_monitor_count; }
 
+  intx held_monitor_count() { return _held_monitor_count; }
   intx jni_monitor_count()  { return _jni_monitor_count;  }
   void clear_jni_monitor_count() { _jni_monitor_count = 0; }
 

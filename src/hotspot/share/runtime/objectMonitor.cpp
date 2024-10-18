@@ -887,8 +887,12 @@ void ObjectMonitor::EnterI(JavaThread* current) {
   // to defer the state transitions until absolutely necessary,
   // and in doing so avoid some transitions ...
 
-  // For virtual threads that are pinned, do a timed-park instead to
-  // alleviate some deadlocks cases where succesor cannot run.
+  // For virtual threads that are pinned do a timed-park instead, to
+  // alleviate some deadlocks cases where the succesor is an unmounted
+  // virtual thread that cannot run. This can happen in particular when
+  // this virtual thread is currently loading/initializing a class, and
+  // all other carriers have a vthread pinned to it waiting for said class
+  // to be loaded/initialized.
   static int MAX_RECHECK_INTERVAL = 1000;
   int recheck_interval = 1;
   bool do_timed_parked = false;
@@ -1007,7 +1011,7 @@ void ObjectMonitor::ReenterI(JavaThread* current, ObjectWaiter* currentNode) {
   assert_mark_word_consistency();
 
   for (;;) {
-    uint8_t v = currentNode->TState;
+    ObjectWaiter::TStates v = currentNode->TState;
     guarantee(v == ObjectWaiter::TS_ENTER || v == ObjectWaiter::TS_CXQ, "invariant");
     assert(!is_owner(current), "invariant");
 
@@ -1830,6 +1834,10 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
     assert(!is_owner(current), "invariant");
     ObjectWaiter::TStates v = node.TState;
     if (v == ObjectWaiter::TS_RUN) {
+      // We use the NoPreemptMark for the very rare case where the previous
+      // preempt attempt failed due to OOM. The preempt on monitor contention
+      // could succeed but we can't unmount now.
+      NoPreemptMark npm(current);
       enter(current);
     } else {
       guarantee(v == ObjectWaiter::TS_ENTER || v == ObjectWaiter::TS_CXQ, "invariant");

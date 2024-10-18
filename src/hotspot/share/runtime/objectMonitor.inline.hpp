@@ -45,6 +45,12 @@ inline int64_t ObjectMonitor::owner_for(JavaThread* thread) {
   return tid;
 }
 
+inline int64_t ObjectMonitor::owner_for_oop(oop vthread) {
+  int64_t tid = java_lang_Thread::thread_id(vthread);
+  assert(tid >= 3 && tid < ThreadIdentifier::current(), "must be reasonable");
+  return tid;
+}
+
 inline bool ObjectMonitor::is_entered(JavaThread* current) const {
   if (is_owner_anonymous()) {
     if (LockingMode == LM_LIGHTWEIGHT) {

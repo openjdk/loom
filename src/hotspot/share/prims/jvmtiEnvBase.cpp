@@ -1034,15 +1034,9 @@ JvmtiEnvBase::get_owned_monitors(JavaThread* calling_thread, JavaThread* carrier
     }
   }
 
-  if (carrier == nullptr) {
-    // vthread gets pinned if monitors are acquired via jni MonitorEnter
-    // so nothing else to do for unmounted case.
-    return err;
-  }
-
   // Get off stack monitors. (e.g. acquired via jni MonitorEnter).
   JvmtiMonitorClosure jmc(calling_thread, owned_monitors_list, this);
-  ObjectSynchronizer::owned_monitors_iterate(&jmc, carrier);
+  ObjectSynchronizer::owned_monitors_iterate(&jmc, carrier != nullptr ? carrier->threadObj() : vthread);
   err = jmc.error();
 
   return err;

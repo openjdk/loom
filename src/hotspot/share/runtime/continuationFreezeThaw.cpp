@@ -2233,8 +2233,8 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
   }
 
   // On first thaw after freeze restore oops to the lockstack if any.
-  if (chunk->lockstack_size() > 0) {
-    assert(kind == Continuation::thaw_top, "");
+  assert(chunk->lockstack_size() == 0 || kind == Continuation::thaw_top, "");
+  if (kind == Continuation::thaw_top && chunk->lockstack_size() > 0) {
     int lockStackSize = chunk->lockstack_size();
     assert(lockStackSize > 0, "should be");
 

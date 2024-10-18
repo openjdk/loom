@@ -297,6 +297,7 @@ class ObjectMonitor : public CHeapObj<mtObjectMonitor> {
   int64_t   owner_raw() const;
 
   static int64_t owner_for(JavaThread* thread);
+  static int64_t owner_for_oop(oop vthread);
 
   // Returns true if owner field == DEFLATER_MARKER and false otherwise.
   bool      owner_is_DEFLATER_MARKER() const;

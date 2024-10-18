@@ -1274,7 +1274,6 @@ JavaThread* Threads::owning_thread_from_monitor(ThreadsList* t_list, ObjectMonit
     }
   } else {
     JavaThread* the_owner = nullptr;
-    int64_t owner_tid = (int64_t)monitor->owner();
     for (JavaThread* q : *t_list) {
       if (monitor->is_owner(q)) {
         the_owner = q;
