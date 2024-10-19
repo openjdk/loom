@@ -41,10 +41,6 @@ static inline void patch_return_pc_with_preempt_stub(frame& f) {
   }
 }
 
-static inline void patch_return_pc_with_preempt_stub(frame& f) {
-  Unimplemented();
-}
-
 inline int ContinuationHelper::frame_align_words(int size) {
   return size & 1;
 }
