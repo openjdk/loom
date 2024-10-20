@@ -44,19 +44,20 @@ import jdk.internal.invoke.MhUtil;
 
 /**
  * An API for <em>structured concurrency</em>. {@code StructuredTaskScope} supports cases
- * where a main task splits into several concurrent subtasks, and where the subtasks must
- * complete before the main task continues. A {@code StructuredTaskScope} can be used to
- * ensure that the lifetime of a concurrent operation is confined by a <em>syntax block</em>,
- * just like that of a sequential operation in structured programming.
+ * where execution of a <em>task</em> (a unit of work) splits into several concurrent
+ * subtasks, and where the subtasks must complete before the task continues. A {@code
+ * StructuredTaskScope} can be used to ensure that the lifetime of a concurrent operation
+ * is confined by a <em>syntax block</em>, just like that of a sequential operation in
+ * structured programming.
  *
  * <p> {@code StructuredTaskScope} defines the static method {@link #open() open} to open
  * a new {@code StructuredTaskScope} and the {@link #close() close} method to close it.
- * The API is designed to be used with the {@code try-with-resources} statement where
+ * The API is designed to be used with the {@code try}-with-resources statement where
  * the {@code StructuredTaskScope} is opened as a resource and then closed automatically.
- * The code in the block uses the {@link #fork(Callable) fork} method to fork subtasks.
+ * The code inside the block uses the {@link #fork(Callable) fork} method to fork subtasks.
  * After forking, it uses the {@link #join() join} method to wait for all subtasks to
  * finish (or some other outcome) as a single operation. Forking a subtask starts a new
- * {@link Thread} to run the subtask. The thread executing the main task does not continue
+ * {@link Thread} to run the subtask. The thread executing the task does not continue
  * beyond the {@code close} method until all threads started to execute subtasks have finished.
  * To ensure correct usage, the {@code fork}, {@code join} and {@code close} methods may
  * only be invoked by the <em>owner thread</em> (the thread that opened the {@code
@@ -65,10 +66,10 @@ import jdk.internal.invoke.MhUtil;
  * an exception after closing if the owner did not invoke the {@code join} method after
  * forking subtasks.
  *
- * <p> As a first example, consider a main task that splits into two subtasks to concurrently
+ * <p> As a first example, consider a task that splits into two subtasks to concurrently
  * fetch resources from two URL locations "left" and "right". Both subtasks may complete
  * successfully, one subtask may succeed and the other may fail, or both subtasks may
- * fail. The main task in this example is interested in the successful result from both
+ * fail. The task in this example is interested in the successful result from both
  * subtasks. It waits in the {@link #join() join} method for both subtasks to complete
  * successfully or for either subtask to fail.
  * {@snippet lang=java :
@@ -91,7 +92,7 @@ import jdk.internal.invoke.MhUtil;
  * }
  *
  * <p> If both subtasks complete successfully then the {@code join} method completes
- * normally and the main task uses the {@link Subtask#get() Subtask.get()} method to get
+ * normally and the task uses the {@link Subtask#get() Subtask.get()} method to get
  * the result of each subtask. If one of the subtasks fails then the other subtask is
  * cancelled (this will interrupt the thread executing the other subtask) and the {@code
  * join} method throws {@link FailedException} with the exception from the failed subtask
@@ -104,7 +105,7 @@ import jdk.internal.invoke.MhUtil;
  *
  * <h2>Joiners</h2>
  *
- * <p> In the example above, the main task fails if any subtask fails. If all subtasks
+ * <p> In the example above, the task fails if any subtask fails. If all subtasks
  * succeed then the {@code join} method completes normally. Other policy and outcome is
  * supported by creating a {@code StructuredTaskScope} with a {@link Joiner} that
  * implements the desired policy. A {@code Joiner} handles subtask completion and produces
@@ -132,7 +133,7 @@ import jdk.internal.invoke.MhUtil;
  * method until the interrupted threads finish.
  *
  * <p> Now consider another example that splits into two subtasks. In this example,
- * each subtask produces a {@code String} result and the main task is only interested in
+ * each subtask produces a {@code String} result and the task is only interested in
  * the result from the first subtask to complete successfully. The example uses {@link
  * Joiner#anySuccessfulResultOrThrow() Joiner.anySuccessfulResultOrThrow()} to
  * create a {@code Joiner} that makes available the result of the first subtask to
@@ -151,19 +152,19 @@ import jdk.internal.invoke.MhUtil;
  *    }
  * }
  *
- * <p> In the example, the main task forks the two subtasks, then waits in the {@code
+ * <p> In the example, the task forks the two subtasks, then waits in the {@code
  * join} method for either subtask to complete successfully or for both subtasks to fail.
  * If one of the subtasks completes successfully then the {@code Joiner} causes the other
  * subtask to be cancelled (this will interrupt the thread executing the subtask), and
  * the {@code join} method returns the result from the successful subtask. Cancelling the
- * other subtask avoids the main task waiting for a result that it doesn't care about. If
+ * other subtask avoids the task waiting for a result that it doesn't care about. If
  * both subtasks fail then the {@code join} method throws {@code FailedException} with the
  * exception from one of the subtasks as the {@linkplain Throwable#getCause() cause}.
  *
  * <p> Whether code uses the {@code Subtask} returned from {@code fork} will depend on
  * the {@code Joiner} and usage. Some {@code Joiner} implementations are suited to subtasks
  * that return results of the same type and where the {@code join} method returns a result
- * for the main task to use. Code that forks subtasks that return results of different
+ * for the task to use. Code that forks subtasks that return results of different
  * types, and uses a {@code Joiner} such as {@code Joiner.awaitAllSuccessfulOrThrow()} that
  * does not return a result, will use {@link Subtask#get() Subtask.get()} after joining.
  *
@@ -180,9 +181,9 @@ import jdk.internal.invoke.MhUtil;
  * for example, the exception is from the first subtask to fail.
  *
  * <p> Many of the details for how exceptions are handled will depend on usage. In some
- * cases it may be useful to add a {@code catch} block to catch {@code FailedException}.
- * The exception handling may use {@code instanceof} with pattern matching to handle
- * specific causes.
+ * cases it may be useful to add a {@code catch} block to the {@code try}-with-resources
+ * statement to catch {@code FailedException}. The exception handling may use {@code
+ * instanceof} with pattern matching to handle specific causes.
  * {@snippet lang=java :
  *    try (var scope = StructuredTaskScope.open()) {
  *
@@ -204,7 +205,7 @@ import jdk.internal.invoke.MhUtil;
  *
  * <p> For cases where a specific exception triggers the use of a default result then it
  * may be more appropriate to handle this in the subtask itself rather than the subtask
- * failing and code in the main task handling the exception.
+ * failing and the scope owner handling the exception.
  *
  * <h2>Configuration</h2>
  *
@@ -277,8 +278,8 @@ import jdk.internal.invoke.MhUtil;
  * <p> When used in conjunction with a {@code StructuredTaskScope}, a {@code ScopedValue}
  * can also safely and efficiently share a value to methods executed by subtasks forked
  * in the scope. When a {@code ScopedValue} object is bound to a value in the thread
- * executing the main task then that binding is inherited by the threads created to
- * execute the subtasks. The thread executing the main task does not continue beyond the
+ * executing the task then that binding is inherited by the threads created to
+ * execute the subtasks. The thread executing the task does not continue beyond the
  * {@link #close() close} method until all threads executing the subtasks have finished.
  * This ensures that the {@code ScopedValue} is not reverted to being {@linkplain
  * ScopedValue#isBound() unbound} (or its previous value) while subtasks are executing.
@@ -291,7 +292,7 @@ import jdk.internal.invoke.MhUtil;
  * inherited by the threads created to execute subtasks in the scope. Forking a
  * subtask checks that the bindings in effect at the time that the subtask is forked
  * match the bindings when the {@code StructuredTaskScope} was created. This check ensures
- * that a subtask does not inherit a binding that is reverted in the main task before the
+ * that a subtask does not inherit a binding that is reverted in the task before the
  * subtask has completed.
  *
  * <p> A {@code ScopedValue} that is shared across threads requires that the value be an
@@ -327,10 +328,10 @@ import jdk.internal.invoke.MhUtil;
  * <a href="{@docRoot}/java.base/java/lang/ScopedValues.html#rebind">rebound</a> to a new
  * value in the subtask for the bounded execution of some method executed in the subtask.
  * When the method completes, the value of the {@code ScopedValue} reverts to its previous
- * value, the value inherited from the thread executing the main task.
+ * value, the value inherited from the thread executing the task.
  *
  * <p> A subtask may execute code that itself opens a new {@code StructuredTaskScope}.
- * A main task executing in thread T1 opens a {@code StructuredTaskScope} and forks a
+ * A task executing in thread T1 opens a {@code StructuredTaskScope} and forks a
  * subtask that runs in thread T2. The scoped value bindings captured when T1 opens the
  * scope are inherited into T2. The subtask (in thread T2) executes code that opens a
  * new {@code StructuredTaskScope} and forks a subtask that runs in thread T3. The scoped
@@ -351,8 +352,8 @@ import jdk.internal.invoke.MhUtil;
  * <p> Unless otherwise specified, passing a {@code null} argument to a method in this
  * class will cause a {@link NullPointerException} to be thrown.
  *
- * @param <T> the result type of tasks executed in the scope
- * @param <R> the type of the result returned by the join method
+ * @param <T> the result type of subtasks executed in the scope
+ * @param <R> the result type of the scope
  *
  * @jls 17.4.5 Happens-before Order
  * @since 21
@@ -596,8 +597,8 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
     }
 
     /**
-     * An object used with a {@link StructuredTaskScope} to handle subtask completion
-     * and produce the result for a main task waiting in the {@link #join() join} method
+     * An object used with a {@link StructuredTaskScope} to handle subtask completion and
+     * produce the result for the scope owner waiting in the {@link #join() join} method
      * for subtasks to complete.
      *
      * <p> Joiner defines static methods to create {@code Joiner} objects for common cases:
@@ -650,8 +651,8 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * place to code "business logic". A {@code Joiner} should be designed to be as
      * general purpose as possible.
      *
-     * @param <T> the result type of tasks executed in the scope
-     * @param <R> the type of results returned by the join method
+     * @param <T> the result type of subtasks executed in the scope
+     * @param <R> the result type of the scope
      * @since 24
      * @see #open(Joiner)
      */
@@ -982,8 +983,8 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * @param joiner the joiner
      * @param configFunction a function to produce the configuration
      * @return a new scope
-     * @param <T> the result type of tasks executed in the scope
-     * @param <R> the type of the result returned by the join method
+     * @param <T> the result type of subtasks executed in the scope
+     * @param <R> the result type of the scope
      * @since 24
      */
     public static <T, R> StructuredTaskScope<T, R> open(Joiner<? super T, ? extends R> joiner,
@@ -1023,8 +1024,8 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      *
      * @param joiner the joiner
      * @return a new scope
-     * @param <T> the result type of tasks executed in the scope
-     * @param <R> the type of the result returned by the join method
+     * @param <T> the result type of subtasks executed in the scope
+     * @param <R> the result type of the scope
      * @since 24
      */
     public static <T, R> StructuredTaskScope<T, R> open(Joiner<? super T, ? extends R> joiner) {
@@ -1224,10 +1225,9 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * method may return {@code true} before all threads have been interrupted or before
      * all threads have finished.
      *
-     * @apiNote A main task with a lengthy "forking phase" (the code that executes before
-     * the main task invokes {@link #join() join}) may use this method to avoid doing work
-     * in cases where scope is cancelled by the completion of a previously forked subtask
-     * or timeout.
+     * @apiNote A task with a lengthy "forking phase" (the code that executes before
+     * it invokes {@link #join() join}) may use this method to avoid doing work in cases
+     * where scope is cancelled by the completion of a previously forked subtask or timeout.
      *
      * @since 24
      */
