@@ -791,10 +791,29 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          *
          * <p> The joiner's {@link Joiner#result() result} method returns {@code null}.
          *
-         * @apiNote This Joiner can be useful for cases where subtasks make use of
+         * @apiNote This Joiner is useful for cases where subtasks make use of
          * <em>side-effects</em> rather than return results or fail with exceptions.
          * The {@link #fork(Runnable) fork(Runnable)} method can be used to fork subtasks
          * that do not return a result.
+         *
+         * <p> This Joiner can also be used for <em>fan-in</em> scenarios where subtasks
+         * for forked to handle incoming connections and the number of subtasks is unbounded.
+         * In this example, the thread executing the {@code acceptLoop} method will only
+         * stop when interrupted or the listener socket is closed asynchronously.
+         * {@snippet lang=java :
+         *   void acceptLoop(ServerSocket listener) throws IOException, InterruptedException {
+         *       try (var scope = StructuredTaskScope.open(Joiner.<Socket>awaitAll())) {
+         *           try {
+         *               while (true) {
+         *                  Socket socket = listener.accept();
+         *                  scope.fork(() -> handle(socket));
+         *               }
+         *           } finally {
+         *               scope.join();
+         *           }
+         *       }
+         *   }
+         * }
          *
          * @param <T> the result type of subtasks
          */
@@ -839,6 +858,18 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
          *     }
          *
          *     var joiner = Joiner.all(new CancelAfterTwoFailures<String>());
+         * }
+         *
+         * <p> The following example uses {@code allUntil} to wait for all subtasks to
+         * complete without any cancellation. This is similar to {@link #awaitAll()}
+         * except that it yields a stream of the completed subtasks.
+         * {@snippet lang=java :
+         *    <T> List<Subtask<T>> invokeAll(Collection<Callable<T>> tasks) throws InterruptedException {
+         *        try (var scope = StructuredTaskScope.open(Joiner.<T>allUntil(_ -> false))) {
+         *            tasks.forEach(scope::fork);
+         *            return scope.join().toList();
+         *        }
+         *    }
          * }
          *
          * @param isDone the predicate to evaluate completed subtasks
