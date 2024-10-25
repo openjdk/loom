@@ -1265,7 +1265,7 @@ JavaThread* Threads::owning_thread_from_object(ThreadsList * t_list, oop obj) {
 }
 
 JavaThread* Threads::owning_thread_from_monitor(ThreadsList* t_list, ObjectMonitor* monitor) {
-  if (monitor->is_owner_anonymous()) {
+  if (monitor->has_anonymous_owner()) {
     if (LockingMode == LM_LIGHTWEIGHT) {
       return owning_thread_from_object(t_list, monitor->object());
     } else {
@@ -1275,7 +1275,7 @@ JavaThread* Threads::owning_thread_from_monitor(ThreadsList* t_list, ObjectMonit
   } else {
     JavaThread* the_owner = nullptr;
     for (JavaThread* q : *t_list) {
-      if (monitor->is_owner(q)) {
+      if (monitor->has_owner(q)) {
         the_owner = q;
         break;
       }
@@ -1333,8 +1333,15 @@ void Threads::print_on(outputStream* st, bool print_stacks,
       } else {
         p->print_stack_on(st);
         if (p->is_vthread_mounted()) {
-          // _lock_id is the thread ID of the mounted virtual thread
-          st->print_cr("   Mounted virtual thread #" INT64_FORMAT, p->lock_id());
+          st->print("   Mounted virtual thread #");
+          // _lock_id is the thread ID of the mounted virtual thread. If it equals
+          // the tid of the carrier we caught thread at the start of a temporary
+          // transition in VirtualThread.switchToCarrierThread. Ignore that case.
+          if (p->lock_id() != java_lang_Thread::thread_id(p->threadObj())) {
+            st->print_cr(INT64_FORMAT, p->lock_id());
+          } else {
+            st->print_cr("%s", "(Unavailable)");
+          }
           p->print_vthread_stack_on(st);
         }
       }
