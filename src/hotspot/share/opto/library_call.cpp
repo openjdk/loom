@@ -479,7 +479,6 @@ bool LibraryCallKit::try_to_inline(int predicate) {
   case vmIntrinsics::_currentCarrierThread:     return inline_native_currentCarrierThread();
   case vmIntrinsics::_currentThread:            return inline_native_currentThread();
   case vmIntrinsics::_setCurrentThread:         return inline_native_setCurrentThread();
-  case vmIntrinsics::_setCurrentLockId:         return inline_native_setCurrentLockId();
 
   case vmIntrinsics::_scopedValueCache:          return inline_native_scopedValueCache();
   case vmIntrinsics::_setScopedValueCache:       return inline_native_setScopedValueCache();
@@ -3711,13 +3710,6 @@ bool LibraryCallKit::inline_native_setCurrentThread() {
   Node* tid_memory = store_to_memory(control(), thread_id_offset, tid, T_LONG, Compile::AliasIdxRaw, MemNode::unordered, true);
 
   JFR_ONLY(extend_setCurrentThread(thread, arr);)
-  return true;
-}
-
-bool LibraryCallKit::inline_native_setCurrentLockId() {
-  Node* thread = _gvn.transform(new ThreadLocalNode());
-  Node* thread_id_offset = basic_plus_adr(thread, in_bytes(JavaThread::lock_id_offset()));
-  Node* tid_memory = store_to_memory(control(), thread_id_offset, ConvL2X(argument(0)), T_LONG, Compile::AliasIdxRaw, MemNode::unordered, true);
   return true;
 }
 

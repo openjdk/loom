@@ -3096,10 +3096,6 @@ JVM_ENTRY(void, JVM_SetCurrentThread(JNIEnv* env, jobject thisThread,
   JFR_ONLY(Jfr::on_set_current_thread(thread, threadObj);)
 JVM_END
 
-JVM_ENTRY_NO_ENV(void, JVM_SetCurrentLockId(JNIEnv* env, jclass threadClass, jlong tid))
-  thread->set_lock_id(tid);
-JVM_END
-
 JVM_ENTRY(jlong, JVM_GetNextThreadIdOffset(JNIEnv* env, jclass threadClass))
   return ThreadIdentifier::unsafe_offset();
 JVM_END
