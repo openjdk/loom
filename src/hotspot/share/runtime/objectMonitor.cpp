@@ -887,7 +887,7 @@ void ObjectMonitor::EnterI(JavaThread* current) {
   // to defer the state transitions until absolutely necessary,
   // and in doing so avoid some transitions ...
 
-  // For virtual threads that are pinned do a timed-park instead, to
+  // For virtual threads that are pinned, do a timed-park instead to
   // alleviate some deadlocks cases where the succesor is an unmounted
   // virtual thread that cannot run. This can happen in particular when
   // this virtual thread is currently loading/initializing a class, and
@@ -1137,8 +1137,12 @@ bool ObjectMonitor::VThreadMonitorEnter(JavaThread* current, ObjectWaiter* waite
   return false;
 }
 
+// Called from thaw code to resume the monitor operation that caused the vthread
+// to be unmounted. Method returns true if the monitor is successfully acquired,
+// which marks the end of the monitor operation, otherwise it returns false.
 bool ObjectMonitor::resume_operation(JavaThread* current, ObjectWaiter* node, ContinuationWrapper& cont) {
   assert(java_lang_VirtualThread::state(current->vthread()) == java_lang_VirtualThread::RUNNING, "wrong state for vthread");
+  assert(!has_owner(current), "");
 
   if (node->is_wait() && !node->at_reenter()) {
     bool acquired_monitor = VThreadWaitReenter(current, node, cont);
@@ -1670,7 +1674,7 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
   current->set_current_waiting_monitor(this);
 
   ContinuationEntry* ce = current->last_continuation();
-  if (interruptible && ce != nullptr && ce->is_virtual_thread()) {
+  if (ce != nullptr && ce->is_virtual_thread()) {
     int result = Continuation::try_preempt(current, ce->cont_oop(current));
     if (result == freeze_ok) {
       VThreadWait(current, millis);
@@ -1935,6 +1939,7 @@ void ObjectMonitor::INotify(JavaThread* current) {
     // is the only thread that grabs _WaitSetLock.  There's almost no contention
     // on _WaitSetLock so it's not profitable to reduce the length of the
     // critical section.
+
     if (!iterator->is_vthread()) {
       iterator->wait_reenter_begin(this);
     }
@@ -2051,7 +2056,6 @@ bool ObjectMonitor::VThreadWaitReenter(JavaThread* current, ObjectWaiter* node, 
 
   // Mark that we are at reenter so that we don't call this method again.
   node->_at_reenter = true;
-  assert(!has_owner(current), "invariant");
 
   if (!was_notified) {
     bool acquired = VThreadMonitorEnter(current, node);
@@ -2482,6 +2486,7 @@ void ObjectMonitor::Initialize() {
   DEBUG_ONLY(InitDone = true;)
 }
 
+// We can't call this during Initialize() because BarrierSet needs to be set.
 void ObjectMonitor::Initialize2() {
   _vthread_cxq_head = OopHandle(JavaThread::thread_oop_storage(), nullptr);
   _vthread_unparker_ParkEvent = ParkEvent::Allocate(nullptr);
