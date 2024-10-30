@@ -175,7 +175,7 @@ final class VirtualThread extends BaseVirtualThread {
     // notified by Object.notify/notifyAll while waiting in Object.wait
     private volatile boolean notified;
 
-    // timed-park, in nanoseconds, only accessed on current/carrier thread
+    // timeout for timed-park, in nanoseconds, only accessed on current/carrier thread
     private long parkTimeout;
 
     // timed-wait, in milliseconds, set in VM, only accessed on current/carrier thread
@@ -799,7 +799,7 @@ final class VirtualThread extends BaseVirtualThread {
 
             // park the thread, afterYield will schedule the thread to unpark
             boolean yielded = false;
-            this.parkTimeout = nanos;
+            setParkTimeout(nanos);
             setState(TIMED_PARKING);
             try {
                 yielded = yieldContinuation();
@@ -1383,6 +1383,10 @@ final class VirtualThread extends BaseVirtualThread {
         } else {
             return newValue;
         }
+    }
+
+    private void setParkTimeout(long timeout) {
+        parkTimeout = timeout;
     }
 
     private void setCarrierThread(Thread carrier) {
