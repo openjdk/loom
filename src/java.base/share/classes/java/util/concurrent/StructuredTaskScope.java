@@ -359,7 +359,7 @@ import jdk.internal.invoke.MhUtil;
  * @since 21
  */
 @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
-public class StructuredTaskScope<T, R> implements AutoCloseable {
+public final class StructuredTaskScope<T, R> implements AutoCloseable {
     private static final VarHandle CANCELLED;
     static {
         MethodHandles.Lookup l = MethodHandles.lookup();
@@ -1176,6 +1176,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * the task's {@link Runnable#run() run} method, and its result is {@code null}.
      *
      * @param task the task for the thread to execute
+     * @param <U> the result type
      * @return the subtask
      * @throws WrongThreadException if the current thread is not the scope owner
      * @throws IllegalStateException if the owner has already {@linkplain #join() joined}
@@ -1186,7 +1187,7 @@ public class StructuredTaskScope<T, R> implements AutoCloseable {
      * thread to run the subtask
      * @since 24
      */
-    public Subtask<? extends T> fork(Runnable task) {
+    public <U extends T> Subtask<U> fork(Runnable task) {
         Objects.requireNonNull(task);
         return fork(() -> { task.run(); return null; });
     }
