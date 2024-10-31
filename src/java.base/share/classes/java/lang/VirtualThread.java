@@ -252,8 +252,6 @@ final class VirtualThread extends BaseVirtualThread {
         }
         @Override
         protected void onPinned(Continuation.Pinned reason) {
-            // emit JFR event
-            virtualThreadPinnedEvent(reason.reasonCode(), reason.reasonString());
         }
         private static Runnable wrap(VirtualThread vthread, Runnable task) {
             return new Runnable() {
@@ -264,13 +262,6 @@ final class VirtualThread extends BaseVirtualThread {
             };
         }
     }
-
-    /**
-     * jdk.VirtualThreadPinned is emitted by HotSpot VM when pinned. Call into VM to
-     * emit event to avoid having a JFR event in Java with the same name (but different ID)
-     * to events emitted by the VM.
-     */
-    private static native void virtualThreadPinnedEvent(int reason, String reasonString);
 
     /**
      * Runs or continues execution on the current thread. The virtual thread is mounted
@@ -297,7 +288,7 @@ final class VirtualThread extends BaseVirtualThread {
             if (initialState == UNPARKED) {
                 cancelTimeoutTask();
                 setParkPermit(false);
-            } if (initialState == UNBLOCKED) {
+            } else if (initialState == UNBLOCKED) {
                 cancelTimeoutTask();
                 blockPermit = false;
             }
@@ -831,6 +822,9 @@ final class VirtualThread extends BaseVirtualThread {
     private void parkOnCarrierThread(boolean timed, long nanos) {
         assert state() == RUNNING;
 
+        // JFR event start
+        pinnedStart();
+
         setState(timed ? TIMED_PINNED : PINNED);
         try {
             if (!parkPermit) {
@@ -846,7 +840,18 @@ final class VirtualThread extends BaseVirtualThread {
 
         // consume parking permit
         setParkPermit(false);
+
+        // JFR event commit
+        pinnedEnd("Parked");
     }
+
+    /**
+     * Call into VM when pinned to record a JFR jdk.VirtualThreadPinned event.
+     * Recording the event in the VM avoids having JFR event recorded in Java
+     * with the same name, but different ID, to events recorded by the VM.
+     */
+    private static native void pinnedStart();
+    private static native void pinnedEnd(String reason);
 
     /**
      * Re-enables this virtual thread for scheduling. If this virtual thread is parked

@@ -37,6 +37,7 @@
 #include "runtime/javaFrameAnchor.hpp"
 #include "runtime/lockStack.hpp"
 #include "runtime/park.hpp"
+#include "utilities/ticks.hpp"
 #include "runtime/safepointMechanism.hpp"
 #include "runtime/stackWatermarkSet.hpp"
 #include "runtime/stackOverflow.hpp"
@@ -77,6 +78,8 @@ class javaVFrame;
 
 class JavaThread;
 typedef void (*ThreadFunction)(JavaThread*, TRAPS);
+
+class EventVirtualThreadPinned;
 
 class JavaThread: public Thread {
   friend class VMStructs;
@@ -1221,11 +1224,22 @@ private:
   void set_class_to_be_initialized(InstanceKlass* k);
   InstanceKlass* class_to_be_initialized() const;
 
+  // Track executing class initializer, see ThreadInClassInitializer
+  void set_class_being_initialized(InstanceKlass* k);
+  InstanceKlass* class_being_initialized() const;
+
 private:
   InstanceKlass* _class_to_be_initialized;
+  InstanceKlass* _class_being_initialized;
 
   // java.lang.Thread.sleep support
   ParkEvent * _SleepEvent;
+
+#if INCLUDE_JFR
+  // Support for jdk.VirtualThreadPinned event
+  Ticks _pinned_start_time;
+#endif
+
 public:
   bool sleep(jlong millis);
   bool sleep_nanos(jlong nanos);
@@ -1233,6 +1247,12 @@ public:
   // java.lang.Thread interruption support
   void interrupt();
   bool is_interrupted(bool clear_interrupted);
+
+#if INCLUDE_JFR
+  Ticks& vthread_pinned_start_time() { return _pinned_start_time; }
+  void start_vthread_pinned() { _pinned_start_time = Ticks::now(); }
+  void post_vthread_pinned_event(EventVirtualThreadPinned* event, const char* reason);
+#endif
 
   // This is only for use by JVMTI RawMonitorWait. It emulates the actions of
   // the Java code in Object::wait which are not present in RawMonitorWait.
@@ -1338,6 +1358,20 @@ class ThreadOnMonitorWaitedEvent {
     JVMTI_ONLY(_thread->set_on_monitor_waited_event(true);)
   }
   ~ThreadOnMonitorWaitedEvent() { JVMTI_ONLY(_thread->set_on_monitor_waited_event(false);) }
+};
+
+class ThreadInClassInitializer : public StackObj {
+  InstanceKlass* _previous;
+ public:
+  ThreadInClassInitializer(InstanceKlass* ik) {
+    JavaThread* current = JavaThread::current();
+    _previous = current->class_being_initialized();
+    current->set_class_being_initialized(ik);
+  }
+  ~ThreadInClassInitializer() {
+    JavaThread* current = JavaThread::current();
+    current->set_class_being_initialized(_previous);
+  }
 };
 
 #endif // SHARE_RUNTIME_JAVATHREAD_HPP

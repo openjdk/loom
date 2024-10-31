@@ -175,6 +175,35 @@ static inline bool is_stack_chunk_class(const Symbol* class_name,
           loader_data->is_the_null_class_loader_data());
 }
 
+class WaitForClassInitializer : public StackObj {
+ private:
+  InstanceKlass* _ik;
+  Ticks _start_time;
+ public:
+  WaitForClassInitializer(InstanceKlass* ik) : _ik(ik) {
+    _start_time = Ticks::now();
+    JavaThread* current = JavaThread::current();
+    current->set_class_to_be_initialized(ik);
+  }
+  ~WaitForClassInitializer() {
+    JavaThread* current = JavaThread::current();
+    current->set_class_to_be_initialized(nullptr);
+#if INCLUDE_JFR
+    ContinuationEntry* ce = current->last_continuation();
+    if (ce != nullptr && ce->is_virtual_thread()) {
+      EventVirtualThreadPinned event;
+      event.set_starttime(_start_time);
+      if (event.should_commit()) {
+        ResourceMark rm(current);
+        char reason[256];
+        jio_snprintf(reason, sizeof reason, "Waited for initialization of klass %s", _ik->external_name());
+        current->post_vthread_pinned_event(&event, reason);
+      }
+    }
+#endif
+  }
+};
+
 // private: called to verify that k is a static member of this nest.
 // We know that k is an instance class in the same package and hence the
 // same classloader.
@@ -1104,25 +1133,10 @@ void InstanceKlass::initialize_impl(TRAPS) {
                                jt->name(), external_name(), init_thread_name());
       }
       wait = true;
-      jt->set_class_to_be_initialized(this);
 
-#if INCLUDE_JFR
-      ContinuationEntry* ce = jt->last_continuation();
-      if (ce != nullptr && ce->is_virtual_thread()) {
-        EventVirtualThreadPinned e;
-        if (e.should_commit()) {
-          ResourceMark rm(jt);
-          char reason[256];
-          jio_snprintf(reason, sizeof reason, "Waiting for initialization of klass %s", external_name());
-          e.set_pinnedReason(reason);
-          e.set_carrierThread(JFR_JVM_THREAD_ID(THREAD));
-          e.commit();
-        }
-      }
- #endif
+      WaitForClassInitializer wfcl(this);
 
       ol.wait_uninterruptibly(jt);
-      jt->set_class_to_be_initialized(nullptr);
     }
 
     // Step 3
@@ -1619,6 +1633,7 @@ void InstanceKlass::call_class_initializer(TRAPS) {
                 THREAD->name());
   }
   if (h_method() != nullptr) {
+    ThreadInClassInitializer ticl(this);
     JavaCallArguments args; // No arguments
     JavaValue result(T_VOID);
     JavaCalls::call(&result, h_method, &args, CHECK); // Static call (no args)
