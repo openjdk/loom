@@ -952,7 +952,7 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
      * @since 24
      */
     @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
-    public static class FailedException extends RuntimeException {
+    public static final class FailedException extends RuntimeException {
         @java.io.Serial
         static final long serialVersionUID = -1533055100078459923L;
 
@@ -974,7 +974,7 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
      * @see Config#withTimeout(Duration)
      */
     @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
-    public static class TimeoutException extends RuntimeException {
+    public static final class TimeoutException extends RuntimeException {
         @java.io.Serial
         static final long serialVersionUID = 705788143955048766L;
 
