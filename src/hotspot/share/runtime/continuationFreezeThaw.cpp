@@ -1600,7 +1600,7 @@ static void jvmti_mount_end(JavaThread* current, ContinuationWrapper& cont, fram
 
   ContinuationWrapper::SafepointOp so(current, cont);
 
-  // Since we might safepoint set the anchor so that the stack can we walked.
+  // Since we might safepoint set the anchor so that the stack can be walked.
   set_anchor(current, top.sp());
 
   JRT_BLOCK
@@ -2042,7 +2042,7 @@ int ThawBase::remove_top_compiled_frame_from_chunk(stackChunkOop chunk, int &arg
   if (check_stub && f.is_stub()) {
     // If we don't thaw the top compiled frame too, after restoring the saved
     // registers back in Java, we would hit the return barrier to thaw one more
-    // frame effectively overwritting the restored registers during that call.
+    // frame effectively overwriting the restored registers during that call.
     f.next(SmallRegisterMap::instance(), true /* stop */);
     assert(!f.is_done(), "");
 
@@ -2059,7 +2059,7 @@ int ThawBase::remove_top_compiled_frame_from_chunk(stackChunkOop chunk, int &arg
     }
   }
 
-  f.next(SmallRegisterMap::instance, true /* stop */);
+  f.next(SmallRegisterMap::instance(), true /* stop */);
   empty = f.is_done();
   assert(!empty || argsize == chunk->argsize(), "");
 
@@ -2232,7 +2232,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
       bool mon_acquired = mon->resume_operation(_thread, waiter, _cont);
       assert(!mon_acquired || mon->has_owner(_thread), "invariant");
       if (!mon_acquired) {
-        // Failed to aquire monitor. Return to enterSpecial to unmount again.
+        // Failed to acquire monitor. Return to enterSpecial to unmount again.
         return push_cleanup_continuation();
       }
       chunk = _cont.tail();  // reload oop in case of safepoint in resume_operation (if posting JVMTI events).
@@ -2489,7 +2489,7 @@ intptr_t* ThawBase::handle_preempted_continuation(intptr_t* sp, Continuation::pr
 
 void ThawBase::throw_interrupted_exception(JavaThread* current, frame& top) {
   ContinuationWrapper::SafepointOp so(current, _cont);
-  // Since we might safepoint set the anchor so that the stack can we walked.
+  // Since we might safepoint set the anchor so that the stack can be walked.
   set_anchor(current, top.sp());
   JRT_BLOCK
     THROW(vmSymbols::java_lang_InterruptedException());
@@ -2647,7 +2647,7 @@ void ThawBase::recurse_thaw_stub_frame(const frame& hf, frame& caller, int num_f
     assert(!_stream.is_done(), "");
     _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>(_stream, &map);
   } else {
-    _stream.next(SmallRegisterMap::instance);
+    _stream.next(SmallRegisterMap::instance());
     assert(!_stream.is_done(), "");
   }
 
