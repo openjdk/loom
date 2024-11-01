@@ -886,7 +886,7 @@ NOINLINE freeze_result FreezeBase::recurse_freeze(frame& f, frame& caller, int c
     assert(f.is_native_frame() || f.is_runtime_frame(), "");
     return f.is_native_frame() ? recurse_freeze_native_frame(f, caller) : recurse_freeze_stub_frame(f, caller);
   } else {
-    // frame can't be freezed. Most likely the call_stub or upcall_stub
+    // Frame can't be frozen. Most likely the call_stub or upcall_stub
     // which indicates there are further natives frames up the stack.
     return freeze_pinned_native;
   }
@@ -1528,9 +1528,7 @@ stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size, int argsize_md)
 
 #if INCLUDE_ZGC
   if (UseZGC) {
-    if (ZGenerational) {
-      ZStackChunkGCData::initialize(chunk);
-    }
+    ZStackChunkGCData::initialize(chunk);
     assert(!chunk->requires_barriers(), "ZGC always allocates in the young generation");
     _barriers = false;
   } else
@@ -2093,7 +2091,7 @@ void ThawBase::thaw_lockstack(stackChunkOop chunk) {
   assert(lockStackSize > 0 && lockStackSize <= LockStack::CAPACITY, "");
 
   oop tmp_lockstack[LockStack::CAPACITY];
-  chunk->transfer_lockstack(tmp_lockstack);
+  chunk->transfer_lockstack(tmp_lockstack, _barriers);
   _thread->lock_stack().move_from_address(tmp_lockstack, lockStackSize);
 
   chunk->set_lockstack_size(0);

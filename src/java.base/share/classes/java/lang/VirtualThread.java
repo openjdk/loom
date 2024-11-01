@@ -57,6 +57,7 @@ import jdk.internal.vm.ThreadContainers;
 import jdk.internal.vm.annotation.ChangesCurrentThread;
 import jdk.internal.vm.annotation.Hidden;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
+import jdk.internal.vm.annotation.JvmtiHideEvents;
 import jdk.internal.vm.annotation.JvmtiMountTransition;
 import jdk.internal.vm.annotation.ReservedStackAccess;
 import sun.nio.ch.Interruptible;
@@ -175,12 +176,11 @@ final class VirtualThread extends BaseVirtualThread {
     // notified by Object.notify/notifyAll while waiting in Object.wait
     private volatile boolean notified;
 
-    // timeout for timed-park, in nanoseconds, only accessed on current/carrier thread
-    private long parkTimeout;
-
-    // timed-wait, in milliseconds, set in VM, only accessed on current/carrier thread
-    private long waitTimeout;
+    // timed-wait support
     private byte timedWaitSeqNo;
+
+    // timeout for timed-park and timed-wait, only accessed on current/carrier thread
+    private long timeout;
 
     // timer task for timed-park and timed-wait, only accessed on current/carrier thread
     private Future<?> timeoutTask;
@@ -256,8 +256,14 @@ final class VirtualThread extends BaseVirtualThread {
         private static Runnable wrap(VirtualThread vthread, Runnable task) {
             return new Runnable() {
                 @Hidden
+                @JvmtiHideEvents
                 public void run() {
-                    vthread.run(task);
+                    vthread.notifyJvmtiStart(); // notify JVMTI
+                    try {
+                        vthread.run(task);
+                    } finally {
+                        vthread.notifyJvmtiEnd(); // notify JVMTI
+                    }
                 }
             };
         }
@@ -311,8 +317,8 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Cancel timeout task when continuing after timed-park or timed-wait. The
-     * timeout task may be executing, or may have already completed.
+     * Cancel timeout task when continuing after timed-park or timed-wait.
+     * The timeout task may be executing, or may have already completed.
      */
     private void cancelTimeoutTask() {
         if (timeoutTask != null) {
@@ -453,9 +459,6 @@ final class VirtualThread extends BaseVirtualThread {
     private void run(Runnable task) {
         assert Thread.currentThread() == this && state == RUNNING;
 
-        // notify JVMTI, may post VirtualThreadStart event
-        notifyJvmtiStart();
-
         // emit JFR event if enabled
         if (VirtualThreadStartEvent.isTurnedOn()) {
             var event = new VirtualThreadStartEvent();
@@ -469,20 +472,14 @@ final class VirtualThread extends BaseVirtualThread {
         } catch (Throwable exc) {
             dispatchUncaughtException(exc);
         } finally {
-            try {
-                // pop any remaining scopes from the stack, this may block
-                StackableScope.popAll();
+            // pop any remaining scopes from the stack, this may block
+            StackableScope.popAll();
 
-                // emit JFR event if enabled
-                if (VirtualThreadEndEvent.isTurnedOn()) {
-                    var event = new VirtualThreadEndEvent();
-                    event.javaThreadId = threadId();
-                    event.commit();
-                }
-
-            } finally {
-                // notify JVMTI, may post VirtualThreadEnd event
-                notifyJvmtiEnd();
+            // emit JFR event if enabled
+            if (VirtualThreadEndEvent.isTurnedOn()) {
+                var event = new VirtualThreadEndEvent();
+                event.javaThreadId = threadId();
+                event.commit();
             }
         }
     }
@@ -575,8 +572,8 @@ final class VirtualThread extends BaseVirtualThread {
                 setState(newState = PARKED);
             } else {
                 // schedule unpark
-                assert parkTimeout > 0;
-                timeoutTask = schedule(this::unpark, parkTimeout, NANOSECONDS);
+                assert timeout > 0;
+                timeoutTask = schedule(this::unpark, timeout, NANOSECONDS);
                 setState(newState = TIMED_PARKED);
             }
 
@@ -626,10 +623,10 @@ final class VirtualThread extends BaseVirtualThread {
                 // the timeout task to coordinate access to the sequence number and to
                 // ensure the timeout task doesn't execute until the thread has got to
                 // the TIMED_WAIT state.
-                assert waitTimeout > 0;
+                assert timeout > 0;
                 synchronized (timedWaitLock()) {
                     byte seqNo = ++timedWaitSeqNo;
-                    timeoutTask = schedule(() -> waitTimeoutExpired(seqNo), waitTimeout, MILLISECONDS);
+                    timeoutTask = schedule(() -> waitTimeoutExpired(seqNo), timeout, MILLISECONDS);
                     setState(newState = TIMED_WAIT);
                 }
             }
@@ -790,7 +787,7 @@ final class VirtualThread extends BaseVirtualThread {
 
             // park the thread, afterYield will schedule the thread to unpark
             boolean yielded = false;
-            setParkTimeout(nanos);
+            timeout = nanos;
             setState(TIMED_PARKING);
             try {
                 yielded = yieldContinuation();
@@ -1390,10 +1387,6 @@ final class VirtualThread extends BaseVirtualThread {
         }
     }
 
-    private void setParkTimeout(long timeout) {
-        parkTimeout = timeout;
-    }
-
     private void setCarrierThread(Thread carrier) {
         // U.putReferenceRelease(this, CARRIER_THREAD, carrier);
         this.carrierThread = carrier;
@@ -1416,10 +1409,6 @@ final class VirtualThread extends BaseVirtualThread {
     @IntrinsicCandidate
     @JvmtiMountTransition
     private native void notifyJvmtiUnmount(boolean hide);
-
-    @IntrinsicCandidate
-    @JvmtiMountTransition
-    private static native void notifyJvmtiHideFrames(boolean hide);
 
     @IntrinsicCandidate
     private static native void notifyJvmtiDisableSuspend(boolean enter);
