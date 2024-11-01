@@ -47,7 +47,7 @@ void continuations_init();
 class javaVFrame;
 class JavaThread;
 
-// should match Continuation.PreemptStatus() in Continuation.java
+// should match Continuation.pinnedReason() in Continuation.java
 enum freeze_result {
   freeze_ok = 0,
   freeze_ok_bottom = 1,
@@ -63,8 +63,8 @@ class Continuation : AllStatic {
 public:
 
   enum preempt_kind {
-    freeze_on_monitorenter = 1,
-    freeze_on_wait         = 2
+    freeze_on_monitorenter,
+    freeze_on_wait
   };
 
   enum thaw_kind {
