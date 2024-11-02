@@ -175,13 +175,13 @@ static inline bool is_stack_chunk_class(const Symbol* class_name,
           loader_data->is_the_null_class_loader_data());
 }
 
+// Tracks waiting for class to be initialized
 class WaitForClassInitializer : public StackObj {
  private:
   InstanceKlass* _ik;
-  Ticks _start_time;
+  EventVirtualThreadPinned event;
  public:
   WaitForClassInitializer(InstanceKlass* ik) : _ik(ik) {
-    _start_time = Ticks::now();
     JavaThread* current = JavaThread::current();
     current->set_class_to_be_initialized(ik);
   }
@@ -190,15 +190,14 @@ class WaitForClassInitializer : public StackObj {
     current->set_class_to_be_initialized(nullptr);
 #if INCLUDE_JFR
     ContinuationEntry* ce = current->last_continuation();
-    if (ce != nullptr && ce->is_virtual_thread()) {
-      EventVirtualThreadPinned event;
-      event.set_starttime(_start_time);
-      if (event.should_commit()) {
-        ResourceMark rm(current);
-        char reason[256];
-        jio_snprintf(reason, sizeof reason, "Waited for initialization of klass %s", _ik->external_name());
-        current->post_vthread_pinned_event(&event, reason);
-      }
+    if (ce != nullptr && ce->is_virtual_thread() && event.should_commit()) {
+      ResourceMark rm(current);
+      char reason[256];
+      jio_snprintf(reason, sizeof reason, "Waited for initialization of %s", _ik->external_name());
+      event.set_blockingOperation("Wait for class initialization lock");
+      event.set_pinnedReason(reason);
+      event.set_carrierThread(JFR_JVM_THREAD_ID(current));
+      event.commit();
     }
 #endif
   }
@@ -1134,7 +1133,7 @@ void InstanceKlass::initialize_impl(TRAPS) {
       }
       wait = true;
 
-      WaitForClassInitializer wfcl(this);
+      WaitForClassInitializer wfcl(this);  // Track waiting for class being initialized
 
       ol.wait_uninterruptibly(jt);
     }
@@ -1633,7 +1632,7 @@ void InstanceKlass::call_class_initializer(TRAPS) {
                 THREAD->name());
   }
   if (h_method() != nullptr) {
-    ThreadInClassInitializer ticl(this);
+    ThreadInClassInitializer ticl(this); // Track class being initialized
     JavaCallArguments args; // No arguments
     JavaValue result(T_VOID);
     JavaCalls::call(&result, h_method, &args, CHECK); // Static call (no args)

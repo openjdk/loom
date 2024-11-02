@@ -839,7 +839,7 @@ final class VirtualThread extends BaseVirtualThread {
         setParkPermit(false);
 
         // JFR event commit
-        pinnedEnd("Parked");
+        pinnedEnd("LockSupport.park");
     }
 
     /**
@@ -848,7 +848,7 @@ final class VirtualThread extends BaseVirtualThread {
      * with the same name, but different ID, to events recorded by the VM.
      */
     private static native void pinnedStart();
-    private static native void pinnedEnd(String reason);
+    private static native void pinnedEnd(String op);
 
     /**
      * Re-enables this virtual thread for scheduling. If this virtual thread is parked

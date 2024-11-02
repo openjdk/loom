@@ -1242,7 +1242,7 @@ public:
 #if INCLUDE_JFR
   Ticks& vthread_pinned_start_time() { return _pinned_start_time; }
   void start_vthread_pinned() { _pinned_start_time = Ticks::now(); }
-  void post_vthread_pinned_event(EventVirtualThreadPinned* event, const char* reason);
+  void post_vthread_pinned_event(EventVirtualThreadPinned* event, const char* op);
 #endif
 
   // This is only for use by JVMTI RawMonitorWait. It emulates the actions of

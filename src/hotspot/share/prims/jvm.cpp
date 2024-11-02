@@ -3965,13 +3965,13 @@ JVM_ENTRY_NO_ENV(void, JVM_VirtualThreadPinnedStart(JNIEnv* env, jclass ignored)
 #endif
 JVM_END
 
-JVM_ENTRY_NO_ENV(void, JVM_VirtualThreadPinnedEnd(JNIEnv* env, jclass ignored, jstring reason))
+JVM_ENTRY_NO_ENV(void, JVM_VirtualThreadPinnedEnd(JNIEnv* env, jclass ignored, jstring op))
 #if INCLUDE_JFR
-  EventVirtualThreadPinned event;
+  EventVirtualThreadPinned event(UNTIMED);
   event.set_starttime(THREAD->vthread_pinned_start_time());
   if (event.should_commit()) {
     ResourceMark rm(THREAD);
-    const char *str = java_lang_String::as_utf8_string(JNIHandles::resolve_non_null(reason));
+    const char *str = java_lang_String::as_utf8_string(JNIHandles::resolve_non_null(op));
     THREAD->post_vthread_pinned_event(&event, str);
   }
 #endif

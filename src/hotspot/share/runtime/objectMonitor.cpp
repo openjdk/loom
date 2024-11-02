@@ -588,7 +588,7 @@ void ObjectMonitor::enter_with_contention_mark(JavaThread *current, ObjectMonito
 
   ContinuationEntry* ce = current->last_continuation();
   if (ce != nullptr && ce->is_virtual_thread()) {
-    current->post_vthread_pinned_event(&vthread_pinned_event, "Blocked on monitor enter");
+    current->post_vthread_pinned_event(&vthread_pinned_event, "Contended monitor enter");
   }
 
   OM_PERFDATA_OP(ContendedLockAttempts, inc());
@@ -1812,7 +1812,7 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
     }
 
     if (ce != nullptr && ce->is_virtual_thread()) {
-      current->post_vthread_pinned_event(&vthread_pinned_event, "Waited in Object.wait");
+      current->post_vthread_pinned_event(&vthread_pinned_event, "Object.wait");
     }
 
     OrderAccess::fence();

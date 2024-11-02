@@ -2330,17 +2330,23 @@ void JavaThread::add_oop_handles_for_release() {
 }
 
 #if INCLUDE_JFR
-void JavaThread::post_vthread_pinned_event(EventVirtualThreadPinned* event, const char* reason) {
+// Post jdk.VirtualThreadPinned event, maybe with additional reason
+void JavaThread::post_vthread_pinned_event(EventVirtualThreadPinned* event, const char* op) {
   if (event->should_commit()) {
-    char long_reason[256];
+    event->set_blockingOperation(op);
     InstanceKlass* ik = class_being_initialized();
     if (ik != nullptr) {
       ResourceMark rm(this);
-      jio_snprintf(long_reason, sizeof(long_reason), "%s when initializing %s", reason, ik->external_name());
+      char reason[256];
+      jio_snprintf(reason, sizeof(reason), "VM call to %s.<clinit> on stack", ik->external_name());
+      event->set_pinnedReason(reason);
     } else {
-      jio_snprintf(long_reason, sizeof(long_reason), "%s when pinned", reason);
+      if (LockingMode == LM_LEGACY) {
+        event->set_pinnedReason("Native frame or monitors on stack");
+      } else {
+        event->set_pinnedReason("Native frame on stack");
+      }
     }
-    event->set_pinnedReason(long_reason);
     event->set_carrierThread(JFR_JVM_THREAD_ID(this));
     event->commit();
   }

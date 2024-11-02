@@ -242,6 +242,7 @@ inline InstanceKlass* JavaThread::class_to_be_initialized() const {
 }
 
 inline void JavaThread::set_class_being_initialized(InstanceKlass* k) {
+  assert(k != nullptr || _class_being_initialized != nullptr, "incorrect usage");
   assert(this == Thread::current(), "Only the current thread can set this field");
   _class_being_initialized = k;
 }
