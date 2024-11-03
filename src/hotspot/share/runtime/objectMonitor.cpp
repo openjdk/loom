@@ -481,6 +481,8 @@ void ObjectMonitor::enter_with_contention_mark(JavaThread *current, ObjectMonito
   }
   EventVirtualThreadPinned vthread_pinned_event;
 
+  int preempt_result = -1;
+
   { // Change java thread status to indicate blocked on monitor enter.
     JavaThreadBlockedOnMonitorEnterState jtbmes(current, this);
 
@@ -500,8 +502,8 @@ void ObjectMonitor::enter_with_contention_mark(JavaThread *current, ObjectMonito
 
     ContinuationEntry* ce = current->last_continuation();
     if (ce != nullptr && ce->is_virtual_thread()) {
-      int result = Continuation::try_preempt(current, ce->cont_oop(current));
-      if (result == freeze_ok) {
+      preempt_result = Continuation::try_preempt(current, ce->cont_oop(current));
+      if (preempt_result == freeze_ok) {
         bool acquired = VThreadMonitorEnter(current);
         if (acquired) {
           // We actually acquired the monitor while trying to add the vthread to the
@@ -588,7 +590,8 @@ void ObjectMonitor::enter_with_contention_mark(JavaThread *current, ObjectMonito
 
   ContinuationEntry* ce = current->last_continuation();
   if (ce != nullptr && ce->is_virtual_thread()) {
-    current->post_vthread_pinned_event(&vthread_pinned_event, "Contended monitor enter");
+    assert(preempt_result != freeze_ok, "sanity check");
+    current->post_vthread_pinned_event(&vthread_pinned_event, "Contended monitor enter", preempt_result);
   }
 
   OM_PERFDATA_OP(ContendedLockAttempts, inc());
@@ -1674,10 +1677,11 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
 
   current->set_current_waiting_monitor(this);
 
+  int preempt_result = -1;
   ContinuationEntry* ce = current->last_continuation();
   if (ce != nullptr && ce->is_virtual_thread()) {
-    int result = Continuation::try_preempt(current, ce->cont_oop(current));
-    if (result == freeze_ok) {
+    preempt_result = Continuation::try_preempt(current, ce->cont_oop(current));
+    if (preempt_result == freeze_ok) {
       VThreadWait(current, millis);
       current->set_current_waiting_monitor(nullptr);
       return;
@@ -1812,7 +1816,8 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
     }
 
     if (ce != nullptr && ce->is_virtual_thread()) {
-      current->post_vthread_pinned_event(&vthread_pinned_event, "Object.wait");
+      assert(preempt_result != freeze_ok, "sanity check");
+      current->post_vthread_pinned_event(&vthread_pinned_event, "Object.wait", preempt_result);
     }
 
     OrderAccess::fence();

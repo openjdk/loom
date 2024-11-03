@@ -37,7 +37,6 @@
 #include "runtime/javaFrameAnchor.hpp"
 #include "runtime/lockStack.hpp"
 #include "runtime/park.hpp"
-#include "utilities/ticks.hpp"
 #include "runtime/safepointMechanism.hpp"
 #include "runtime/stackWatermarkSet.hpp"
 #include "runtime/stackOverflow.hpp"
@@ -50,6 +49,7 @@
 #include "utilities/macros.hpp"
 #if INCLUDE_JFR
 #include "jfr/support/jfrThreadExtension.hpp"
+#include "utilities/ticks.hpp"
 #endif
 
 class AsyncExceptionHandshake;
@@ -1228,7 +1228,8 @@ private:
 
 #if INCLUDE_JFR
   // Support for jdk.VirtualThreadPinned event
-  Ticks _pinned_start_time;
+  int _last_freeze_fail_result;
+  Ticks _last_freeze_fail_time;
 #endif
 
 public:
@@ -1240,9 +1241,11 @@ public:
   bool is_interrupted(bool clear_interrupted);
 
 #if INCLUDE_JFR
-  Ticks& vthread_pinned_start_time() { return _pinned_start_time; }
-  void start_vthread_pinned() { _pinned_start_time = Ticks::now(); }
-  void post_vthread_pinned_event(EventVirtualThreadPinned* event, const char* op);
+  // Support for jdk.VirtualThreadPinned event
+  int last_freeze_fail_result() { return _last_freeze_fail_result; }
+  Ticks& last_freeze_fail_time() { return _last_freeze_fail_time; }
+  void set_last_freeze_fail_result(int result);
+  void post_vthread_pinned_event(EventVirtualThreadPinned* event, const char* op, int result);
 #endif
 
   // This is only for use by JVMTI RawMonitorWait. It emulates the actions of

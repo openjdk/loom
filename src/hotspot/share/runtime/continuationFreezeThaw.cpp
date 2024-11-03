@@ -1674,6 +1674,7 @@ static inline int freeze_epilog(ContinuationWrapper& cont) {
 
 static int freeze_epilog(JavaThread* thread, ContinuationWrapper& cont, freeze_result res) {
   if (UNLIKELY(res != freeze_ok)) {
+    JFR_ONLY(thread->set_last_freeze_fail_result((int)res);)
     verify_continuation(cont.continuation());
     log_develop_trace(continuations)("=== end of freeze (fail %d)", res);
     return res;

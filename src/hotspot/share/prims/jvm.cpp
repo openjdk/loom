@@ -3959,20 +3959,16 @@ JVM_ENTRY(void, JVM_VirtualThreadDisableSuspend(JNIEnv* env, jclass clazz, jbool
 #endif
 JVM_END
 
-JVM_ENTRY_NO_ENV(void, JVM_VirtualThreadPinnedStart(JNIEnv* env, jclass ignored))
+JVM_ENTRY_NO_ENV(void, JVM_VirtualThreadPinnedEvent(JNIEnv* env, jclass ignored, jstring op))
 #if INCLUDE_JFR
-  THREAD->start_vthread_pinned();
-#endif
-JVM_END
-
-JVM_ENTRY_NO_ENV(void, JVM_VirtualThreadPinnedEnd(JNIEnv* env, jclass ignored, jstring op))
-#if INCLUDE_JFR
+  int freeze_result = THREAD->last_freeze_fail_result();
+  assert(freeze_result != freeze_ok, "sanity check");
   EventVirtualThreadPinned event(UNTIMED);
-  event.set_starttime(THREAD->vthread_pinned_start_time());
+  event.set_starttime(THREAD->last_freeze_fail_time());
   if (event.should_commit()) {
     ResourceMark rm(THREAD);
     const char *str = java_lang_String::as_utf8_string(JNIHandles::resolve_non_null(op));
-    THREAD->post_vthread_pinned_event(&event, str);
+    THREAD->post_vthread_pinned_event(&event, str, freeze_result);
   }
 #endif
 JVM_END

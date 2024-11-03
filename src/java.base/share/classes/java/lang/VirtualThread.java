@@ -819,9 +819,6 @@ final class VirtualThread extends BaseVirtualThread {
     private void parkOnCarrierThread(boolean timed, long nanos) {
         assert state() == RUNNING;
 
-        // JFR event start
-        pinnedStart();
-
         setState(timed ? TIMED_PINNED : PINNED);
         try {
             if (!parkPermit) {
@@ -838,8 +835,8 @@ final class VirtualThread extends BaseVirtualThread {
         // consume parking permit
         setParkPermit(false);
 
-        // JFR event commit
-        pinnedEnd("LockSupport.park");
+        // JFR jdk.VirtualThreadPinned event
+        postPinnedEvent("LockSupport.park");
     }
 
     /**
@@ -847,8 +844,8 @@ final class VirtualThread extends BaseVirtualThread {
      * Recording the event in the VM avoids having JFR event recorded in Java
      * with the same name, but different ID, to events recorded by the VM.
      */
-    private static native void pinnedStart();
-    private static native void pinnedEnd(String op);
+    @Hidden
+    private static native void postPinnedEvent(String op);
 
     /**
      * Re-enables this virtual thread for scheduling. If this virtual thread is parked

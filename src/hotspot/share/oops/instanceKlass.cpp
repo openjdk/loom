@@ -175,34 +175,6 @@ static inline bool is_stack_chunk_class(const Symbol* class_name,
           loader_data->is_the_null_class_loader_data());
 }
 
-// Tracks waiting for class to be initialized
-class WaitForClassInitializer : public StackObj {
- private:
-  InstanceKlass* _ik;
-  EventVirtualThreadPinned event;
- public:
-  WaitForClassInitializer(InstanceKlass* ik) : _ik(ik) {
-    JavaThread* current = JavaThread::current();
-    current->set_class_to_be_initialized(ik);
-  }
-  ~WaitForClassInitializer() {
-    JavaThread* current = JavaThread::current();
-    current->set_class_to_be_initialized(nullptr);
-#if INCLUDE_JFR
-    ContinuationEntry* ce = current->last_continuation();
-    if (ce != nullptr && ce->is_virtual_thread() && event.should_commit()) {
-      ResourceMark rm(current);
-      char reason[256];
-      jio_snprintf(reason, sizeof reason, "Waited for initialization of %s", _ik->external_name());
-      event.set_blockingOperation("Wait for class initialization lock");
-      event.set_pinnedReason(reason);
-      event.set_carrierThread(JFR_JVM_THREAD_ID(current));
-      event.commit();
-    }
-#endif
-  }
-};
-
 // private: called to verify that k is a static member of this nest.
 // We know that k is an instance class in the same package and hence the
 // same classloader.
@@ -1132,10 +1104,9 @@ void InstanceKlass::initialize_impl(TRAPS) {
                                jt->name(), external_name(), init_thread_name());
       }
       wait = true;
-
-      WaitForClassInitializer wfcl(this);  // Track waiting for class being initialized
-
+      jt->set_class_to_be_initialized(this);
       ol.wait_uninterruptibly(jt);
+      jt->set_class_to_be_initialized(nullptr);
     }
 
     // Step 3

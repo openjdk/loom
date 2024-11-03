@@ -37,8 +37,7 @@ static JNINativeMethod methods[] = {
     { "notifyJvmtiMount",          "(Z)V", (void *)&JVM_VirtualThreadMount },
     { "notifyJvmtiUnmount",        "(Z)V", (void *)&JVM_VirtualThreadUnmount },
     { "notifyJvmtiDisableSuspend", "(Z)V", (void *)&JVM_VirtualThreadDisableSuspend },
-    { "pinnedStart",               "()V",  (void *)&JVM_VirtualThreadPinnedStart },
-    { "pinnedEnd",                 "(" STR ")V", (void *)&JVM_VirtualThreadPinnedEnd },
+    { "postPinnedEvent",           "(" STR ")V", (void *)&JVM_VirtualThreadPinnedEvent },
     { "takeVirtualThreadListToUnblock", "()" VIRTUAL_THREAD, (void *)&JVM_TakeVirtualThreadListToUnblock},
 };
 

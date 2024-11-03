@@ -2330,23 +2330,34 @@ void JavaThread::add_oop_handles_for_release() {
 }
 
 #if INCLUDE_JFR
-// Post jdk.VirtualThreadPinned event, maybe with additional reason
-void JavaThread::post_vthread_pinned_event(EventVirtualThreadPinned* event, const char* op) {
+void JavaThread::set_last_freeze_fail_result(int result) {
+  assert(result != freeze_ok, "sanity check");
+  _last_freeze_fail_result = result;
+  _last_freeze_fail_time = Ticks::now();
+}
+
+// Post jdk.VirtualThreadPinned event
+void JavaThread::post_vthread_pinned_event(EventVirtualThreadPinned* event, const char* op, int freeze_result) {
+  assert(freeze_result != freeze_ok, "sanity check");
   if (event->should_commit()) {
-    event->set_blockingOperation(op);
-    InstanceKlass* ik = class_being_initialized();
-    if (ik != nullptr) {
+    char reason[256];
+    if (class_being_initialized() != nullptr) {
       ResourceMark rm(this);
-      char reason[256];
-      jio_snprintf(reason, sizeof(reason), "VM call to %s.<clinit> on stack", ik->external_name());
+      jio_snprintf(reason, sizeof(reason), "VM call to %s.<clinit> on stack",
+                   class_being_initialized()->external_name());
       event->set_pinnedReason(reason);
+    } else if (class_to_be_initialized() != nullptr) {
+      ResourceMark rm(this);
+      jio_snprintf(reason, sizeof reason, "Waited for initialization of %s by another thread",
+                   class_to_be_initialized()->external_name());
+      event->set_pinnedReason(reason);
+    } else if (freeze_result == freeze_pinned_native) {
+      event->set_pinnedReason("Native or VM frame on stack");
     } else {
-      if (LockingMode == LM_LEGACY) {
-        event->set_pinnedReason("Native frame or monitors on stack");
-      } else {
-        event->set_pinnedReason("Native frame on stack");
-      }
+      jio_snprintf(reason, sizeof(reason), "Freeze or preempt failed (%d)", (int)freeze_result);
+      event->set_pinnedReason(reason);
     }
+    event->set_blockingOperation(op);
     event->set_carrierThread(JFR_JVM_THREAD_ID(this));
     event->commit();
   }
