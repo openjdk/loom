@@ -24,10 +24,10 @@
 #include "jni.h"
 
 JNIEXPORT void JNICALL
-Java_VThreadBlockedAtSynchronizedNative_runWithSynchronizedNative(JNIEnv *env, jobject obj, jobject task) {
+Java_UnmountedVThreadNativeMethodAtTop_runWithSynchronizedNative(JNIEnv *env, jobject obj) {
     jclass clazz = (*env)->GetObjectClass(env, obj);
-    jmethodID mid = (*env)->GetMethodID(env, clazz, "run", "(Ljava/lang/Runnable;)V");
+    jmethodID mid = (*env)->GetMethodID(env, clazz, "run", "()V");
     if (mid != NULL) {
-        (*env)->CallVoidMethod(env, obj, mid, task);
+        (*env)->CallVoidMethod(env, obj, mid);
     }
 }
