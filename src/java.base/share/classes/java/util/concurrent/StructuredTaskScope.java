@@ -24,24 +24,12 @@
  */
 package java.util.concurrent;
 
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import jdk.internal.javac.PreviewFeature;
-import jdk.internal.misc.InnocuousThread;
-import jdk.internal.misc.ThreadFlock;
-import jdk.internal.invoke.MhUtil;
 
 /**
  * An API for <em>structured concurrency</em>. {@code StructuredTaskScope} supports cases
@@ -357,152 +345,12 @@ import jdk.internal.invoke.MhUtil;
  * @param <R> the result type of the scope
  *
  * @jls 17.4.5 Happens-before Order
- * @since 21
+ * @since 24
  */
 @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
-public final class StructuredTaskScope<T, R> implements AutoCloseable {
-    private static final VarHandle CANCELLED =
-            MhUtil.findVarHandle(MethodHandles.lookup(), "cancelled", boolean.class);
-
-    private final Joiner<? super T, ? extends R> joiner;
-    private final ThreadFactory threadFactory;
-    private final ThreadFlock flock;
-
-    // state, only accessed by owner thread
-    private static final int ST_NEW            = 0;
-    private static final int ST_FORKED         = 1;   // subtasks forked, need to join
-    private static final int ST_JOIN_STARTED   = 2;   // join started, can no longer fork
-    private static final int ST_JOIN_COMPLETED = 3;   // join completed
-    private static final int ST_CLOSED         = 4;   // closed
-    private int state;
-
-    // timer task, only accessed by owner thread
-    private Future<?> timerTask;
-
-    // set or read by any thread
-    private volatile boolean cancelled;
-
-    // set by the timer thread, read by the owner thread
-    private volatile boolean timeoutExpired;
-
-    /**
-     * Throws WrongThreadException if the current thread is not the owner thread.
-     */
-    private void ensureOwner() {
-        if (Thread.currentThread() != flock.owner()) {
-            throw new WrongThreadException("Current thread not owner");
-        }
-    }
-
-    /**
-     * Throws IllegalStateException if already joined or scope is closed.
-     */
-    private void ensureNotJoined() {
-        assert Thread.currentThread() == flock.owner();
-        if (state > ST_FORKED) {
-            throw new IllegalStateException("Already joined or scope is closed");
-        }
-    }
-
-    /**
-     * Throws IllegalStateException if invoked by the owner thread and the owner thread
-     * has not joined.
-     */
-    private void ensureJoinedIfOwner() {
-        if (Thread.currentThread() == flock.owner() && state <= ST_JOIN_STARTED) {
-            throw new IllegalStateException("join not called");
-        }
-    }
-
-    /**
-     * Interrupts all threads in this scope, except the current thread.
-     */
-    private void implInterruptAll() {
-        flock.threads()
-                .filter(t -> t != Thread.currentThread())
-                .forEach(t -> {
-                    try {
-                        t.interrupt();
-                    } catch (Throwable ignore) { }
-                });
-    }
-
-    @SuppressWarnings("removal")
-    private void interruptAll() {
-        if (System.getSecurityManager() == null) {
-            implInterruptAll();
-        } else {
-            PrivilegedAction<Void> pa = () -> {
-                implInterruptAll();
-                return null;
-            };
-            AccessController.doPrivileged(pa);
-        }
-    }
-
-    /**
-     * Cancel the scope if not already cancelled.
-     */
-    private void cancel() {
-        if (!cancelled && CANCELLED.compareAndSet(this, false, true)) {
-            // prevent new threads from starting
-            flock.shutdown();
-
-            // interrupt all unfinished threads
-            interruptAll();
-
-            // wakeup join
-            flock.wakeup();
-        }
-    }
-
-    /**
-     * Schedules a task to cancel the scope on timeout.
-     */
-    private void scheduleTimeout(Duration timeout) {
-        assert Thread.currentThread() == flock.owner() && timerTask == null;
-        timerTask = TimerSupport.schedule(timeout, () -> {
-            if (!cancelled) {
-                timeoutExpired = true;
-                cancel();
-            }
-        });
-    }
-
-    /**
-     * Cancels the timer task if set.
-     */
-    private void cancelTimeout() {
-        assert Thread.currentThread() == flock.owner();
-        if (timerTask != null) {
-            timerTask.cancel(false);
-        }
-    }
-
-    /**
-     * Invoked by the thread for a subtask when the subtask completes before scope is cancelled.
-     */
-    private void onComplete(SubtaskImpl<? extends T> subtask) {
-        assert subtask.state() != Subtask.State.UNAVAILABLE;
-        if (joiner.onComplete(subtask)) {
-            cancel();
-        }
-    }
-
-    /**
-     * Initialize a new StructuredTaskScope.
-     */
-    @SuppressWarnings("this-escape")
-    private StructuredTaskScope(Joiner<? super T, ? extends R> joiner,
-                                ThreadFactory threadFactory,
-                                String name) {
-        this.joiner = joiner;
-        this.threadFactory = threadFactory;
-
-        if (name == null)
-            name = Objects.toIdentityString(this);
-        this.flock = ThreadFlock.open(name);
-    }
+public sealed interface StructuredTaskScope<T, R>
+        extends AutoCloseable
+        permits StructuredTaskScopeImpl {
 
     /**
      * Represents a subtask forked with {@link #fork(Callable)} or {@link #fork(Runnable)}.
@@ -516,7 +364,7 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
      * @since 21
      */
     @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
-    public sealed interface Subtask<T> extends Supplier<T> permits SubtaskImpl {
+    sealed interface Subtask<T> extends Supplier<T> permits StructuredTaskScopeImpl.SubtaskImpl {
         /**
          * Represents the state of a subtask.
          * @see Subtask#state()
@@ -656,8 +504,7 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
      */
     @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
     @FunctionalInterface
-    public interface Joiner<T, R> {
-
+    interface Joiner<T, R> {
         /**
          * Invoked by {@link #fork(Callable) fork(Callable)} and {@link #fork(Runnable)
          * fork(Runnable)} when forking a subtask. The method is invoked from the task
@@ -745,7 +592,7 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
          * @param <T> the result type of subtasks
          */
         static <T> Joiner<T, Stream<Subtask<T>>> allSuccessfulOrThrow() {
-            return new AllSuccessful<>();
+            return new Joiners.AllSuccessful<>();
         }
 
         /**
@@ -761,7 +608,7 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
          * @param <T> the result type of subtasks
          */
         static <T> Joiner<T, T> anySuccessfulResultOrThrow() {
-            return new AnySuccessful<>();
+            return new Joiners.AnySuccessful<>();
         }
 
         /**
@@ -780,7 +627,7 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
          * @param <T> the result type of subtasks
          */
         static <T> Joiner<T, Void> awaitAllSuccessfulOrThrow() {
-            return new AwaitSuccessful<>();
+            return new Joiners.AwaitSuccessful<>();
         }
 
         /**
@@ -801,13 +648,9 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
          * {@snippet lang=java :
          *   void acceptLoop(ServerSocket listener) throws IOException, InterruptedException {
          *       try (var scope = StructuredTaskScope.open(Joiner.<Socket>awaitAll())) {
-         *           try {
-         *               while (true) {
-         *                  Socket socket = listener.accept();
-         *                  scope.fork(() -> handle(socket));
-         *               }
-         *           } finally {
-         *               scope.join();
+         *           while (true) {
+         *               Socket socket = listener.accept();
+         *               scope.fork(() -> handle(socket));
          *           }
          *       }
          *   }
@@ -874,7 +717,7 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
          * @param <T> the result type of subtasks
          */
         static <T> Joiner<T, Stream<Subtask<T>>> allUntil(Predicate<Subtask<? extends T>> isDone) {
-            return new AllSubtasks<>(isDone);
+            return new Joiners.AllSubtasks<>(isDone);
         }
     }
 
@@ -904,7 +747,7 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
      * @since 24
      */
     @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
-    public sealed interface Config permits ConfigImpl {
+    sealed interface Config permits StructuredTaskScopeImpl.ConfigImpl {
         /**
          * {@return a new {@code Config} object with the given thread factory}
          * The other components are the same as this object. The thread factory is used by
@@ -925,7 +768,6 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
          * The other components are the same as this object. A scope is optionally
          * named for the purposes of monitoring and management.
          * @param name the name
-         * @see StructuredTaskScope#toString()
          */
         Config withName(String name);
 
@@ -950,7 +792,7 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
      * @since 24
      */
     @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
-    public static final class FailedException extends RuntimeException {
+    final class FailedException extends RuntimeException {
         @java.io.Serial
         static final long serialVersionUID = -1533055100078459923L;
 
@@ -972,7 +814,7 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
      * @see Config#withTimeout(Duration)
      */
     @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
-    public static final class TimeoutException extends RuntimeException {
+    final class TimeoutException extends RuntimeException {
         @java.io.Serial
         static final long serialVersionUID = 705788143955048766L;
 
@@ -1014,30 +856,10 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
      * @return a new scope
      * @param <T> the result type of subtasks executed in the scope
      * @param <R> the result type of the scope
-     * @since 24
      */
-    public static <T, R> StructuredTaskScope<T, R> open(Joiner<? super T, ? extends R> joiner,
-                                                        Function<Config, Config> configFunction) {
-        Objects.requireNonNull(joiner);
-
-        var config = (ConfigImpl) configFunction.apply(ConfigImpl.defaultConfig());
-        var scope = new StructuredTaskScope<T, R>(joiner, config.threadFactory(), config.name());
-
-        // schedule timeout
-        Duration timeout = config.timeout();
-        if (timeout != null) {
-            boolean scheduled = false;
-            try {
-                scope.scheduleTimeout(timeout);
-                scheduled = true;
-            } finally {
-                if (!scheduled) {
-                    scope.close();  // pop if scheduling timeout failed
-                }
-            }
-        }
-
-        return scope;
+    static <T, R> StructuredTaskScope<T, R> open(Joiner<? super T, ? extends R> joiner,
+                                                 Function<Config, Config> configFunction) {
+        return StructuredTaskScopeImpl.open(joiner, configFunction);
     }
 
     /**
@@ -1055,9 +877,8 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
      * @return a new scope
      * @param <T> the result type of subtasks executed in the scope
      * @param <R> the result type of the scope
-     * @since 24
      */
-    public static <T, R> StructuredTaskScope<T, R> open(Joiner<? super T, ? extends R> joiner) {
+    static <T, R> StructuredTaskScope<T, R> open(Joiner<? super T, ? extends R> joiner) {
         return open(joiner, Function.identity());
     }
 
@@ -1082,9 +903,8 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
      *
      * @param <T> the result type of subtasks
      * @return a new scope
-     * @since 24
      */
-    public static <T> StructuredTaskScope<T, Void> open() {
+    static <T> StructuredTaskScope<T, Void> open() {
         return open(Joiner.awaitAllSuccessfulOrThrow(), Function.identity());
     }
 
@@ -1131,39 +951,9 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
      * the same as when the scope was created
      * @throws RejectedExecutionException if the thread factory rejected creating a
      * thread to run the subtask
+     * @since 21
      */
-    public <U extends T> Subtask<U> fork(Callable<? extends U> task) {
-        Objects.requireNonNull(task);
-        ensureOwner();
-        ensureNotJoined();
-
-        var subtask = new SubtaskImpl<U>(this, task);
-
-        // notify joiner, even if cancelled
-        if (joiner.onFork(subtask)) {
-            cancel();
-        }
-
-        if (!cancelled) {
-            // create thread to run task
-            Thread thread = threadFactory.newThread(subtask);
-            if (thread == null) {
-                throw new RejectedExecutionException("Rejected by thread factory");
-            }
-
-            // attempt to start the thread
-            try {
-                flock.start(thread);
-            } catch (IllegalStateException e) {
-                // shutdown by another thread, or underlying flock is shutdown due
-                // to unstructured use
-            }
-        }
-
-        // force owner to join
-        state = ST_FORKED;
-        return subtask;
-    }
+    <U extends T> Subtask<U> fork(Callable<? extends U> task);
 
     /**
      * Starts a new thread in this scope to execute a task that does not return a
@@ -1183,12 +973,8 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
      * the same as when the scope was created
      * @throws RejectedExecutionException if the thread factory rejected creating a
      * thread to run the subtask
-     * @since 24
      */
-    public <U extends T> Subtask<U> fork(Runnable task) {
-        Objects.requireNonNull(task);
-        return fork(() -> { task.run(); return null; });
-    }
+    <U extends T> Subtask<U> fork(Runnable task);
 
     /**
      * Waits for all subtasks started in this scope to complete or the scope is cancelled.
@@ -1216,34 +1002,8 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
      * @throws TimeoutException if a timeout is set and the timeout expires before or
      * while waiting
      * @throws InterruptedException if interrupted while waiting
-     * @since 24
      */
-    public R join() throws InterruptedException {
-        ensureOwner();
-        ensureNotJoined();
-
-        // join started
-        state = ST_JOIN_STARTED;
-
-        // wait for all subtasks, the scope to be cancelled, or interrupt
-        flock.awaitAll();
-
-        // throw if timeout expired
-        if (timeoutExpired) {
-            throw new TimeoutException();
-        }
-        cancelTimeout();
-
-        // all subtasks completed or cancelled
-        state = ST_JOIN_COMPLETED;
-
-        // invoke joiner to get result
-        try {
-            return joiner.result();
-        } catch (Throwable e) {
-            throw new FailedException(e);
-        }
-    }
+    R join() throws InterruptedException;
 
     /**
      * {@return {@code true} if this scope is <a href="#Cancallation">cancelled</a> or in
@@ -1258,12 +1018,8 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
      * @apiNote A task with a lengthy "forking phase" (the code that executes before
      * it invokes {@link #join() join}) may use this method to avoid doing work in cases
      * where scope is cancelled by the completion of a previously forked subtask or timeout.
-     *
-     * @since 24
      */
-    public boolean isCancelled() {
-        return cancelled;
-    }
+    boolean isCancelled();
 
     /**
      * Closes this scope.
@@ -1296,349 +1052,8 @@ public final class StructuredTaskScope<T, R> implements AutoCloseable {
      * owner did not attempt to join after forking
      * @throws WrongThreadException if the current thread is not the scope owner
      * @throws StructureViolationException if a structure violation was detected
+     * @since 21
      */
     @Override
-    public void close() {
-        ensureOwner();
-        int s = state;
-        if (s == ST_CLOSED) {
-            return;
-        }
-
-        // cancel the scope if join did not complete
-        if (s < ST_JOIN_COMPLETED) {
-            cancel();
-            cancelTimeout();
-        }
-
-        // wait for stragglers
-        try {
-            flock.close();
-        } finally {
-            state = ST_CLOSED;
-        }
-
-        // throw ISE if the owner didn't join after forking
-        if (s == ST_FORKED) {
-            throw new IllegalStateException("Owner did not join after forking");
-        }
-    }
-
-    /**
-     * {@inheritDoc}  If a {@link Config#withName(String) name} for monitoring and
-     * monitoring purposes has been set then the string representation includes the name.
-     */
-    @Override
-    public String toString() {
-        return flock.name();
-    }
-
-    /**
-     * Subtask implementation, runs the task specified to the fork method.
-     */
-    private static final class SubtaskImpl<T> implements Subtask<T>, Runnable {
-        private static final AltResult RESULT_NULL = new AltResult(Subtask.State.SUCCESS);
-
-        private record AltResult(Subtask.State state, Throwable exception) {
-            AltResult(Subtask.State state) {
-                this(state, null);
-            }
-        }
-
-        private final StructuredTaskScope<? super T, ?> scope;
-        private final Callable<? extends T> task;
-        private volatile Object result;
-
-        SubtaskImpl(StructuredTaskScope<? super T, ?> scope, Callable<? extends T> task) {
-            this.scope = scope;
-            this.task = task;
-        }
-
-        @Override
-        public void run() {
-            T result = null;
-            Throwable ex = null;
-            try {
-                result = task.call();
-            } catch (Throwable e) {
-                ex = e;
-            }
-
-            // nothing to do if scope is cancelled
-            if (scope.isCancelled())
-                return;
-
-            // set result/exception and invoke onComplete
-            if (ex == null) {
-                this.result = (result != null) ? result : RESULT_NULL;
-            } else {
-                this.result = new AltResult(State.FAILED, ex);
-            }
-            scope.onComplete(this);
-        }
-
-        @Override
-        public Subtask.State state() {
-            Object result = this.result;
-            if (result == null) {
-                return State.UNAVAILABLE;
-            } else if (result instanceof AltResult alt) {
-                // null or failed
-                return alt.state();
-            } else {
-                return State.SUCCESS;
-            }
-        }
-
-        @Override
-        public T get() {
-            scope.ensureJoinedIfOwner();
-            Object result = this.result;
-            if (result instanceof AltResult) {
-                if (result == RESULT_NULL) return null;
-            } else if (result != null) {
-                @SuppressWarnings("unchecked")
-                T r = (T) result;
-                return r;
-            }
-            throw new IllegalStateException(
-                    "Result is unavailable or subtask did not complete successfully");
-        }
-
-        @Override
-        public Throwable exception() {
-            scope.ensureJoinedIfOwner();
-            Object result = this.result;
-            if (result instanceof AltResult alt && alt.state() == State.FAILED) {
-                return alt.exception();
-            }
-            throw new IllegalStateException(
-                    "Exception is unavailable or subtask did not complete with exception");
-        }
-
-        @Override
-        public String toString() {
-            String stateAsString = switch (state()) {
-                case UNAVAILABLE -> "[Unavailable]";
-                case SUCCESS     -> "[Completed successfully]";
-                case FAILED      -> {
-                    Throwable ex = ((AltResult) result).exception();
-                    yield "[Failed: " + ex + "]";
-                }
-            };
-            return Objects.toIdentityString(this) + stateAsString;
-        }
-    }
-
-    /**
-     * Maps a Subtask.State to an int that can be compared: UNAVAILABLE < FAILED < SUCCESS.
-     */
-    private static int subtaskStateToInt(Subtask.State s) {
-        return switch (s) {
-            case UNAVAILABLE -> 0;
-            case FAILED      -> 1;
-            case SUCCESS     -> 2;
-        };
-    }
-
-    // RUNNING < CANCELLED < FAILED < SUCCESS
-    private static final Comparator<Subtask.State> SUBTASK_STATE_COMPARATOR =
-            Comparator.comparingInt(StructuredTaskScope::subtaskStateToInt);
-
-    /**
-     * A joiner that returns a stream of all subtasks when all subtasks complete
-     * successfully. Cancels the scope if any subtask fails.
-     */
-    private static final class AllSuccessful<T> implements Joiner<T, Stream<Subtask<T>>> {
-        private static final VarHandle FIRST_EXCEPTION =
-                MhUtil.findVarHandle(MethodHandles.lookup(), "firstException", Throwable.class);
-
-        private volatile Throwable firstException;
-
-        // list of forked subtasks, only accessed by owner thread
-        private final List<Subtask<T>> subtasks = new ArrayList<>();
-
-        @Override
-        public boolean onFork(Subtask<? extends T> subtask) {
-            if (subtask.state() != Subtask.State.UNAVAILABLE) {
-                throw new IllegalArgumentException();
-            }
-            @SuppressWarnings("unchecked")
-            var s = (Subtask<T>) subtask;
-            subtasks.add(s);
-            return false;
-        }
-
-        @Override
-        public boolean onComplete(Subtask<? extends T> subtask) {
-            Subtask.State state = subtask.state();
-            if (state == Subtask.State.UNAVAILABLE) {
-                throw new IllegalArgumentException();
-            }
-            return (state == Subtask.State.FAILED)
-                    && (firstException == null)
-                    && FIRST_EXCEPTION.compareAndSet(this, null, subtask.exception());
-        }
-
-        @Override
-        public Stream<Subtask<T>> result() throws Throwable {
-            Throwable ex = firstException;
-            if (ex != null) {
-                throw ex;
-            } else {
-                return subtasks.stream();
-            }
-        }
-    }
-
-    /**
-     * A joiner that returns the result of the first subtask to complete successfully.
-     * Cancels the scope if any subtasks succeeds.
-     */
-    private static final class AnySuccessful<T> implements Joiner<T, T> {
-        private static final VarHandle SUBTASK =
-                MhUtil.findVarHandle(MethodHandles.lookup(), "subtask", Subtask.class);
-        private volatile Subtask<T> subtask;
-
-        @Override
-        public boolean onComplete(Subtask<? extends T> subtask) {
-            Subtask.State state = subtask.state();
-            if (state == Subtask.State.UNAVAILABLE) {
-                throw new IllegalArgumentException();
-            }
-            Subtask<T> s;
-            while (((s = this.subtask) == null)
-                    || SUBTASK_STATE_COMPARATOR.compare(s.state(), state) < 0) {
-                if (SUBTASK.compareAndSet(this, s, subtask)) {
-                    return (state == Subtask.State.SUCCESS);
-                }
-            }
-            return false;
-        }
-
-        @Override
-        public T result() throws Throwable {
-            Subtask<T> subtask = this.subtask;
-            if (subtask == null) {
-                throw new NoSuchElementException("No subtasks completed");
-            }
-            return switch (subtask.state()) {
-                case SUCCESS -> subtask.get();
-                case FAILED -> throw subtask.exception();
-                default -> throw new InternalError();
-            };
-        }
-    }
-
-    /**
-     * A joiner that that waits for all successful subtasks. Cancels the scope if any
-     * subtask fails.
-     */
-    private static final class AwaitSuccessful<T> implements Joiner<T, Void> {
-        private static final VarHandle FIRST_EXCEPTION =
-                MhUtil.findVarHandle(MethodHandles.lookup(), "firstException", Throwable.class);
-        private volatile Throwable firstException;
-
-        @Override
-        public boolean onComplete(Subtask<? extends T> subtask) {
-            return (subtask.state() == Subtask.State.FAILED)
-                    && (firstException == null)
-                    && FIRST_EXCEPTION.compareAndSet(this, null, subtask.exception());
-        }
-
-        @Override
-        public Void result() throws Throwable {
-            Throwable ex = firstException;
-            if (ex != null) {
-                throw ex;
-            } else {
-                return null;
-            }
-        }
-    }
-
-    /**
-     * A joiner that returns a stream of all subtasks.
-     */
-    private static class AllSubtasks<T> implements Joiner<T, Stream<Subtask<T>>> {
-        private final Predicate<Subtask<? extends T>> isDone;
-        // list of forked subtasks, only accessed by owner thread
-        private final List<Subtask<T>> subtasks = new ArrayList<>();
-
-        AllSubtasks(Predicate<Subtask<? extends T>> isDone) {
-            this.isDone = Objects.requireNonNull(isDone);
-        }
-
-        @Override
-        public boolean onFork(Subtask<? extends T> subtask) {
-            if (subtask.state() != Subtask.State.UNAVAILABLE) {
-                throw new IllegalArgumentException();
-            }
-            @SuppressWarnings("unchecked")
-            var s = (Subtask<T>) subtask;
-            subtasks.add(s);
-            return false;
-        }
-
-        @Override
-        public boolean onComplete(Subtask<? extends T> subtask) {
-            if (subtask.state() == Subtask.State.UNAVAILABLE) {
-                throw new IllegalArgumentException();
-            }
-            return isDone.test(subtask);
-        }
-
-        @Override
-        public Stream<Subtask<T>> result() {
-            return subtasks.stream();
-        }
-    }
-
-    /**
-     * Implementation of Config.
-     */
-    private record ConfigImpl(ThreadFactory threadFactory,
-                              String name,
-                              Duration timeout) implements Config {
-        static Config defaultConfig() {
-            return new ConfigImpl(Thread.ofVirtual().factory(), null, null);
-        }
-
-        @Override
-        public Config withThreadFactory(ThreadFactory threadFactory) {
-            return new ConfigImpl(Objects.requireNonNull(threadFactory), name, timeout);
-        }
-
-        @Override
-        public Config withName(String name) {
-            return new ConfigImpl(threadFactory, Objects.requireNonNull(name), timeout);
-        }
-
-        @Override
-        public Config withTimeout(Duration timeout) {
-            return new ConfigImpl(threadFactory, name, Objects.requireNonNull(timeout));
-        }
-    }
-
-    /**
-     * Used to schedule a task to cancel the scope when a timeout expires.
-     */
-    private static class TimerSupport {
-        private static final ScheduledExecutorService DELAYED_TASK_SCHEDULER;
-        static {
-            ScheduledThreadPoolExecutor stpe = (ScheduledThreadPoolExecutor)
-                Executors.newScheduledThreadPool(1, task -> {
-                    Thread t = InnocuousThread.newThread("StructuredTaskScope-Timer", task);
-                    t.setDaemon(true);
-                    return t;
-                });
-            stpe.setRemoveOnCancelPolicy(true);
-            DELAYED_TASK_SCHEDULER = stpe;
-        }
-
-        static Future<?> schedule(Duration timeout, Runnable task) {
-            long nanos = TimeUnit.NANOSECONDS.convert(timeout);
-            return DELAYED_TASK_SCHEDULER.schedule(task, nanos, TimeUnit.NANOSECONDS);
-        }
-    }
+    void close();
 }

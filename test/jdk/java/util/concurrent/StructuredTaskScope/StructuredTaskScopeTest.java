@@ -467,8 +467,8 @@ class StructuredTaskScopeTest {
                 return "foo";
             });
 
-            // join should throw
-            scheduleInterruptAt("java.util.concurrent.StructuredTaskScope.join");
+            // interrupt main thread when it blocks in join
+            scheduleInterruptAt("java.util.concurrent.StructuredTaskScopeImpl.join");
             try {
                 scope.join();
                 fail("join did not throw");
@@ -821,7 +821,7 @@ class StructuredTaskScopeTest {
                 }
 
                 // interrupt main thread when it blocks in close
-                interruptThreadAt(mainThread, "java.util.concurrent.StructuredTaskScope.close");
+                interruptThreadAt(mainThread, "java.util.concurrent.StructuredTaskScopeImpl.close");
 
                 Thread.sleep(Duration.ofMillis(100)); // force close to wait
                 done.set(true);
