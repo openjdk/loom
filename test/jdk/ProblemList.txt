@@ -824,3 +824,8 @@ java/awt/Checkbox/CheckboxBoxSizeTest.java 8340870 windows-all
 java/awt/Checkbox/CheckboxIndicatorSizeTest.java 8340870 windows-all
 java/awt/Checkbox/CheckboxNullLabelTest.java 8340870 windows-all
 java/awt/dnd/WinMoveFileToShellTest.java 8341665 windows-all
+
+############################################################################
+
+# TypeElement to indicate class or interface included in id
+tools/sincechecker/modules/java_base/CheckSince_javaBase.java 0000000 generic-all

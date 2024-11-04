@@ -345,7 +345,7 @@ import jdk.internal.javac.PreviewFeature;
  * @param <R> the result type of the scope
  *
  * @jls 17.4.5 Happens-before Order
- * @since 24
+ * @since 21
  */
 @PreviewFeature(feature = PreviewFeature.Feature.STRUCTURED_CONCURRENCY)
 public sealed interface StructuredTaskScope<T, R>
@@ -856,6 +856,7 @@ public sealed interface StructuredTaskScope<T, R>
      * @return a new scope
      * @param <T> the result type of subtasks executed in the scope
      * @param <R> the result type of the scope
+     * @since 24
      */
     static <T, R> StructuredTaskScope<T, R> open(Joiner<? super T, ? extends R> joiner,
                                                  Function<Config, Config> configFunction) {
@@ -877,6 +878,7 @@ public sealed interface StructuredTaskScope<T, R>
      * @return a new scope
      * @param <T> the result type of subtasks executed in the scope
      * @param <R> the result type of the scope
+     * @since 24
      */
     static <T, R> StructuredTaskScope<T, R> open(Joiner<? super T, ? extends R> joiner) {
         return open(joiner, Function.identity());
@@ -903,6 +905,7 @@ public sealed interface StructuredTaskScope<T, R>
      *
      * @param <T> the result type of subtasks
      * @return a new scope
+     * @since 24
      */
     static <T> StructuredTaskScope<T, Void> open() {
         return open(Joiner.awaitAllSuccessfulOrThrow(), Function.identity());
@@ -951,7 +954,6 @@ public sealed interface StructuredTaskScope<T, R>
      * the same as when the scope was created
      * @throws RejectedExecutionException if the thread factory rejected creating a
      * thread to run the subtask
-     * @since 21
      */
     <U extends T> Subtask<U> fork(Callable<? extends U> task);
 
@@ -973,6 +975,7 @@ public sealed interface StructuredTaskScope<T, R>
      * the same as when the scope was created
      * @throws RejectedExecutionException if the thread factory rejected creating a
      * thread to run the subtask
+     * @since 24
      */
     <U extends T> Subtask<U> fork(Runnable task);
 
@@ -1002,6 +1005,7 @@ public sealed interface StructuredTaskScope<T, R>
      * @throws TimeoutException if a timeout is set and the timeout expires before or
      * while waiting
      * @throws InterruptedException if interrupted while waiting
+     * @since 24
      */
     R join() throws InterruptedException;
 
@@ -1018,6 +1022,8 @@ public sealed interface StructuredTaskScope<T, R>
      * @apiNote A task with a lengthy "forking phase" (the code that executes before
      * it invokes {@link #join() join}) may use this method to avoid doing work in cases
      * where scope is cancelled by the completion of a previously forked subtask or timeout.
+     *
+     * @since 24
      */
     boolean isCancelled();
 
@@ -1052,7 +1058,6 @@ public sealed interface StructuredTaskScope<T, R>
      * owner did not attempt to join after forking
      * @throws WrongThreadException if the current thread is not the scope owner
      * @throws StructureViolationException if a structure violation was detected
-     * @since 21
      */
     @Override
     void close();
