@@ -3959,7 +3959,7 @@ JVM_ENTRY(void, JVM_VirtualThreadDisableSuspend(JNIEnv* env, jclass clazz, jbool
 #endif
 JVM_END
 
-JVM_ENTRY_NO_ENV(void, JVM_VirtualThreadPinnedEvent(JNIEnv* env, jclass ignored, jstring op))
+JVM_ENTRY(void, JVM_VirtualThreadPinnedEvent(JNIEnv* env, jclass ignored, jstring op))
 #if INCLUDE_JFR
   int freeze_result = THREAD->last_freeze_fail_result();
   assert(freeze_result != freeze_ok, "sanity check");
