@@ -490,7 +490,7 @@ void ObjectMonitor::enter_with_contention_mark(JavaThread *current, ObjectMonito
   }
   EventVirtualThreadPinned vthread_pinned_event;
 
-  int preempt_result = -1;
+  freeze_result result;
 
   { // Change java thread status to indicate blocked on monitor enter.
     JavaThreadBlockedOnMonitorEnterState jtbmes(current, this);
@@ -511,8 +511,8 @@ void ObjectMonitor::enter_with_contention_mark(JavaThread *current, ObjectMonito
 
     ContinuationEntry* ce = current->last_continuation();
     if (ce != nullptr && ce->is_virtual_thread()) {
-      preempt_result = Continuation::try_preempt(current, ce->cont_oop(current));
-      if (preempt_result == freeze_ok) {
+      result = Continuation::try_preempt(current, ce->cont_oop(current));
+      if (result == freeze_ok) {
         bool acquired = VThreadMonitorEnter(current);
         if (acquired) {
           // We actually acquired the monitor while trying to add the vthread to the
@@ -599,8 +599,8 @@ void ObjectMonitor::enter_with_contention_mark(JavaThread *current, ObjectMonito
 
   ContinuationEntry* ce = current->last_continuation();
   if (ce != nullptr && ce->is_virtual_thread()) {
-    assert(preempt_result != freeze_ok, "sanity check");
-    current->post_vthread_pinned_event(&vthread_pinned_event, "Contended monitor enter", preempt_result);
+    assert(result != freeze_ok, "sanity check");
+    current->post_vthread_pinned_event(&vthread_pinned_event, "Contended monitor enter", result);
   }
 
   OM_PERFDATA_OP(ContendedLockAttempts, inc());
@@ -1631,7 +1631,7 @@ static void vthread_monitor_waited_event(JavaThread *current, ObjectWaiter* node
 
   JRT_BLOCK
     if (event->should_commit()) {
-      long timeout = java_lang_VirtualThread::waitTimeout(current->vthread());
+      long timeout = java_lang_VirtualThread::timeout(current->vthread());
       post_monitor_wait_event(event, node->_monitor, node->_notifier_tid, timeout, timed_out);
     }
     if (JvmtiExport::should_post_monitor_waited()) {
@@ -1686,11 +1686,11 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
 
   current->set_current_waiting_monitor(this);
 
-  int preempt_result = -1;
+  freeze_result result;
   ContinuationEntry* ce = current->last_continuation();
   if (ce != nullptr && ce->is_virtual_thread()) {
-    preempt_result = Continuation::try_preempt(current, ce->cont_oop(current));
-    if (preempt_result == freeze_ok) {
+    result = Continuation::try_preempt(current, ce->cont_oop(current));
+    if (result == freeze_ok) {
       VThreadWait(current, millis);
       current->set_current_waiting_monitor(nullptr);
       return;
@@ -1825,8 +1825,8 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
     }
 
     if (ce != nullptr && ce->is_virtual_thread()) {
-      assert(preempt_result != freeze_ok, "sanity check");
-      current->post_vthread_pinned_event(&vthread_pinned_event, "Object.wait", preempt_result);
+      assert(result != freeze_ok, "sanity check");
+      current->post_vthread_pinned_event(&vthread_pinned_event, "Object.wait", result);
     }
 
     OrderAccess::fence();
@@ -2028,7 +2028,7 @@ void ObjectMonitor::VThreadWait(JavaThread* current, jlong millis) {
 
   assert(java_lang_VirtualThread::state(vthread) == java_lang_VirtualThread::RUNNING, "wrong state for vthread");
   java_lang_VirtualThread::set_state(vthread, millis == 0 ? java_lang_VirtualThread::WAITING : java_lang_VirtualThread::TIMED_WAITING);
-  java_lang_VirtualThread::set_waitTimeout(vthread, millis);
+  java_lang_VirtualThread::set_timeout(vthread, millis);
 
   // Save the ObjectWaiter* in the chunk since we will need it when resuming execution.
   oop cont = java_lang_VirtualThread::continuation(vthread);

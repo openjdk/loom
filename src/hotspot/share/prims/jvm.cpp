@@ -3961,14 +3961,14 @@ JVM_END
 
 JVM_ENTRY(void, JVM_VirtualThreadPinnedEvent(JNIEnv* env, jclass ignored, jstring op))
 #if INCLUDE_JFR
-  int freeze_result = THREAD->last_freeze_fail_result();
-  assert(freeze_result != freeze_ok, "sanity check");
+  freeze_result result = THREAD->last_freeze_fail_result();
+  assert(result != freeze_ok, "sanity check");
   EventVirtualThreadPinned event(UNTIMED);
   event.set_starttime(THREAD->last_freeze_fail_time());
   if (event.should_commit()) {
     ResourceMark rm(THREAD);
     const char *str = java_lang_String::as_utf8_string(JNIHandles::resolve_non_null(op));
-    THREAD->post_vthread_pinned_event(&event, str, freeze_result);
+    THREAD->post_vthread_pinned_event(&event, str, result);
   }
 #endif
 JVM_END

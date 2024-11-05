@@ -1228,7 +1228,7 @@ private:
 
 #if INCLUDE_JFR
   // Support for jdk.VirtualThreadPinned event
-  int _last_freeze_fail_result;
+  freeze_result _last_freeze_fail_result;
   Ticks _last_freeze_fail_time;
 #endif
 
@@ -1242,11 +1242,12 @@ public:
 
 #if INCLUDE_JFR
   // Support for jdk.VirtualThreadPinned event
-  int last_freeze_fail_result() { return _last_freeze_fail_result; }
+  freeze_result last_freeze_fail_result() { return _last_freeze_fail_result; }
   Ticks& last_freeze_fail_time() { return _last_freeze_fail_time; }
-  void set_last_freeze_fail_result(int result);
-  void post_vthread_pinned_event(EventVirtualThreadPinned* event, const char* op, int result);
+  void set_last_freeze_fail_result(freeze_result result);
 #endif
+  void post_vthread_pinned_event(EventVirtualThreadPinned* event, const char* op, freeze_result result) NOT_JFR_RETURN();
+
 
   // This is only for use by JVMTI RawMonitorWait. It emulates the actions of
   // the Java code in Object::wait which are not present in RawMonitorWait.
@@ -1355,16 +1356,15 @@ class ThreadOnMonitorWaitedEvent {
 };
 
 class ThreadInClassInitializer : public StackObj {
+  JavaThread* _thread;
   InstanceKlass* _previous;
  public:
-  ThreadInClassInitializer(InstanceKlass* ik) {
-    JavaThread* current = JavaThread::current();
-    _previous = current->class_being_initialized();
-    current->set_class_being_initialized(ik);
+  ThreadInClassInitializer(JavaThread* thread, InstanceKlass* ik) : _thread(thread) {
+    _previous = _thread->class_being_initialized();
+    _thread->set_class_being_initialized(ik);
   }
   ~ThreadInClassInitializer() {
-    JavaThread* current = JavaThread::current();
-    current->set_class_being_initialized(_previous);
+    _thread->set_class_being_initialized(_previous);
   }
 };
 

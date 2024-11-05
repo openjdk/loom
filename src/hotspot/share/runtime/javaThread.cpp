@@ -2330,15 +2330,15 @@ void JavaThread::add_oop_handles_for_release() {
 }
 
 #if INCLUDE_JFR
-void JavaThread::set_last_freeze_fail_result(int result) {
+void JavaThread::set_last_freeze_fail_result(freeze_result result) {
   assert(result != freeze_ok, "sanity check");
   _last_freeze_fail_result = result;
   _last_freeze_fail_time = Ticks::now();
 }
 
 // Post jdk.VirtualThreadPinned event
-void JavaThread::post_vthread_pinned_event(EventVirtualThreadPinned* event, const char* op, int freeze_result) {
-  assert(freeze_result != freeze_ok, "sanity check");
+void JavaThread::post_vthread_pinned_event(EventVirtualThreadPinned* event, const char* op, freeze_result result) {
+  assert(result != freeze_ok, "sanity check");
   if (event->should_commit()) {
     char reason[256];
     if (class_to_be_initialized() != nullptr) {
@@ -2351,10 +2351,10 @@ void JavaThread::post_vthread_pinned_event(EventVirtualThreadPinned* event, cons
       jio_snprintf(reason, sizeof(reason), "VM call to %s.<clinit> on stack",
                    class_being_initialized()->external_name());
       event->set_pinnedReason(reason);
-    } else if (freeze_result == freeze_pinned_native) {
+    } else if (result == freeze_pinned_native) {
       event->set_pinnedReason("Native or VM frame on stack");
     } else {
-      jio_snprintf(reason, sizeof(reason), "Freeze or preempt failed (%d)", freeze_result);
+      jio_snprintf(reason, sizeof(reason), "Freeze or preempt failed (%d)", result);
       event->set_pinnedReason(reason);
     }
     event->set_blockingOperation(op);
