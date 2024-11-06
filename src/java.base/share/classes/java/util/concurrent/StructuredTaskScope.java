@@ -36,7 +36,7 @@ import jdk.internal.javac.PreviewFeature;
  * where execution of a <em>task</em> (a unit of work) splits into several concurrent
  * subtasks, and where the subtasks must complete before the task continues. A {@code
  * StructuredTaskScope} can be used to ensure that the lifetime of a concurrent operation
- * is confined by a <em>syntax block</em>, just like that of a sequential operation in
+ * is confined by a <em>syntax block</em>, similar to that of a sequential operation in
  * structured programming.
  *
  * <p> {@code StructuredTaskScope} defines the static method {@link #open() open} to open
@@ -831,8 +831,10 @@ public sealed interface StructuredTaskScope<T, R>
      *
      * <p> The {@code configFunction} is called with the default configuration and returns
      * the configuration for the new scope. The function may, for example, set the
-     * {@linkplain Config#withThreadFactory(ThreadFactory) ThreadFactory} or set
-     * a {@linkplain Config#withTimeout(Duration) timeout}.
+     * {@linkplain Config#withThreadFactory(ThreadFactory) ThreadFactory} or set a
+     * {@linkplain Config#withTimeout(Duration) timeout}. If the function completes with
+     * an exception or error then it is propagated by this method. If the function returns
+     * {@code null} then {@code NullPointerException} is thrown.
      *
      * <p> If a {@code ThreadFactory} is set then its {@link ThreadFactory#newThread(Runnable)
      * newThread} method will be called to create threads when {@linkplain #fork(Callable)
@@ -912,25 +914,31 @@ public sealed interface StructuredTaskScope<T, R>
     }
 
     /**
-     * Starts a new thread in this scope to execute a value-returning task, thus
-     * creating a <em>subtask</em>. The value-returning task is provided to this method
-     * as a {@link Callable}, the thread executes the task's {@link Callable#call() call}
-     * method.
+     * Starts a new thread in this scope to execute a value-returning task, thus creating
+     * a <em>subtask</em>. The value-returning task is provided to this method as a
+     * {@link Callable}, the thread executes its {@link Callable#call() call} method.
      *
-     * <p> This method first creates a {@link Subtask Subtask} to represent the <em>forked
-     * subtask</em>. It invokes the joiner's {@link Joiner#onFork(Subtask) onFork} method
-     * with the {@code Subtask} object. If the {@code onFork} completes with an exception
-     * or error then it is propagated by the {@code fork} method. If the scope is cancelled,
-     * or {@code onFork} returns {@code true} to cancel the scope, then this method returns
-     * the {@code Subtask}, in the {@link Subtask.State#UNAVAILABLE UNAVAILABLE} state,
-     * without creating a thread to execute the subtask. If the scope is not cancelled
+     * <p> This method first creates a {@link Subtask Subtask} object to represent the
+     * <em>forked subtask</em>. It invokes the joiner's {@link Joiner#onFork(Subtask) onFork}
+     * method with the subtask in the {@link Subtask.State#UNAVAILABLE UNAVAILABLE} state.
+     * If the {@code onFork} completes with an exception or error then it is propagated by
+     * the {@code fork} method without creating a thread. If the scope is already
+     * <a href="#Cancallation">cancelled</a>, or {@code onFork} returns {@code true} to
+     * cancel the scope, then this method returns the {@code Subtask}, in the
+     * {@link Subtask.State#UNAVAILABLE UNAVAILABLE} state, without creating a thread to
+     * execute the subtask.
+     *
+     * <p> If the scope is not cancelled, and the {@code onFork} method returns {@code false},
      * then a thread is created with the {@link ThreadFactory} configured when the scope
-     * was created, and the thread is started. Forking a subtask inherits the current thread's
+     * was opened, and the thread is started. Forking a subtask inherits the current thread's
      * {@linkplain ScopedValue scoped value} bindings. The bindings must match the bindings
      * captured when the scope was opened. If the subtask completes (successfully or with
      * an exception) before the scope is cancelled, then the thread invokes the joiner's
-     * {@link Joiner#onComplete(Subtask) onComplete} method with subtask in the
+     * {@link Joiner#onComplete(Subtask) onComplete} method with the subtask in the
      * {@link Subtask.State#SUCCESS SUCCESS} or {@link Subtask.State#FAILED FAILED} state.
+     * If the {@code onComplete} method completes with an exception or error, then the
+     * {@linkplain Thread.UncaughtExceptionHandler uncaught exception handler} is invoked
+     * with the exception or error before the thread terminates.
      *
      * <p> This method returns the {@link Subtask Subtask} object. In some usages, this
      * object may be used to get its result. In other cases it may be used for correlation

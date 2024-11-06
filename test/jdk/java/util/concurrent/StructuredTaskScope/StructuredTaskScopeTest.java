@@ -60,6 +60,7 @@ import java.util.concurrent.StructuredTaskScope.Subtask;
 import java.util.concurrent.StructureViolationException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -928,6 +929,33 @@ class StructuredTaskScopeTest {
     }
 
     /**
+     * Test Joiner.onComplete throwing exception causes UHE to be invoked.
+     */
+    @Test
+    void testOnCompleteThrows() throws Exception {
+        var joiner = new Joiner<String, Void>() {
+            @Override
+            public boolean onComplete(Subtask<? extends String> subtask) {
+                throw new FooException();
+            }
+            @Override
+            public Void result() {
+                return null;
+            }
+        };
+        var excRef = new AtomicReference<Throwable>();
+        Thread.UncaughtExceptionHandler uhe = (t, e) -> excRef.set(e);
+        ThreadFactory factory = Thread.ofPlatform()
+                .uncaughtExceptionHandler(uhe)
+                .factory();
+        try (var scope = StructuredTaskScope.open(joiner, cf -> cf.withThreadFactory(factory))) {
+            scope.fork(() -> "foo");
+            scope.join();
+            assertInstanceOf(FooException.class, excRef.get());
+        }
+    }
+
+    /**
      * Test Joiner.onComplete returning true to cancel execution.
      */
     @Test
@@ -1409,6 +1437,16 @@ class StructuredTaskScopeTest {
     }
 
     /**
+     * Test the Config function apply method throwing an exception.
+     */
+    @Test
+    void testConfigFunctionThrows() throws Exception {
+        assertThrows(FooException.class,
+                () -> StructuredTaskScope.open(Joiner.awaitAll(),
+                                               cf -> { throw new FooException(); }));
+    }
+
+    /**
      * Test Config equals/hashCode/toString
      */
     @Test
@@ -1483,8 +1521,6 @@ class StructuredTaskScopeTest {
                 () -> StructuredTaskScope.open(null, cf -> cf));
         assertThrows(NullPointerException.class,
                 () -> StructuredTaskScope.open(Joiner.awaitAll(), null));
-        assertThrows(NullPointerException.class,
-                () -> StructuredTaskScope.open(Joiner.awaitAll(), cf -> null));
 
         assertThrows(NullPointerException.class, () -> Joiner.allUntil(null));
 
@@ -1494,7 +1530,9 @@ class StructuredTaskScopeTest {
             assertThrows(NullPointerException.class, () -> scope.fork((Runnable) null));
         }
 
-        // withXXX
+        // Config and withXXX methods
+        assertThrows(NullPointerException.class,
+                () -> StructuredTaskScope.open(Joiner.awaitAll(), cf -> null));
         assertThrows(NullPointerException.class,
                 () -> StructuredTaskScope.open(Joiner.awaitAll(), cf -> cf.withName(null)));
         assertThrows(NullPointerException.class,
