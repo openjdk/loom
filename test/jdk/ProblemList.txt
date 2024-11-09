@@ -563,6 +563,8 @@ javax/management/monitor/DerivedGaugeMonitorTest.java           8042211 generic-
 
 javax/management/remote/mandatory/connection/BrokenConnectionTest.java 8262312 linux-all
 
+javax/management/remote/mandatory/notif/EmptyDomainNotificationTest.java 8343838 generic-all
+
 ############################################################################
 
 # jdk_net
@@ -830,4 +832,4 @@ java/awt/dnd/WinMoveFileToShellTest.java 8341665 windows-all
 ############################################################################
 
 # TypeElement to indicate class or interface included in id
-tools/sincechecker/modules/java_base/CheckSince_javaBase.java 0000000 generic-all
+tools/sincechecker/modules/java.base/JavaBaseCheckSince.java 8343598 generic-all
