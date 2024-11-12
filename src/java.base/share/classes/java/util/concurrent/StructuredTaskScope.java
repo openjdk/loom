@@ -917,9 +917,10 @@ public sealed interface StructuredTaskScope<T, R>
     }
 
     /**
-     * Starts a new thread in this scope to execute a value-returning task, thus creating
-     * a <em>subtask</em>. The value-returning task is provided to this method as a
-     * {@link Callable}, the thread executes its {@link Callable#call() call} method.
+     * Fork a subtask by starting a new thread in this scope to execute a value-returning
+     * method. The new thread executes the subtask concurrently with the current thread.
+     * The parameter to this method is a {@link Callable}, the new thread executes its
+     * {@link Callable#call() call()} method.
      *
      * <p> This method first creates a {@link Subtask Subtask} object to represent the
      * <em>forked subtask</em>. It invokes the joiner's {@link Joiner#onFork(Subtask) onFork}
@@ -969,12 +970,13 @@ public sealed interface StructuredTaskScope<T, R>
     <U extends T> Subtask<U> fork(Callable<? extends U> task);
 
     /**
-     * Starts a new thread in this scope to execute a task that does not return a
-     * result, creating a <em>subtask</em>.
+     * Fork a subtask by starting a new thread in this scope to execute a method that
+     * does not return a result.
      *
-     * <p> This method works exactly the same as {@link #fork(Callable)} except that
-     * the task is provided to this method as a {@link Runnable}, the thread executes
-     * the task's {@link Runnable#run() run} method, and its result is {@code null}.
+     * <p> This method works exactly the same as {@link #fork(Callable)} except that the
+     * parameter to this method is a {@link Runnable}, the new thread executes its
+     * {@link Runnable#run() run} method, and {@link Subtask#get() Subtask.get()} returns
+     * {@code null} if the subtask completes successfully.
      *
      * @param task the task for the thread to execute
      * @param <U> the result type
