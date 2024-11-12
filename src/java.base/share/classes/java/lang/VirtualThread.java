@@ -1026,8 +1026,6 @@ final class VirtualThread extends BaseVirtualThread {
     @SuppressWarnings("removal")
     public void interrupt() {
         if (Thread.currentThread() != this) {
-            checkAccess();
-
             // if current thread is a virtual thread then prevent it from being
             // suspended or unmounted when entering or holding interruptLock
             Interruptible blocker;
@@ -1428,8 +1426,7 @@ final class VirtualThread extends BaseVirtualThread {
      * ForkJoinPool instance.
      */
     private static Executor createDefaultScheduler() {
-        String propName = "jdk.virtualThreadScheduler.implClass";
-        String propValue = GetPropertyAction.privilegedGetProperty(propName);
+        String propValue = System.getProperty("jdk.virtualThreadScheduler.implClass");
         if (propValue != null) {
             try {
                 Class<?> clazz = Class.forName(propValue, true,
@@ -1450,39 +1447,32 @@ final class VirtualThread extends BaseVirtualThread {
     /**
      * Creates the default ForkJoinPool scheduler.
      */
-    @SuppressWarnings("removal")
     private static ForkJoinPool createDefaultForkJoinPoolScheduler() {
-        ForkJoinWorkerThreadFactory factory = pool -> {
-            PrivilegedAction<ForkJoinWorkerThread> pa = () -> new CarrierThread(pool);
-            return AccessController.doPrivileged(pa);
-        };
-        PrivilegedAction<ForkJoinPool> pa = () -> {
-            int parallelism, maxPoolSize, minRunnable;
-            String parallelismValue = System.getProperty("jdk.virtualThreadScheduler.parallelism");
-            String maxPoolSizeValue = System.getProperty("jdk.virtualThreadScheduler.maxPoolSize");
-            String minRunnableValue = System.getProperty("jdk.virtualThreadScheduler.minRunnable");
-            if (parallelismValue != null) {
-                parallelism = Integer.parseInt(parallelismValue);
-            } else {
-                parallelism = Runtime.getRuntime().availableProcessors();
-            }
-            if (maxPoolSizeValue != null) {
-                maxPoolSize = Integer.parseInt(maxPoolSizeValue);
-                parallelism = Integer.min(parallelism, maxPoolSize);
-            } else {
-                maxPoolSize = Integer.max(parallelism, 256);
-            }
-            if (minRunnableValue != null) {
-                minRunnable = Integer.parseInt(minRunnableValue);
-            } else {
-                minRunnable = Integer.max(parallelism / 2, 1);
-            }
-            Thread.UncaughtExceptionHandler handler = (t, e) -> { };
-            boolean asyncMode = true; // FIFO
-            return new ForkJoinPool(parallelism, factory, handler, asyncMode,
-                         0, maxPoolSize, minRunnable, pool -> true, 30, SECONDS);
-        };
-        return AccessController.doPrivileged(pa);
+        ForkJoinWorkerThreadFactory factory = pool -> new CarrierThread(pool);
+        int parallelism, maxPoolSize, minRunnable;
+        String parallelismValue = System.getProperty("jdk.virtualThreadScheduler.parallelism");
+        String maxPoolSizeValue = System.getProperty("jdk.virtualThreadScheduler.maxPoolSize");
+        String minRunnableValue = System.getProperty("jdk.virtualThreadScheduler.minRunnable");
+        if (parallelismValue != null) {
+            parallelism = Integer.parseInt(parallelismValue);
+        } else {
+            parallelism = Runtime.getRuntime().availableProcessors();
+        }
+        if (maxPoolSizeValue != null) {
+            maxPoolSize = Integer.parseInt(maxPoolSizeValue);
+            parallelism = Integer.min(parallelism, maxPoolSize);
+        } else {
+            maxPoolSize = Integer.max(parallelism, 256);
+        }
+        if (minRunnableValue != null) {
+            minRunnable = Integer.parseInt(minRunnableValue);
+        } else {
+            minRunnable = Integer.max(parallelism / 2, 1);
+        }
+        Thread.UncaughtExceptionHandler handler = (t, e) -> { };
+        boolean asyncMode = true; // FIFO
+        return new ForkJoinPool(parallelism, factory, handler, asyncMode,
+                     0, maxPoolSize, minRunnable, pool -> true, 30, SECONDS);
     }
 
     /**
