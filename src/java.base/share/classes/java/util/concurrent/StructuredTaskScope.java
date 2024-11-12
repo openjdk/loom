@@ -991,24 +991,20 @@ public sealed interface StructuredTaskScope<T, R>
     <U extends T> Subtask<U> fork(Runnable task);
 
     /**
-     * Waits for all subtasks started in this scope to complete or the scope is cancelled.
-     * If a {@linkplain Config#withTimeout(Duration) timeout} has been set then the scope
-     * is cancelled if the timeout expires before or while waiting.
-     * Once finished waiting, the {@code Joiner}'s {@link Joiner#result() result} method
-     * is invoked to get the result or throw an exception. If the {@code result} method
-     * throws then this method throws {@code FailedException} with the exception thrown
-     * by the {@code result()} method as the cause.
+     * Returns the result, or throws, after waiting for all subtasks to complete or
+     * the scope to be <a href="#Cancallation">cancelled</a>.
      *
-     * <p> This method waits for all subtasks by waiting for all threads {@linkplain
-     * #fork(Callable) started} in this scope to finish execution. It stops waiting
-     * when all threads finish, the {@code Joiner}'s {@link Joiner#onFork(Subtask)
-     * onFork} or {@link Joiner#onComplete(Subtask) onComplete} returns {@code true}
-     * to cancel the scope, the timeout (if set) expires, or the current thread is
-     * {@linkplain Thread#interrupt() interrupted}.
+     * <p> This method waits for all subtasks started in this scope to complete or the
+     * scope to be cancelled. If a {@linkplain Config#withTimeout(Duration) timeout} is
+     * configured and the timeout expires before or while waiting, then the scope is
+     * cancelled and {@link TimeoutException TimeoutException} is thrown. Once finished
+     * waiting, the {@code Joiner}'s {@link Joiner#result() result()} method is invoked
+     * to get the result or throw an exception. If the {@code result()} method throws
+     * then this method throws {@code FailedException} with the exception as the cause.
      *
      * <p> This method may only be invoked by the scope owner, and only once.
      *
-     * @return the {@link Joiner#result() result}
+     * @return the result
      * @throws WrongThreadException if the current thread is not the scope owner
      * @throws IllegalStateException if already joined or this scope is closed
      * @throws FailedException if the <i>outcome</i> is an exception, thrown with the
