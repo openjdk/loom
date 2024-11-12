@@ -25,8 +25,6 @@
 package java.lang;
 
 import java.lang.reflect.Constructor;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Objects;
@@ -36,7 +34,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinPool.ForkJoinWorkerThreadFactory;
 import java.util.concurrent.ForkJoinTask;
-import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -61,7 +58,6 @@ import jdk.internal.vm.annotation.JvmtiHideEvents;
 import jdk.internal.vm.annotation.JvmtiMountTransition;
 import jdk.internal.vm.annotation.ReservedStackAccess;
 import sun.nio.ch.Interruptible;
-import sun.security.action.GetPropertyAction;
 import static java.util.concurrent.TimeUnit.*;
 
 /**
@@ -1489,7 +1485,7 @@ final class VirtualThread extends BaseVirtualThread {
      */
     private static ScheduledExecutorService[] createDelayedTaskSchedulers() {
         String propName = "jdk.virtualThreadScheduler.timerQueues";
-        String propValue = GetPropertyAction.privilegedGetProperty(propName);
+        String propValue = System.getProperty(propName);
         int queueCount;
         if (propValue != null) {
             queueCount = Integer.parseInt(propValue);
