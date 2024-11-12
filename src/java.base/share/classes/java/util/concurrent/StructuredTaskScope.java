@@ -642,7 +642,7 @@ public sealed interface StructuredTaskScope<T, R>
          * that do not return a result.
          *
          * <p> This Joiner can also be used for <em>fan-in</em> scenarios where subtasks
-         * for forked to handle incoming connections and the number of subtasks is unbounded.
+         * are forked to handle incoming connections and the number of subtasks is unbounded.
          * In this example, the thread executing the {@code acceptLoop} method will only
          * stop when interrupted or the listener socket is closed asynchronously.
          * {@snippet lang=java :
