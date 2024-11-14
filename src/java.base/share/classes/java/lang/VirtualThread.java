@@ -1019,7 +1019,6 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     @Override
-    @SuppressWarnings("removal")
     public void interrupt() {
         if (Thread.currentThread() != this) {
             // if current thread is a virtual thread then prevent it from being
