@@ -696,7 +696,7 @@ void JMXStartRemoteDCmd::execute(DCmdSource source, TRAPS) {
 
     loadAgentModule(CHECK);
     Handle loader = Handle(THREAD, SystemDictionary::java_system_loader());
-    Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::jdk_internal_agent_Agent(), loader, Handle(), true, CHECK);
+    Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::jdk_internal_agent_Agent(), loader, true, CHECK);
 
     JavaValue result(T_VOID);
 
@@ -769,7 +769,7 @@ void JMXStartLocalDCmd::execute(DCmdSource source, TRAPS) {
 
     loadAgentModule(CHECK);
     Handle loader = Handle(THREAD, SystemDictionary::java_system_loader());
-    Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::jdk_internal_agent_Agent(), loader, Handle(), true, CHECK);
+    Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::jdk_internal_agent_Agent(), loader, true, CHECK);
 
     JavaValue result(T_VOID);
     JavaCalls::call_static(&result, k, vmSymbols::startLocalAgent_name(), vmSymbols::void_method_signature(), CHECK);
@@ -786,7 +786,7 @@ void JMXStopRemoteDCmd::execute(DCmdSource source, TRAPS) {
 
     loadAgentModule(CHECK);
     Handle loader = Handle(THREAD, SystemDictionary::java_system_loader());
-    Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::jdk_internal_agent_Agent(), loader, Handle(), true, CHECK);
+    Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::jdk_internal_agent_Agent(), loader, true, CHECK);
 
     JavaValue result(T_VOID);
     JavaCalls::call_static(&result, k, vmSymbols::stopRemoteAgent_name(), vmSymbols::void_method_signature(), CHECK);
@@ -807,7 +807,7 @@ void JMXStatusDCmd::execute(DCmdSource source, TRAPS) {
 
   loadAgentModule(CHECK);
   Handle loader = Handle(THREAD, SystemDictionary::java_system_loader());
-  Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::jdk_internal_agent_Agent(), loader, Handle(), true, CHECK);
+  Klass* k = SystemDictionary::resolve_or_fail(vmSymbols::jdk_internal_agent_Agent(), loader, true, CHECK);
 
   JavaValue result(T_OBJECT);
   JavaCalls::call_static(&result, k, vmSymbols::getAgentStatus_name(), vmSymbols::void_string_signature(), CHECK);
