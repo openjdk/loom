@@ -38,14 +38,12 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.IntStream;
 import java.lang.management.ManagementFactory;
 import jdk.management.VirtualThreadSchedulerMXBean;
 
@@ -99,40 +97,6 @@ class VThreadSummaryTest {
         jcmd().shouldContain("Read I/O pollers:")
                 .shouldContain("Write I/O pollers:")
                 .shouldContain("[0] sun.nio.ch");
-    }
-
-    /**
-     * Test that the output includes thread groupings.
-     */
-    @Test
-    void testThreadGroupings() {
-        // ensure common pool is initialized
-        CompletableFuture.runAsync(() -> { });
-
-        try (var pool = Executors.newFixedThreadPool(1);
-             var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-
-            jcmd().shouldContain("<root>")
-                    .shouldContain("ForkJoinPool.commonPool")
-                    .shouldContain(Objects.toIdentityString(pool))
-                    .shouldContain(Objects.toIdentityString(executor));
-        }
-    }
-
-    /**
-     * Test that output is truncated when there are too many thread groupings.
-     */
-    @Test
-    void testTooManyThreadGroupings() {
-        List<ExecutorService> executors = IntStream.range(0, 1000)
-                .mapToObj(_ -> Executors.newCachedThreadPool())
-                .toList();
-        try {
-            jcmd().shouldContain("<root>")
-                    .shouldContain("<truncated ...>");
-        } finally {
-            executors.forEach(ExecutorService::close);
-        }
     }
 
     /**

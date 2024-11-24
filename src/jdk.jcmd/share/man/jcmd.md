@@ -738,7 +738,7 @@ The following commands are available:
     -   `-l`: (Optional) Prints `java.util.concurrent` locks (BOOLEAN, false)
 
 `Thread.vthread_summary`
-:   Print the virtual thread scheduler, timeout schedulers, I/O pollers, and thread groupings.
+:   Print the virtual thread scheduler, timeout schedulers, and I/O pollers.
 
     Impact: Low
 

@@ -25,10 +25,7 @@
 package jdk.internal.vm;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
@@ -41,9 +38,6 @@ import sun.nio.ch.Poller;
 public class VThreadSummary {
     private static final Unsafe U = Unsafe.getUnsafe();
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
-
-    // maximum number of thread containers to print
-    private static final int MAX_THREAD_CONTAINERS = 256;
 
     private VThreadSummary() { }
 
@@ -63,10 +57,6 @@ public class VThreadSummary {
             printPollers(sb);
             sb.append(System.lineSeparator());
         }
-
-        // print thread groupings/containers
-        printThreadContainers(sb);
-        sb.append(System.lineSeparator());
 
         return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
@@ -128,51 +118,5 @@ public class VThreadSummary {
                         .append("] ")
                         .append(writePollers.get(i))
                         .append(System.lineSeparator()));
-    }
-
-    /**
-     * Print the thread containers that don't have an owner to the given string builder.
-     * The output will include the root container and all thread pools.
-     *
-     * In the future, this could be extended to support structured concurrency so that
-     * it prints a tree of owned thread containers.
-     */
-    private static void printThreadContainers(StringBuilder sb) {
-        sb.append("Thread groupings:")
-                .append(System.lineSeparator());
-
-        ThreadContainer root = ThreadContainers.root();
-        printThreadContainer(root, sb);
-
-        int printed = 1;
-        Iterator<ThreadContainer> iterator = root.children().iterator();
-        while (iterator.hasNext() && printed < MAX_THREAD_CONTAINERS) {
-            ThreadContainer container = iterator.next();
-            if (container.owner() == null) {
-                printThreadContainer(container, sb);
-                printed++;
-            }
-        }
-        if (iterator.hasNext()) {
-            sb.append("<truncated ...>")
-                    .append(System.lineSeparator());
-        }
-    }
-
-    /**
-     * Print a thread container to the given string builder.
-     */
-    private static void printThreadContainer(ThreadContainer container, StringBuilder sb) {
-        Map<Boolean, Long> threadCounts = container.threads()
-                .collect(Collectors.partitioningBy(Thread::isVirtual, Collectors.counting()));
-        long platformThreadCount = threadCounts.get(Boolean.FALSE);
-        long virtualThreadCount = threadCounts.get(Boolean.TRUE);
-        sb.append(container)
-                .append(" [platform threads = ")
-                .append(platformThreadCount)
-                .append(", virtual threads = ")
-                .append(virtualThreadCount)
-                .append("]")
-                .append(System.lineSeparator());
     }
 }
