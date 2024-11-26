@@ -29,65 +29,49 @@ import java.util.List;
 import java.util.stream.IntStream;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
-import jdk.internal.misc.Unsafe;
 import sun.nio.ch.Poller;
 
 /**
- * The implementation for the jcmd Thread.vthread_summary diagnostic command.
+ * The implementation for the jcmd Thread.vthread_* diagnostic commands.
  */
-public class VThreadSummary {
-    private static final Unsafe U = Unsafe.getUnsafe();
+public class JcmdVThreadCommands {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
-    private VThreadSummary() { }
+    private JcmdVThreadCommands() { }
 
     /**
-     * Invoked by the VM to print virtual thread summary information.
-     * @return the UTF-8 encoded information to print
+     * Invoked by the VM to print the virtual scheduler to a byte[].
      */
-    private static byte[] print() {
+    private static byte[] printScheduler() {
         StringBuilder sb = new StringBuilder();
 
-        // print virtual thread scheduler
-        printSchedulers(sb);
+        // virtual thread scheduler
+        sb.append(JLA.virtualThreadDefaultScheduler())
+                .append(System.lineSeparator());
+
+        // break
         sb.append(System.lineSeparator());
 
-        // print I/O pollers if initialized
-        if (!U.shouldBeInitialized(Poller.class)) {
-            printPollers(sb);
-            sb.append(System.lineSeparator());
+        // delayed task schedulers
+        var delayedTaskSchedulers = JLA.virtualThreadDelayedTaskSchedulers().toList();
+        sb.append("Delayed task schedulers:")
+                .append(System.lineSeparator());
+        for (int i = 0; i < delayedTaskSchedulers.size(); i++) {
+            sb.append('[')
+                    .append(i)
+                    .append("] ")
+                    .append(delayedTaskSchedulers.get(i))
+                    .append(System.lineSeparator());
         }
-
         return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
 
     /**
-     * Print information on the virtual thread schedulers to given string builder.
+     * Print information on threads registered for I/O to a byte[].
      */
-    private static void printSchedulers(StringBuilder sb) {
-        sb.append("Virtual thread scheduler:")
-                .append(System.lineSeparator());
-        sb.append(JLA.virtualThreadDefaultScheduler())
-                .append(System.lineSeparator());
+    private static byte[] printPollers() {
+        StringBuilder sb = new StringBuilder();
 
-        sb.append(System.lineSeparator());
-
-        sb.append("Timeout schedulers:")
-                .append(System.lineSeparator());
-        var schedulers = JLA.virtualThreadDelayedTaskSchedulers().toList();
-        for (int i = 0; i < schedulers.size(); i++) {
-            sb.append('[')
-                    .append(i)
-                    .append("] ")
-                    .append(schedulers.get(i))
-                    .append(System.lineSeparator());
-        }
-    }
-
-    /**
-     * Print information on threads registered for I/O to the given string builder.
-     */
-    private static void printPollers(StringBuilder sb) {
         Poller masterPoller = Poller.masterPoller();
         List<Poller> readPollers = Poller.readPollers();
         List<Poller> writePollers = Poller.writePollers();
@@ -118,5 +102,7 @@ public class VThreadSummary {
                         .append("] ")
                         .append(writePollers.get(i))
                         .append(System.lineSeparator()));
+
+        return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
 }

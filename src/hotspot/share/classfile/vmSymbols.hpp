@@ -742,9 +742,10 @@ class SerializeClosure;
   template(dumpThreads_name,                       "dumpThreads")                                                 \
   template(dumpThreadsToJson_name,                 "dumpThreadsToJson")                                           \
                                                                                                                   \
-  /* jcmd Thread.vthread_summary */                                                                               \
-  template(jdk_internal_vm_VThreadSummary,         "jdk/internal/vm/VThreadSummary")                              \
-  template(print_name,                             "print")                                                       \
+  /* jcmd Thread.vthread_scheduler and Thread.vthread_pollers */                                                  \
+  template(jdk_internal_vm_JcmdVThreadCommands,    "jdk/internal/vm/JcmdVThreadCommands")                         \
+  template(printScheduler_name,                    "printScheduler")                                              \
+  template(printPollers_name,                      "printPollers")                                                \
 
   /*end*/
 
