@@ -162,8 +162,7 @@ public final class PlatformMBeanProviderImpl extends PlatformMBeanProvider {
         /**
          * VirtualThreadSchedulerMXBean registered when using JDK's virtual thread scheduler.
          */
-        PrivilegedAction<String> pa = () -> System.getProperty("jdk.virtualThreadScheduler.implClass");
-        String value = AccessController.doPrivileged(pa);
+        String value = System.getProperty("jdk.virtualThreadScheduler.implClass");
         if (value == null) {
             initMBeanList.add(new PlatformComponent<VirtualThreadSchedulerMXBean>() {
                 private final Set<Class<? extends VirtualThreadSchedulerMXBean>> mbeanInterfaces =
