@@ -24,11 +24,11 @@
 /*
  * @test
  * @bug 8337199
- * @summary Basic test for jcmd Thread.vthread_summary
+ * @summary Basic test for jcmd Thread.vthread_scheduler and Thread.vthread_pollers
  * @requires vm.continuations
  * @modules jdk.jcmd
  * @library /test/lib
- * @run junit/othervm VThreadSummaryTest
+ * @run junit/othervm VThreadCommandsTest
  */
 
 import java.net.InetAddress;
@@ -52,31 +52,27 @@ import jdk.test.lib.process.OutputAnalyzer;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
-class VThreadSummaryTest {
-
-    private OutputAnalyzer jcmd() {
-        return new PidJcmdExecutor().execute("Thread.vthread_summary");
-    }
+class VThreadCommandsTest {
 
     /**
-     * Test that output includes the default scheduler and timeout schedulers.
+     * Thread.vthread_scheduler
      */
     @Test
-    void testSchedulers() {
+    void testVThreadScheduler() {
         // ensure default scheduler are timeout schedulers are initialized
         Thread.startVirtualThread(() -> { });
 
-        jcmd().shouldContain("Virtual thread scheduler:")
+        jcmd("Thread.vthread_scheduler")
                 .shouldContain(Objects.toIdentityString(defaultScheduler()))
-                .shouldContain("Timeout schedulers:")
+                .shouldContain("Delayed task schedulers:")
                 .shouldContain("[0] " + ScheduledThreadPoolExecutor.class.getName());
     }
 
     /**
-     * Test that the output includes the read and writer I/O pollers.
+     * Thread.vthread_pollers
      */
     @Test
-    void testPollers() throws Exception {
+    void testVThreadPollers() throws Exception {
         // do blocking I/O op on a virtual thread to ensure poller mechanism is initialized
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             executor.submit(() -> {
@@ -94,9 +90,14 @@ class VThreadSummaryTest {
             }).get();
         }
 
-        jcmd().shouldContain("Read I/O pollers:")
+        jcmd("Thread.vthread_pollers")
+                .shouldContain("Read I/O pollers:")
                 .shouldContain("Write I/O pollers:")
                 .shouldContain("[0] sun.nio.ch");
+    }
+
+    private OutputAnalyzer jcmd(String cmd) {
+        return new PidJcmdExecutor().execute(cmd);
     }
 
     /**

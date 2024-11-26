@@ -936,14 +936,27 @@ public:
   virtual void execute(DCmdSource source, TRAPS);
 };
 
-class VThreadSummaryDCmd : public DCmd {
+class VThreadSchedulerDCmd : public DCmd {
 public:
-  VThreadSummaryDCmd(outputStream* output, bool heap) : DCmd(output, heap) { }
+  VThreadSchedulerDCmd(outputStream* output, bool heap) : DCmd(output, heap) { }
   static const char* name() {
-    return "Thread.vthread_summary";
+    return "Thread.vthread_scheduler";
   }
   static const char* description() {
-    return "Print the virtual thread scheduler, timeout schedulers, I/O pollers, and thread groupings.";
+    return "Print the virtual thread scheduler.";
+  }
+  static const char* impact() { return "Low"; }
+  virtual void execute(DCmdSource source, TRAPS);
+};
+
+class VThreadPollersDCmd : public DCmd {
+public:
+  VThreadPollersDCmd(outputStream* output, bool heap) : DCmd(output, heap) { }
+  static const char* name() {
+    return "Thread.vthread_pollers";
+  }
+  static const char* description() {
+    return "Print the virtual thread I/O pollers.";
   }
   static const char* impact() { return "Low"; }
   virtual void execute(DCmdSource source, TRAPS);
