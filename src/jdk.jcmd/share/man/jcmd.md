@@ -737,8 +737,13 @@ The following commands are available:
     -   `-e`: (Optional) Print extended thread information (BOOLEAN, false)
     -   `-l`: (Optional) Prints `java.util.concurrent` locks (BOOLEAN, false)
 
-`Thread.vthread_summary`
-:   Print the virtual thread scheduler, timeout schedulers, and I/O pollers.
+`Thread.vthread_scheduler`
+:   Print the virtual thread scheduler.
+
+    Impact: Low
+
+`Thread.vthread_pollers`
+:   Print the virtual thread I/O pollers.
 
     Impact: Low
 
