@@ -32,7 +32,8 @@ import jdk.internal.access.SharedSecrets;
 import sun.nio.ch.Poller;
 
 /**
- * The implementation for the jcmd Thread.vthread_* diagnostic commands.
+ * The implementation for the jcmd Thread.vthread_* diagnostic commands. These methods are
+ * called from the "Attach Listener" thread.
  */
 public class JcmdVThreadCommands {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
@@ -47,22 +48,21 @@ public class JcmdVThreadCommands {
 
         // virtual thread scheduler
         sb.append(JLA.virtualThreadDefaultScheduler())
-                .append(System.lineSeparator());
+          .append(System.lineSeparator());
 
         // break
         sb.append(System.lineSeparator());
 
         // delayed task schedulers
+        sb.append("Delayed task schedulers:").append(System.lineSeparator());
         var delayedTaskSchedulers = JLA.virtualThreadDelayedTaskSchedulers().toList();
-        sb.append("Delayed task schedulers:")
-                .append(System.lineSeparator());
-        for (int i = 0; i < delayedTaskSchedulers.size(); i++) {
-            sb.append('[')
-                    .append(i)
-                    .append("] ")
-                    .append(delayedTaskSchedulers.get(i))
-                    .append(System.lineSeparator());
-        }
+        IntStream.range(0, delayedTaskSchedulers.size())
+                .forEach(i -> sb.append('[')
+                                .append(i)
+                                .append("] ")
+                                .append(delayedTaskSchedulers.get(i))
+                                .append(System.lineSeparator()));
+
         return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
 
@@ -78,9 +78,11 @@ public class JcmdVThreadCommands {
 
         if (masterPoller != null) {
             sb.append("Master I/O poller:")
-                    .append(System.lineSeparator())
-                    .append(masterPoller)
-                    .append(System.lineSeparator());
+              .append(System.lineSeparator())
+              .append(masterPoller)
+              .append(System.lineSeparator());
+
+            // break
             sb.append(System.lineSeparator());
         }
 
@@ -88,20 +90,22 @@ public class JcmdVThreadCommands {
         sb.append(System.lineSeparator());
         IntStream.range(0, readPollers.size())
                 .forEach(i -> sb.append('[')
-                        .append(i)
-                        .append("] ")
-                        .append(readPollers.get(i))
-                        .append(System.lineSeparator()));
+                                .append(i)
+                                .append("] ")
+                                .append(readPollers.get(i))
+                                .append(System.lineSeparator()));
+
+        // break
         sb.append(System.lineSeparator());
 
         sb.append("Write I/O pollers:");
         sb.append(System.lineSeparator());
         IntStream.range(0, writePollers.size())
                 .forEach(i -> sb.append('[')
-                        .append(i)
-                        .append("] ")
-                        .append(writePollers.get(i))
-                        .append(System.lineSeparator()));
+                                .append(i)
+                                .append("] ")
+                                .append(writePollers.get(i))
+                                .append(System.lineSeparator()));
 
         return sb.toString().getBytes(StandardCharsets.UTF_8);
     }

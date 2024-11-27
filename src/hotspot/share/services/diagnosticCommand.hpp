@@ -943,7 +943,8 @@ public:
     return "Thread.vthread_scheduler";
   }
   static const char* description() {
-    return "Print the virtual thread scheduler.";
+    return "Print the virtual thread scheduler, and the delayed task schedulers that support "
+           "virtual threads doing timed operations.";
   }
   static const char* impact() { return "Low"; }
   virtual void execute(DCmdSource source, TRAPS);
@@ -956,7 +957,7 @@ public:
     return "Thread.vthread_pollers";
   }
   static const char* description() {
-    return "Print the virtual thread I/O pollers.";
+    return "Print the I/O pollers that support virtual threads doing blocking network I/O operations.";
   }
   static const char* impact() { return "Low"; }
   virtual void execute(DCmdSource source, TRAPS);

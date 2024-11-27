@@ -738,12 +738,13 @@ The following commands are available:
     -   `-l`: (Optional) Prints `java.util.concurrent` locks (BOOLEAN, false)
 
 `Thread.vthread_scheduler`
-:   Print the virtual thread scheduler.
+:   Print the virtual thread scheduler, and the delayed task schedulers that support
+    virtual threads doing timed operations.
 
     Impact: Low
 
 `Thread.vthread_pollers`
-:   Print the virtual thread I/O pollers.
+:   Print the I/O pollers that support virtual threads doing blocking network I/O operations.
 
     Impact: Low
 
