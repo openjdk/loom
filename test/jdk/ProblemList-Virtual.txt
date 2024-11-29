@@ -69,6 +69,7 @@ java/lang/Thread/UncaughtExceptionsTest.java 0000000 generic-all
 java/lang/invoke/condy/CondyNestedResolutionTest.java 0000000 generic-all
 java/lang/ref/OOMEInReferenceHandler.java 0000000 generic-all
 java/util/concurrent/locks/Lock/OOMEInAQS.java 0000000 generic-all
+java/util/concurrent/locks/StampedLock/OOMEInStampedLock.java 0000000 generic-all
 jdk/internal/vm/Continuation/Scoped.java 0000000 generic-all
 jdk/jfr/event/runtime/TestThreadDumpEvent.java 0000000 generic-all
 jdk/jfr/event/runtime/TestThreadStartEvent.java 0000000 generic-all
