@@ -53,6 +53,8 @@ java/nio/channels/SocketChannel/ShortWrite.java 0000000 generic-all
 
 jdk/jfr/event/compiler/TestCompilerCompile.java 8325392 generic-all
 
+java/util/concurrent/locks/StampedLock/OOMEInStampedLock.java 8345266 generic-all
+
 
 ##########
 ## Tests incompatible with virtual test thread factory.
