@@ -45,8 +45,7 @@ javax/management/remote/mandatory/connection/DeadLockTest.java 8309069 windows-x
 javax/management/remote/mandatory/connection/ConnectionTest.java 8308352 windows-x64
 
 ## DatagramSocket blocks ops are interruptible when invoked on virtual threads
-java/nio/channels/DatagramChannel/InterruptibleOrNot.java 0000000 generic-all
-java/net/DatagramSocket/InterruptibleDatagramSocket.java 0000000 generic-all
+java/net/DatagramSocket/InterruptibleDatagramSocket.java 8347173 generic-all
 
 # Underlying implementation is non-blocking
 java/nio/channels/SocketChannel/ShortWrite.java 0000000 generic-all
