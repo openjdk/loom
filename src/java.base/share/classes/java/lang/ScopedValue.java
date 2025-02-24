@@ -612,10 +612,11 @@ public final class ScopedValue<T> {
      * Returns the value of this scoped value if bound in the current thread, otherwise
      * returns {@code other}.
      *
-     * @param other the value to return if not bound, can be {@code null}
+     * @param other the value to return if not bound
      * @return the value of the scoped value if bound, otherwise {@code other}
      */
     public T orElse(T other) {
+        Objects.requireNonNull(other);
         Object obj = findBinding();
         if (obj != Snapshot.NIL) {
             @SuppressWarnings("unchecked")
