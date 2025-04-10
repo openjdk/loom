@@ -776,7 +776,9 @@ static void pass_arg3(MacroAssembler* masm, Register arg) {
 }
 
 static bool is_preemptable(address entry_point) {
-  return entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter);
+  return entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter) ||
+         entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::resolve_from_cache) ||
+         entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::_new);
 }
 
 void MacroAssembler::call_VM_base(Register oop_result,

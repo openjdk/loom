@@ -79,7 +79,8 @@ public:
   const ImmutableOopMap* oopmap() const { if (_oopmap == nullptr) get_oopmap(); return _oopmap; }
   inline int frame_size() const;
   inline int stack_argsize() const;
-  inline int num_oops() const;
+  template <typename RegisterMapT>
+  inline int num_oops(RegisterMapT* map) const;
 
   inline void initialize_register_map(RegisterMap* map);
   template <typename RegisterMapT> inline void next(RegisterMapT* map, bool stop = false);
@@ -101,7 +102,8 @@ public:
   inline address get_pc() const;
 
   inline int interpreter_frame_size() const;
-  inline int interpreter_frame_num_oops() const;
+  template <typename RegisterMapT>
+  inline int interpreter_frame_num_oops(RegisterMapT* map) const;
   inline int interpreter_frame_stack_argsize() const;
   inline void next_for_interpreter_frame();
   inline intptr_t* unextended_sp_for_interpreter_frame() const;

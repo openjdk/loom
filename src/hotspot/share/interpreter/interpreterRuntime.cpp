@@ -119,6 +119,23 @@ public:
   frame& get_frame()                             { return _last_frame; }
 };
 
+class ProfileTrapsMark : public StackObj {
+  JavaThread* _thread;
+ public:
+  ProfileTrapsMark(JavaThread* current) : _thread(current) {}
+  ~ProfileTrapsMark() {
+    JavaThread* THREAD = _thread;
+    if (HAS_PENDING_EXCEPTION) {
+      if (ProfileTraps && PENDING_EXCEPTION->klass()->name() == vmSymbols::java_lang_NullPointerException()) {
+        // Preserve the original exception across the call to note_trap()
+        PreserveExceptionMark pm(_thread);
+        // Recording the trap will help the compiler to potentially recognize this exception as "hot"
+        InterpreterRuntime::note_trap(_thread, Deoptimization::Reason_null_check);
+      }
+    }
+  }
+};
+
 //------------------------------------------------------------------------------------------------------------------------
 // State accessors
 
@@ -217,7 +234,7 @@ JRT_ENTRY(void, InterpreterRuntime::_new(JavaThread* current, ConstantPool* pool
   klass->check_valid_for_instantiation(true, CHECK);
 
   // Make sure klass is initialized
-  klass->initialize(CHECK);
+  klass->initialize_preemptable(CHECK_AND_CLEAR_PREEMPTED);
 
   oop obj = klass->allocate_instance(CHECK);
   current->set_vm_result(obj);
@@ -641,17 +658,18 @@ JRT_END
 //
 
 void InterpreterRuntime::resolve_get_put(JavaThread* current, Bytecodes::Code bytecode) {
+  JavaThread* THREAD = current;
   LastFrameAccessor last_frame(current);
   constantPoolHandle pool(current, last_frame.method()->constants());
   methodHandle m(current, last_frame.method());
 
-  resolve_get_put(bytecode, last_frame.get_index_u2(bytecode), m, pool, true /*initialize_holder*/, current);
+  resolve_get_put(bytecode, last_frame.get_index_u2(bytecode), m, pool, StaticMode::initialize_klass_preemptable, CHECK_AND_CLEAR_PREEMPTED);
 }
 
 void InterpreterRuntime::resolve_get_put(Bytecodes::Code bytecode, int field_index,
                                          methodHandle& m,
                                          constantPoolHandle& pool,
-                                         bool initialize_holder, TRAPS) {
+                                         StaticMode static_mode, TRAPS) {
   fieldDescriptor info;
   bool is_put    = (bytecode == Bytecodes::_putfield  || bytecode == Bytecodes::_nofast_putfield ||
                     bytecode == Bytecodes::_putstatic);
@@ -660,7 +678,7 @@ void InterpreterRuntime::resolve_get_put(Bytecodes::Code bytecode, int field_ind
   {
     JvmtiHideSingleStepping jhss(THREAD);
     LinkResolver::resolve_field_access(info, pool, field_index,
-                                       m, bytecode, initialize_holder, CHECK);
+                                       m, bytecode, static_mode, CHECK);
   } // end JvmtiHideSingleStepping
 
   // check if link resolution caused cpCache to be updated
@@ -814,24 +832,14 @@ void InterpreterRuntime::resolve_invoke(JavaThread* current, Bytecodes::Code byt
   methodHandle resolved_method;
 
   int method_index = last_frame.get_index_u2(bytecode);
-  {
+  { ProfileTrapsMark pt(current);
     JvmtiHideSingleStepping jhss(current);
     JavaThread* THREAD = current; // For exception macros.
     LinkResolver::resolve_invoke(info, receiver, pool,
                                  method_index, bytecode,
-                                 THREAD);
-
-    if (HAS_PENDING_EXCEPTION) {
-      if (ProfileTraps && PENDING_EXCEPTION->klass()->name() == vmSymbols::java_lang_NullPointerException()) {
-        // Preserve the original exception across the call to note_trap()
-        PreserveExceptionMark pm(current);
-        // Recording the trap will help the compiler to potentially recognize this exception as "hot"
-        note_trap(current, Deoptimization::Reason_null_check);
-      }
-      return;
-    }
-
+                                 StaticMode::initialize_klass_preemptable, CHECK_AND_CLEAR_PREEMPTED);
     resolved_method = methodHandle(current, info.resolved_method());
+    ResourceMark rm(THREAD);
   } // end JvmtiHideSingleStepping
 
   update_invoke_cp_cache_entry(info, bytecode, resolved_method, pool, method_index);

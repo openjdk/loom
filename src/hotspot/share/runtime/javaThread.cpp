@@ -496,6 +496,8 @@ JavaThread::JavaThread(MemTag mem_tag) :
   _preempt_alternate_return(nullptr),
   _preemption_cancelled(false),
   _pending_interrupted_exception(false),
+  _at_preemptable_init(false),
+  DEBUG_ONLY(_preempt_init_klass(nullptr) COMMA)
 
   _handshake(this),
 

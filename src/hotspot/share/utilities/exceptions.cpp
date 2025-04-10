@@ -83,6 +83,27 @@ void ThreadShadow::clear_pending_nonasync_exception() {
   }
 }
 
+void ThreadShadow::set_pending_preempted_exception() {
+  assert(!has_pending_exception(), "");
+  // We always install the same dummy exception since we only want
+  // to use the TRAPS mechaninsm to bail out from all methods until
+  // reaching the one using the CHECK_AND_CLEAR_PREEMPTED macro.
+  set_pending_exception(Universe::preempted_exception_instance(), __FILE__, __LINE__);
+}
+
+void ThreadShadow::clear_pending_preempted_exception() {
+  if (_pending_exception->klass() == vmClasses::PreemptedException_klass()) {
+    clear_pending_exception();
+  }
+}
+
+#ifdef ASSERT
+void ThreadShadow::check_preempted_exception() {
+  assert(has_pending_exception(), "");
+  assert(pending_exception()->is_a(vmClasses::PreemptedException_klass()), "");
+}
+#endif
+
 // Implementation of Exceptions
 
 bool Exceptions::special_exception(JavaThread* thread, const char* file, int line, Handle h_exception, Symbol* h_name, const char* message) {

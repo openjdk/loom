@@ -169,6 +169,9 @@ final class VirtualThread extends BaseVirtualThread {
     // notified by Object.notify/notifyAll while waiting in Object.wait
     private volatile boolean notified;
 
+    // true when virtual thread is executing Java level Object.wait, false on VM internal Object.wait
+    private volatile boolean interruptableWait;
+
     // timed-wait support
     private byte timedWaitSeqNo;
 
@@ -629,7 +632,7 @@ final class VirtualThread extends BaseVirtualThread {
             }
 
             // may have been interrupted while in transition to wait state
-            if (interrupted && compareAndSetState(newState, UNBLOCKED)) {
+            if (interruptableWait && interrupted && compareAndSetState(newState, UNBLOCKED)) {
                 submitRunContinuation();
                 return;
             }
@@ -665,7 +668,7 @@ final class VirtualThread extends BaseVirtualThread {
 
         // notify container
         if (notifyContainer) {
-            threadContainer().onExit(this);
+            threadContainer().remove(this);
         }
 
         // clear references to thread locals
@@ -693,7 +696,7 @@ final class VirtualThread extends BaseVirtualThread {
         boolean addedToContainer = false;
         boolean started = false;
         try {
-            container.onStart(this);  // may throw
+            container.add(this);  // may throw
             addedToContainer = true;
 
             // scoped values may be inherited
@@ -1055,7 +1058,7 @@ final class VirtualThread extends BaseVirtualThread {
 
             // if thread is waiting in Object.wait then schedule to try to reenter
             int s = state();
-            if ((s == WAIT || s == TIMED_WAIT) && compareAndSetState(s, UNBLOCKED)) {
+            if ((s == WAIT || s == TIMED_WAIT) && interruptableWait && compareAndSetState(s, UNBLOCKED)) {
                 submitRunContinuation();
             }
 
@@ -1351,7 +1354,7 @@ final class VirtualThread extends BaseVirtualThread {
 
     // -- wrappers for get/set of state, parking permit, and carrier thread --
 
-    private int state() {
+    public int state() {
         return state;  // volatile read
     }
 
@@ -1384,6 +1387,10 @@ final class VirtualThread extends BaseVirtualThread {
     private void setCarrierThread(Thread carrier) {
         // U.putReferenceRelease(this, CARRIER_THREAD, carrier);
         this.carrierThread = carrier;
+    }
+
+    public Thread getCarrierThread() {
+        return this.carrierThread;
     }
 
     // -- JVM TI support --

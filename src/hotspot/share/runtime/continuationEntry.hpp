@@ -61,6 +61,7 @@ public:
   static int _cleanup_offset;
 
   static void set_enter_code(nmethod* nm, int interpreted_entry_offset);
+  static void set_yield_code(nmethod* nm);
   static bool is_interpreted_call(address call_address);
 
 private:
@@ -68,6 +69,7 @@ private:
   static address _thaw_call_pc;
   static address _cleanup_pc;
   static nmethod* _enter_special;
+  static nmethod* _do_yield;
   static int _interpreted_entry_offset;
 
 private:
@@ -112,6 +114,11 @@ public:
   static address compiled_entry();
   static address interpreted_entry();
 
+  static nmethod* do_yield_nmethod() {
+    assert(_do_yield != nullptr, "oops");
+    return _do_yield;
+  }
+
   int argsize() const { return _argsize; }
   void set_argsize(int value) { _argsize = value; }
 
@@ -150,7 +157,7 @@ public:
 #endif
 
 #ifdef ASSERT
-  static bool assert_entry_frame_laid_out(JavaThread* thread);
+  static bool assert_entry_frame_laid_out(JavaThread* thread, bool preempted = false);
 #endif
 };
 

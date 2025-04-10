@@ -105,18 +105,24 @@ inline int StackChunkFrameStream<frame_kind>::interpreter_frame_stack_argsize() 
   return diff;
 }
 
+class InterpreterOopCount : public OopClosure {
+  int _count;
+public:
+  InterpreterOopCount() : _count(0) {}
+  void do_oop(oop* p) override { _count++; }
+  void do_oop(narrowOop* p) override { _count++; }
+  int count() { return _count; }
+};
+
 template <ChunkFrames frame_kind>
-inline int StackChunkFrameStream<frame_kind>::interpreter_frame_num_oops() const {
+template <typename RegisterMapT>
+inline int StackChunkFrameStream<frame_kind>::interpreter_frame_num_oops(RegisterMapT* map) const {
   assert_is_interpreted_and_frame_type_mixed();
   ResourceMark rm;
-  InterpreterOopMap mask;
   frame f = to_frame();
-  f.interpreted_frame_oop_map(&mask);
-  return  mask.num_oops()
-        + 1 // for the mirror oop
-        + (f.interpreter_frame_method()->is_native() ? 1 : 0) // temp oop slot
-        + pointer_delta_as_int((intptr_t*)f.interpreter_frame_monitor_begin(),
-              (intptr_t*)f.interpreter_frame_monitor_end())/BasicObjectLock::size();
+  InterpreterOopCount closure;
+  f.oops_interpreted_do(&closure, map, false);
+  return closure.count();
 }
 
 template<>

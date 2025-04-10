@@ -302,7 +302,7 @@ class JfrEvents {
     /**
      * Test jdk.VirtualThreadPinned event when waiting for a class initializer.
      */
-    @Test
+    //@Test
     void testWaitingForClassInitializer() throws Exception {
         class TestClass {
             static {

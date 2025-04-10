@@ -2287,7 +2287,7 @@ void TemplateTable::resolve_cache_and_index_for_method(int byte_no,
   __ bind(clinit_barrier_slow);
   address entry = CAST_FROM_FN_PTR(address, InterpreterRuntime::resolve_from_cache);
   __ mov(temp, (int) code);
-  __ call_VM(noreg, entry, temp);
+  __ call_VM_preemptable(noreg, entry, temp);
 
   // Update registers with resolved info
   __ load_method_entry(Rcache, index);
@@ -2333,7 +2333,7 @@ void TemplateTable::resolve_cache_and_index_for_field(int byte_no,
   // resolve first time through
   address entry = CAST_FROM_FN_PTR(address, InterpreterRuntime::resolve_from_cache);
   __ mov(temp, (int) code);
-  __ call_VM(noreg, entry, temp);
+  __ call_VM_preemptable(noreg, entry, temp);
 
   // Update registers with resolved info
   __ load_field_entry(Rcache, index);
@@ -2494,7 +2494,7 @@ void TemplateTable::load_invokedynamic_entry(Register method) {
   // Call to the interpreter runtime to resolve invokedynamic
   address entry = CAST_FROM_FN_PTR(address, InterpreterRuntime::resolve_from_cache);
   __ mov(method, code); // this is essentially Bytecodes::_invokedynamic
-  __ call_VM(noreg, entry, method);
+  __ call_VM_preemptable(noreg, entry, method);
   // Update registers with resolved info
   __ load_resolved_indy_entry(cache, index);
   // Load-acquire the adapter method to match store-release in ResolvedIndyEntry::fill_in()
@@ -3670,7 +3670,7 @@ void TemplateTable::_new() {
   __ bind(slow_case);
   __ get_constant_pool(c_rarg1);
   __ get_unsigned_2_byte_index_at_bcp(c_rarg2, 1);
-  call_VM(r0, CAST_FROM_FN_PTR(address, InterpreterRuntime::_new), c_rarg1, c_rarg2);
+  __ call_VM_preemptable(r0, CAST_FROM_FN_PTR(address, InterpreterRuntime::_new), c_rarg1, c_rarg2);
   __ verify_oop(r0);
 
   // continue

@@ -326,10 +326,10 @@ void InterpreterMacroAssembler::call_VM_base(Register oop_result,
   restore_locals();
 }
 
-void InterpreterMacroAssembler::call_VM_preemptable(Register oop_result,
-                                                    address entry_point,
-                                                    Register arg_1) {
-  assert(arg_1 == c_rarg1, "");
+void InterpreterMacroAssembler::call_VM_preemptable_helper(Register oop_result,
+                                                           address entry_point,
+                                                           int number_of_arguments,
+                                                           bool check_exceptions) {
   Label resume_pc, not_preempted;
 
 #ifdef ASSERT
@@ -349,7 +349,7 @@ void InterpreterMacroAssembler::call_VM_preemptable(Register oop_result,
   // Note: call_VM_helper requires last_Java_pc for anchor to be at the top of the stack.
   lea(rscratch1, resume_pc);
   push(rscratch1);
-  MacroAssembler::call_VM_helper(oop_result, entry_point, 1, false /*check_exceptions*/);
+  MacroAssembler::call_VM_helper(oop_result, entry_point, number_of_arguments, check_exceptions);
   pop(rscratch1);
 
   pop_cont_fastpath();
@@ -365,7 +365,52 @@ void InterpreterMacroAssembler::call_VM_preemptable(Register oop_result,
   bind(resume_pc);
   restore_after_resume(false /* is_native */);
 
+  if (check_exceptions) {
+    // check for pending exceptions (java_thread is set upon return)
+    cmpptr(Address(r15_thread, Thread::pending_exception_offset()), NULL_WORD);
+    Label ok;
+    jcc(Assembler::equal, ok);
+    jump(RuntimeAddress(StubRoutines::forward_exception_entry()));
+    bind(ok);
+  }
+
+  // get oop result if there is one and reset the value in the thread
+  if (oop_result->is_valid()) {
+    get_vm_result(oop_result);
+  }
+
   bind(not_preempted);
+}
+
+static void pass_arg1(MacroAssembler* masm, Register arg) {
+  if (c_rarg1 != arg ) {
+    masm->mov(c_rarg1, arg);
+  }
+}
+
+static void pass_arg2(MacroAssembler* masm, Register arg) {
+  if (c_rarg2 != arg ) {
+    masm->mov(c_rarg2, arg);
+  }
+}
+
+void InterpreterMacroAssembler::call_VM_preemptable(Register oop_result,
+                                         address entry_point,
+                                         Register arg_1,
+                                         bool check_exceptions) {
+  pass_arg1(this, arg_1);
+  call_VM_preemptable_helper(oop_result, entry_point, 1, check_exceptions);
+}
+
+void InterpreterMacroAssembler::call_VM_preemptable(Register oop_result,
+                                         address entry_point,
+                                         Register arg_1,
+                                         Register arg_2,
+                                         bool check_exceptions) {
+  LP64_ONLY(assert_different_registers(arg_1, c_rarg2));
+  pass_arg2(this, arg_2);
+  pass_arg1(this, arg_1);
+  call_VM_preemptable_helper(oop_result, entry_point, 2, check_exceptions);
 }
 
 void InterpreterMacroAssembler::restore_after_resume(bool is_native) {

@@ -795,17 +795,14 @@ oop InstanceKlass::init_lock() const {
   return lock;
 }
 
-// Set the initialization lock to null so the object can be GC'ed.  Any racing
-// threads to get this lock will see a null lock and will not lock.
-// That's okay because they all check for initialized state after getting
-// the lock and return.
-void InstanceKlass::fence_and_clear_init_lock() {
-  // make sure previous stores are all done, notably the init_state.
-  OrderAccess::storestore();
-  java_lang_Class::clear_init_lock(java_mirror());
-  assert(!is_not_initialized(), "class must be initialized now");
+void InstanceKlass::initialize_preemptable(TRAPS) {
+  if (this->should_be_initialized()) {
+    PREEMPT_ON_INIT_SUPPORTED_ONLY(PreemptableInitCall pic(THREAD, this);)
+    initialize_impl(THREAD);
+  } else {
+    assert(is_initialized(), "sanity check");
+  }
 }
-
 
 // See "The Virtual Machine Specification" section 2.16.5 for a detailed explanation of the class initialization
 // process. The step comments refers to the procedure described in that section.
@@ -978,7 +975,11 @@ bool InstanceKlass::link_class_impl(TRAPS) {
   {
     HandleMark hm(THREAD);
     Handle h_init_lock(THREAD, init_lock());
-    ObjectLocker ol(h_init_lock, jt);
+    ObjectLocker ol(h_init_lock, CHECK_PREEMPTABLE_false);
+    // Don't preempt once we own the monitor as that would complicate
+    // redoing the VM call (we don't expect to own this monitor).
+    NoPreemptMark npm(THREAD);
+
     // rewritten will have been set if loader constraint error found
     // on an earlier link attempt
     // don't verify or rewrite if already rewritten
@@ -1191,7 +1192,7 @@ void InstanceKlass::initialize_impl(TRAPS) {
   // Step 1
   {
     Handle h_init_lock(THREAD, init_lock());
-    ObjectLocker ol(h_init_lock, jt);
+    ObjectLocker ol(h_init_lock, CHECK_PREEMPTABLE);
 
     // Step 2
     // If we were to use wait() instead of waitInterruptibly() then
@@ -1205,7 +1206,7 @@ void InstanceKlass::initialize_impl(TRAPS) {
       }
       wait = true;
       jt->set_class_to_be_initialized(this);
-      ol.wait_uninterruptibly(jt);
+      ol.wait_uninterruptibly(CHECK_PREEMPTABLE);
       jt->set_class_to_be_initialized(nullptr);
     }
 
@@ -1263,6 +1264,10 @@ void InstanceKlass::initialize_impl(TRAPS) {
       }
     }
   }
+
+  // Block preemption once we are the initializer thread.
+  // Unmounting now would complicate the reentrant case.
+  NoPreemptMark npm(THREAD);
 
   // Step 7
   // Next, if C is a class rather than an interface, initialize it's super class and super
@@ -1360,7 +1365,6 @@ void InstanceKlass::set_initialization_state_and_notify(ClassState state, TRAPS)
     ObjectLocker ol(h_init_lock, THREAD);
     set_init_thread(nullptr); // reset _init_thread before changing _init_state
     set_init_state(state);
-    fence_and_clear_init_lock();
     ol.notify_all(CHECK);
   } else {
     assert(h_init_lock() != nullptr, "The initialization state should never be set twice");

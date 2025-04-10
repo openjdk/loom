@@ -1770,7 +1770,7 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
     current->set_current_waiting_monitor(this);
     result = Continuation::try_preempt(current, ce->cont_oop(current));
     if (result == freeze_ok) {
-      vthread_wait(current, millis);
+      vthread_wait(current, millis, interruptible);
       current->set_current_waiting_monitor(nullptr);
       return;
     }
@@ -2106,12 +2106,14 @@ void ObjectMonitor::quick_notifyAll(JavaThread* current) {
   }
 }
 
-void ObjectMonitor::vthread_wait(JavaThread* current, jlong millis) {
+void ObjectMonitor::vthread_wait(JavaThread* current, jlong millis, bool interruptible) {
   oop vthread = current->vthread();
   ObjectWaiter* node = new ObjectWaiter(vthread, this);
   node->_is_wait = true;
+  node->_interruptible = interruptible;
   node->TState = ObjectWaiter::TS_WAIT;
   java_lang_VirtualThread::set_notified(vthread, false);  // Reset notified flag
+  java_lang_VirtualThread::set_interruptible_wait(vthread, interruptible);
 
   // Enter the waiting queue, which is a circular doubly linked list in this case
   // but it could be a priority queue or any data structure.
@@ -2157,11 +2159,12 @@ bool ObjectMonitor::vthread_wait_reenter(JavaThread* current, ObjectWaiter* node
   ObjectWaiter::TStates state = node->TState;
   bool was_notified = state == ObjectWaiter::TS_ENTER;
   assert(was_notified || state == ObjectWaiter::TS_RUN, "");
-  node->_interrupted = !was_notified && current->is_interrupted(false);
+  node->_interrupted = node->_interruptible && !was_notified && current->is_interrupted(false);
 
-  // Post JFR and JVMTI events.
+  // Post JFR and JVMTI events. If non-interruptible we are in
+  // ObjectLocker case so we don't post anything.
   EventJavaMonitorWait wait_event;
-  if (wait_event.should_commit() || JvmtiExport::should_post_monitor_waited()) {
+  if (node->_interruptible && (wait_event.should_commit() || JvmtiExport::should_post_monitor_waited())) {
     vthread_monitor_waited_event(current, node, cont, &wait_event, !was_notified && !node->_interrupted);
   }
 

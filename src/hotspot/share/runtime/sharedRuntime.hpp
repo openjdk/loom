@@ -84,12 +84,6 @@ class SharedRuntime: AllStatic {
   }
 #endif
 
-  // cont_doYieldStub is not yet folded into the general model for
-  // shared stub/blob handling. It is actually a specially generated
-  // native wrapper for a specific native method, as also is it's
-  // counterpart the continuation do_enter method.
-  static nmethod*            _cont_doYield_stub;
-
   // Stub names indexed by SharedStubId
   static const char *_stub_names[];
 
@@ -278,11 +272,6 @@ class SharedRuntime: AllStatic {
   static SafepointBlob* polling_page_return_handler_blob()     { return _polling_page_return_handler_blob; }
   static SafepointBlob* polling_page_safepoint_handler_blob()  { return _polling_page_safepoint_handler_blob; }
   static SafepointBlob* polling_page_vectors_safepoint_handler_blob()  { return _polling_page_vectors_safepoint_handler_blob; }
-
-  static nmethod* cont_doYield_stub() {
-    assert(_cont_doYield_stub != nullptr, "oops");
-    return _cont_doYield_stub;
-  }
 
   // Implicit exceptions
   static address throw_AbstractMethodError_entry()          { return _throw_AbstractMethodError_blob->entry_point(); }

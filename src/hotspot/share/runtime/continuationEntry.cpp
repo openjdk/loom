@@ -41,10 +41,12 @@ address ContinuationEntry::_return_pc = nullptr;
 address ContinuationEntry::_thaw_call_pc = nullptr;
 address ContinuationEntry::_cleanup_pc = nullptr;
 nmethod* ContinuationEntry::_enter_special = nullptr;
+nmethod* ContinuationEntry::_do_yield = nullptr;
 int ContinuationEntry::_interpreted_entry_offset = 0;
 
 void ContinuationEntry::set_enter_code(nmethod* nm, int interpreted_entry_offset) {
   assert(_return_pc_offset != 0, "");
+  assert(_thaw_call_pc_offset != 0, "");
   _return_pc = nm->code_begin() + _return_pc_offset;
   _thaw_call_pc = nm->code_begin() + _thaw_call_pc_offset;
   _cleanup_pc = nm->code_begin() + _cleanup_offset;
@@ -55,6 +57,10 @@ void ContinuationEntry::set_enter_code(nmethod* nm, int interpreted_entry_offset
   assert(_enter_special->code_contains(compiled_entry()),    "entry not in enterSpecial");
   assert(_enter_special->code_contains(interpreted_entry()), "entry not in enterSpecial");
   assert(interpreted_entry() < compiled_entry(), "unexpected code layout");
+}
+
+void ContinuationEntry::set_yield_code(nmethod* nm) {
+  _do_yield = nm;
 }
 
 address ContinuationEntry::compiled_entry() {
@@ -112,8 +118,10 @@ void ContinuationEntry::describe(FrameValues& values, int frame_no) const {
 #endif
 
 #ifdef ASSERT
-bool ContinuationEntry::assert_entry_frame_laid_out(JavaThread* thread) {
+bool ContinuationEntry::assert_entry_frame_laid_out(JavaThread* thread, bool preempted) {
   assert(thread->has_last_Java_frame(), "Wrong place to use this assertion");
+
+  if (preempted) return true;
 
   ContinuationEntry* entry = thread->last_continuation();
   assert(entry != nullptr, "");

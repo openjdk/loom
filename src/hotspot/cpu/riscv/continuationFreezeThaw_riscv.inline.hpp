@@ -194,6 +194,13 @@ inline void FreezeBase::patch_pd(frame& hf, const frame& caller) {
   }
 }
 
+inline intptr_t* AnchorMark::anchor_mark_set_pd() {
+  return _top_frame.sp();
+}
+
+inline void AnchorMark::anchor_mark_clear_pd() {
+}
+
 //////// Thaw
 
 // Fast path
@@ -307,6 +314,11 @@ inline intptr_t* ThawBase::push_cleanup_continuation() {
 
   log_develop_trace(continuations, preempt)("push_cleanup_continuation initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT, p2i(sp + 2 * frame::metadata_words), p2i(sp));
   return sp;
+}
+
+inline intptr_t* ThawBase::push_preempt_adapter() {
+  Unimplemented();
+  return nullptr;
 }
 
 inline void ThawBase::derelativize_interpreted_frame_metadata(const frame& hf, const frame& f) {

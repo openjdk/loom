@@ -45,7 +45,6 @@ class InterpreterRuntime: AllStatic {
   static void      set_bcp_and_mdp(address bcp, JavaThread* current);
   static void      note_trap_inner(JavaThread* current, int reason,
                                    const methodHandle& trap_method, int trap_bci);
-  static void      note_trap(JavaThread* current, int reason);
 
   // Inner work method for Interpreter's frequency counter overflow.
   static nmethod* frequency_counter_overflow_inner(JavaThread* current, address branch_bcp);
@@ -90,11 +89,13 @@ class InterpreterRuntime: AllStatic {
 #endif
   static void    throw_pending_exception(JavaThread* current);
 
+  static void    note_trap(JavaThread* current, int reason);
+
   static void resolve_from_cache(JavaThread* current, Bytecodes::Code bytecode);
 
   // Used by AOTConstantPoolResolver
   static void resolve_get_put(Bytecodes::Code bytecode, int field_index,
-                              methodHandle& m, constantPoolHandle& pool, bool initialize_holder, TRAPS);
+                              methodHandle& m, constantPoolHandle& pool, StaticMode static_mode, TRAPS);
   static void cds_resolve_invoke(Bytecodes::Code bytecode, int method_index,
                                  constantPoolHandle& pool, TRAPS);
   static void cds_resolve_invokehandle(int raw_index,

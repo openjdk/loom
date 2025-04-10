@@ -55,6 +55,7 @@ class ObjectWaiter : public CHeapObj<mtThread> {
   bool           _is_wait;
   bool        _at_reenter;
   bool       _interrupted;
+  bool     _interruptible;
   bool            _active;    // Contention monitoring is enabled
  public:
   ObjectWaiter(JavaThread* current);
@@ -410,7 +411,7 @@ class ObjectMonitor : public CHeapObj<mtObjectMonitor> {
   ObjectWaiter* entry_list_tail(JavaThread* current);
 
   bool      vthread_monitor_enter(JavaThread* current, ObjectWaiter* node = nullptr);
-  void      vthread_wait(JavaThread* current, jlong millis);
+  void      vthread_wait(JavaThread* current, jlong millis, bool interruptible);
   bool      vthread_wait_reenter(JavaThread* current, ObjectWaiter* node, ContinuationWrapper& cont);
   void      vthread_epilog(JavaThread* current, ObjectWaiter* node);
 

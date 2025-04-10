@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1994, 2024, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1994, 2025, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -387,6 +387,15 @@ public class Thread implements Runnable {
      */
     @IntrinsicCandidate
     static native Thread currentCarrierThread();
+
+    /**
+     * Gets the current carrier Thread.
+     * @return  this thread's carrier.
+     * @since 25
+     */
+    public Thread getCarrierThread() {
+        return null;
+    }
 
     /**
      * Returns the Thread object for the current thread.
@@ -1409,7 +1418,7 @@ public class Thread implements Runnable {
 
             // start thread
             boolean started = false;
-            container.onStart(this);  // may throw
+            container.add(this);  // may throw
             try {
                 // scoped values may be inherited
                 inheritScopedValueBindings(container);
@@ -1418,7 +1427,7 @@ public class Thread implements Runnable {
                 started = true;
             } finally {
                 if (!started) {
-                    container.onExit(this);
+                    container.remove(this);
                 }
             }
         }
@@ -1487,7 +1496,7 @@ public class Thread implements Runnable {
             // notify container that thread is exiting
             ThreadContainer container = threadContainer();
             if (container != null) {
-                container.onExit(this);
+                container.remove(this);
             }
         }
 
@@ -1743,6 +1752,16 @@ public class Thread implements Runnable {
      */
     public final String getName() {
         return name;
+    }
+
+    /**
+     * Returns this thread's state.
+     *
+     * @return  this thread's state.
+     * @since 25
+     */
+    public int state() {
+        return 0;
     }
 
     /**

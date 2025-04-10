@@ -162,6 +162,11 @@ public class ThreadDumper {
     private static void dumpThread(Thread thread, PrintStream ps) {
         String suffix = thread.isVirtual() ? " virtual" : "";
         ps.println("#" + thread.threadId() + " \"" + thread.getName() + "\"" + suffix);
+        if (thread.isVirtual()) {
+            Thread carrier = thread.getCarrierThread();
+            String mountedOnName =  carrier != null ? "mounted on \"" + carrier.getName() + "\"" + "(#" + carrier.threadId() + ")" : "";
+            ps.println("state:" + thread.state() + " - " + mountedOnName);
+        }
         for (StackTraceElement ste : thread.getStackTrace()) {
             ps.print("      ");
             ps.println(ste);
