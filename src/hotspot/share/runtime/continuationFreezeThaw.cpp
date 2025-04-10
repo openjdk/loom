@@ -1641,7 +1641,7 @@ static void jvmti_yield_cleanup(JavaThread* thread, ContinuationWrapper& cont) {
   invalidate_jvmti_stack(thread);
 }
 
-static void jvmti_mount_end(JavaThread* current, ContinuationWrapper& cont, frame top) {
+static void jvmti_mount_end(JavaThread* current, ContinuationWrapper& cont, frame top, Continuation::preempt_kind pk) {
   assert(current->vthread() != nullptr, "must be");
 
   HandleMarkCleaner hm(current);  // Cleanup vth and so._conth Handles
@@ -1654,7 +1654,10 @@ static void jvmti_mount_end(JavaThread* current, ContinuationWrapper& cont, fram
     JvmtiVTMSTransitionDisabler::VTMS_vthread_mount((jthread)vth.raw_value(), false);
 
     if (current->pending_contended_entered_event()) {
-      JvmtiExport::post_monitor_contended_entered(current, current->contended_entered_monitor());
+      // No monitor JVMTI events for ObjectLocker case.
+      if (pk != Continuation::object_locker) {
+        JvmtiExport::post_monitor_contended_entered(current, current->contended_entered_monitor());
+      }
       current->set_contended_entered_monitor(nullptr);
     }
   JRT_BLOCK_END
@@ -2607,7 +2610,7 @@ intptr_t* ThawBase::handle_preempted_continuation(intptr_t* sp, Continuation::pr
   bool is_vthread = Continuation::continuation_scope(_cont.continuation()) == java_lang_VirtualThread::vthread_scope();
   if (is_vthread) {
     if (JvmtiVTMSTransitionDisabler::VTMS_notify_jvmti_events()) {
-      jvmti_mount_end(_thread, _cont, top);
+      jvmti_mount_end(_thread, _cont, top, preempt_kind);
     } else {
       _thread->set_is_in_VTMS_transition(false);
       java_lang_Thread::set_is_in_VTMS_transition(_thread->vthread(), false);
