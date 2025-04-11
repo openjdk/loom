@@ -220,7 +220,7 @@ class SerializeClosure;
   template(java_lang_Exception,                       "java/lang/Exception")                      \
   template(java_lang_RuntimeException,                "java/lang/RuntimeException")               \
   template(java_io_IOException,                       "java/io/IOException")                      \
-  template(java_lang_PreemptedException,              "java/lang/PreemptedException")             \
+  template(jdk_internal_vm_PreemptedException,        "jdk/internal/vm/PreemptedException")       \
                                                                                                   \
   /* error klasses: at least all errors thrown by the VM have entries here */                     \
   template(java_lang_AbstractMethodError,             "java/lang/AbstractMethodError")            \

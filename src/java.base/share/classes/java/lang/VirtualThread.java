@@ -442,7 +442,7 @@ final class VirtualThread extends BaseVirtualThread {
         }
     }
 
-    /**
+    /**ForkjJ
      * Runs a task in the context of this virtual thread.
      */
     private void run(Runnable task) {
@@ -1354,7 +1354,7 @@ final class VirtualThread extends BaseVirtualThread {
 
     // -- wrappers for get/set of state, parking permit, and carrier thread --
 
-    public int state() {
+    int state() {
         return state;  // volatile read
     }
 
@@ -1384,13 +1384,13 @@ final class VirtualThread extends BaseVirtualThread {
         }
     }
 
+    Thread carrierThread() {
+        return carrierThread;
+    }
+
     private void setCarrierThread(Thread carrier) {
         // U.putReferenceRelease(this, CARRIER_THREAD, carrier);
         this.carrierThread = carrier;
-    }
-
-    public Thread getCarrierThread() {
-        return this.carrierThread;
     }
 
     // -- JVM TI support --

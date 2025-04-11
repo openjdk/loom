@@ -1117,7 +1117,7 @@ bool universe_post_init() {
   _array_index_out_of_bounds_exception.init_if_empty(vmSymbols::java_lang_ArrayIndexOutOfBoundsException(), CHECK_false);
   _array_store_exception.init_if_empty(vmSymbols::java_lang_ArrayStoreException(), CHECK_false);
   _class_cast_exception.init_if_empty(vmSymbols::java_lang_ClassCastException(), CHECK_false);
-  _preempted_exception.init_if_empty(vmSymbols::java_lang_PreemptedException(), CHECK_false);
+  _preempted_exception.init_if_empty(vmSymbols::jdk_internal_vm_PreemptedException(), CHECK_false);
 
   // Virtual Machine Error for when we get into a situation we can't resolve
   Klass* k = vmClasses::InternalError_klass();

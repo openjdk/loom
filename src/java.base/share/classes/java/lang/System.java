@@ -2220,6 +2220,22 @@ public final class System {
                 return Thread.currentCarrierThread();
             }
 
+            public Thread getCarrierThread(Thread thread) {
+                if (thread instanceof VirtualThread vthread) {
+                    return vthread.carrierThread();
+                } else {
+                    throw new UnsupportedOperationException();
+                }
+            }
+
+            public int getInternalState(Thread thread) {
+                if (thread instanceof VirtualThread vthread) {
+                    return vthread.state();
+                } else {
+                    throw new UnsupportedOperationException();
+                }
+            }
+
             public <T> T getCarrierThreadLocal(CarrierThreadLocal<T> local) {
                 return ((ThreadLocal<T>)local).getCarrierThreadLocal();
             }

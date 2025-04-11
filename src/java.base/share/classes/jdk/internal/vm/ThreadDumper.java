@@ -39,6 +39,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.SharedSecrets;
 
 /**
  * Thread dump support.
@@ -47,6 +49,8 @@ import java.util.List;
  * text or JSON format.
  */
 public class ThreadDumper {
+    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
+
     private ThreadDumper() { }
 
     // the maximum byte array to return when generating the thread dump to a byte array
@@ -163,9 +167,12 @@ public class ThreadDumper {
         String suffix = thread.isVirtual() ? " virtual" : "";
         ps.println("#" + thread.threadId() + " \"" + thread.getName() + "\"" + suffix);
         if (thread.isVirtual()) {
-            Thread carrier = thread.getCarrierThread();
-            String mountedOnName =  carrier != null ? "mounted on \"" + carrier.getName() + "\"" + "(#" + carrier.threadId() + ")" : "";
-            ps.println("state:" + thread.state() + " - " + mountedOnName);
+            Thread carrier = JLA.getCarrierThread(thread);
+            int internalState = JLA.getInternalState(thread);
+            String mountedOnName = carrier != null
+                    ? "mounted on \"" + carrier.getName() + "\"" + "(#" + carrier.threadId() + ")"
+                    : "";
+            ps.println("state:" + internalState + " - " + mountedOnName);
         }
         for (StackTraceElement ste : thread.getStackTrace()) {
             ps.print("      ");

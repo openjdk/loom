@@ -23,7 +23,7 @@
  * questions.
  */
 
-package java.lang;
+package jdk.internal.vm;
 
 /**
  * Internal exception used only by the VM.

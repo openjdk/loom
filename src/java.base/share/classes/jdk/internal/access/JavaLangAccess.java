@@ -508,6 +508,18 @@ public interface JavaLangAccess {
     Thread currentCarrierThread();
 
     /**
+     * Returns the given virtual thread's carrier or {@code null} if not mounted.
+     * @throws UnsupportedOperationException if the thread is not a virtual thread
+     */
+    Thread getCarrierThread(Thread thread);
+
+    /**
+     * Returns the given virtual thread's internal state.
+     * @throws UnsupportedOperationException if the thread is not a virtual thread
+     */
+    int getInternalState(Thread thread);
+
+    /**
      * Returns the value of the current carrier thread's copy of a thread-local.
      */
     <T> T getCarrierThreadLocal(CarrierThreadLocal<T> local);

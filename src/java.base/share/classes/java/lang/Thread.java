@@ -389,15 +389,6 @@ public class Thread implements Runnable {
     static native Thread currentCarrierThread();
 
     /**
-     * Gets the current carrier Thread.
-     * @return  this thread's carrier.
-     * @since 25
-     */
-    public Thread getCarrierThread() {
-        return null;
-    }
-
-    /**
      * Returns the Thread object for the current thread.
      * @return  the current thread
      */
@@ -1752,16 +1743,6 @@ public class Thread implements Runnable {
      */
     public final String getName() {
         return name;
-    }
-
-    /**
-     * Returns this thread's state.
-     *
-     * @return  this thread's state.
-     * @since 25
-     */
-    public int state() {
-        return 0;
     }
 
     /**
