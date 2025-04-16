@@ -442,7 +442,7 @@ final class VirtualThread extends BaseVirtualThread {
         }
     }
 
-    /**ForkjJ
+    /**
      * Runs a task in the context of this virtual thread.
      */
     private void run(Runnable task) {
