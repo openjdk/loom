@@ -25,26 +25,38 @@
 package jdk.internal.vm;
 
 import java.util.Arrays;
-import java.util.HexFormat;
-import java.util.List;
+import java.util.stream.Stream;
 
-public class ThreadSnapshot {
-
-    private String name;
-    private int threadStatus;
-    private StackTraceElement[] ste;
-    private ThreadLock[] locks;
-
+/**
+ * Represents a snapshot of information about a Thread.
+ */
+class ThreadSnapshot {
     private static final StackTraceElement[] EMPTY_STACK = new StackTraceElement[0];
     private static final ThreadLock[] EMPTY_LOCKS = new ThreadLock[0];
 
-    private static native ThreadSnapshot create0(Thread thread, boolean withLocks);
+    private String name;
+    private int threadStatus;
+    private StackTraceElement[] stackTrace;
+    private ThreadLock[] locks;
 
-    public static ThreadSnapshot create(Thread thread) {
-        ThreadSnapshot snapshot = create0(thread, true);
+    // called by the VM
+    private ThreadSnapshot(StackTraceElement[] stackTrace,
+                           ThreadLock[] locks,
+                           String name,
+                           int threadStatus) {
+        this.stackTrace = stackTrace;
+        this.locks = locks;
+        this.name = name;
+        this.threadStatus = threadStatus;
+    }
 
-        if (snapshot.ste == null) {
-            snapshot.ste = EMPTY_STACK;
+    /**
+     * Take a snapshot of a Thread to get all information about the thread.
+     */
+    static ThreadSnapshot of(Thread thread) {
+        ThreadSnapshot snapshot = create(thread, true);
+        if (snapshot.stackTrace == null) {
+            snapshot.stackTrace = EMPTY_STACK;
         }
         if (snapshot.locks == null) {
             snapshot.locks = EMPTY_LOCKS;
@@ -52,77 +64,90 @@ public class ThreadSnapshot {
         return snapshot;
     }
 
-//    private ThreadSnapshot() {    }
-
-    private ThreadSnapshot(StackTraceElement[] ste, ThreadLock[] locks, String name, int threadStatus) {
-        this.ste = ste;
-        this.locks = locks;
-        this.name = name;
-        this.threadStatus = threadStatus;
-    }
-
-    public String getName() {
+    /**
+     * Returns the thread name.
+     */
+    String threadName() {
         return name;
     }
 
-    public Thread.State getState() {
+    /**
+     * Returns the thread state.
+     */
+    Thread.State threadState() {
+        // is this valid for virtual threads
         return jdk.internal.misc.VM.toThreadState(threadStatus);
     }
 
-    List<StackTraceElement> getStackTrace() {
-        return Arrays.asList(ste);
+    /**
+     * Returns the thread stack trace.
+     */
+    StackTraceElement[] stackTrace() {
+        return stackTrace;
     }
 
-    List<ThreadLock> getLocks(int depth) {
+    /**
+     * Returns a stream of the thread lock usage at the given stack depth.
+     */
+    Stream<ThreadLock> locksAtDepth(int depth) {
         return Arrays.stream(locks)
-            .filter(lock -> lock.depth == depth)
-            .toList();
+            .filter(lock -> lock.depth == depth);
     }
 
-    List<ThreadLock> getLocksFor(StackTraceElement element) {
-        int depth  = getStackTrace().indexOf(element);
-        if (depth < 0) {
-            throw new IllegalArgumentException();
-        }
-        return getLocks(depth);
-    }
-
-    List<ThreadLock> getOwnableSynchronizers() {
-        return getLocks(-1);
-    }
-
-    public static enum LockType {
+    /**
+     * Represents information about a locking operation.
+     */
+    private enum LockType {
         // Park blocker
-        PARKING_TO_WAIT,
+        PARKING_TO_WAIT("parked waiting on"),
         // Lock object is a class of the eliminated monitor
-        ELEMINATED_SCALAR_REPLACED,
-        ELEMINATED_MONITOR,
-        LOCKED,
-        WAITING_TO_LOCK,
-        WAITING_ON,
-        WAITING_TO_RELOCK,
+        ELEMINATED_SCALAR_REPLACED(null),
+        ELEMINATED_MONITOR(null),
+        LOCKED("locked"),
+        WAITING_TO_LOCK("waiting to lock"),
+        WAITING_ON("waiting on"),
+        WAITING_TO_RELOCK(null),
         // No corresponding stack frame, depth is always == -1
-        OWNABLE_SYNCHRONIZER
+        OWNABLE_SYNCHRONIZER(null);
+
+        private final String message;
+        LockType(String message) {
+            this.message = message;
+        }
+
+        @Override
+        public String toString() {
+            if (message != null) {
+                return message;
+            } else {
+                return super.toString();
+            }
+        }
     }
 
-    public static record ThreadLock(int depth, LockType type, Object obj) {
+    /**
+     * Represents a locking operation of a thread at a specific stack depth.
+     */
+    record ThreadLock(int depth, LockType type, Object obj) {
         private static final LockType[] lockTypeValues = LockType.values(); // cache
+
+        // called by the VM
         private ThreadLock(int depth, int typeOrdinal, Object obj) {
             this(depth, lockTypeValues[typeOrdinal], obj);
         }
 
-        public Object lockObject() {
+        String lockOperation() {
+            return type.toString();
+        }
+
+        Object lockObject() {
             if (type == LockType.ELEMINATED_SCALAR_REPLACED) {
                 // we have no lock object, lock contains lock class
                 return null;
             }
             return obj;
         }
-        public Class<?> lockClass() {
-            if (type == LockType.ELEMINATED_SCALAR_REPLACED) {
-                return (Class)obj;
-            }
-            return obj == null ? null : obj.getClass();
-        }
     }
+
+    private static native ThreadSnapshot create(Thread thread, boolean withLocks);
 }

@@ -39,8 +39,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import jdk.internal.access.JavaLangAccess;
-import jdk.internal.access.SharedSecrets;
+import java.util.Objects;
 
 /**
  * Thread dump support.
@@ -49,8 +48,6 @@ import jdk.internal.access.SharedSecrets;
  * text or JSON format.
  */
 public class ThreadDumper {
-    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
-
     private ThreadDumper() { }
 
     // the maximum byte array to return when generating the thread dump to a byte array
@@ -164,19 +161,24 @@ public class ThreadDumper {
     }
 
     private static void dumpThread(Thread thread, PrintStream ps) {
-        String suffix = thread.isVirtual() ? " virtual" : "";
-        ps.println("#" + thread.threadId() + " \"" + thread.getName() + "\"" + suffix);
-        if (thread.isVirtual()) {
-            Thread carrier = JLA.getCarrierThread(thread);
-            int internalState = JLA.getInternalState(thread);
-            String mountedOnName = carrier != null
-                    ? "mounted on \"" + carrier.getName() + "\"" + "(#" + carrier.threadId() + ")"
-                    : "";
-            ps.println("state:" + internalState + " - " + mountedOnName);
-        }
-        for (StackTraceElement ste : thread.getStackTrace()) {
+        ThreadSnapshot snapshot = ThreadSnapshot.of(thread);
+        ps.println("#" + thread.threadId() + " \"" + snapshot.threadName()
+                +  "\" " + snapshot.threadState() + " " + Instant.now());
+        StackTraceElement[] stackTrace = snapshot.stackTrace();
+        int depth = 0;
+        while (depth < stackTrace.length) {
+
+            snapshot.locksAtDepth(depth)
+                .filter(lock -> lock.lockObject() != null)
+                .forEach(lock -> {
+                    String identityString = Objects.toIdentityString(lock.lockObject());
+                    ps.println("      // " + lock.lockOperation() + " " + identityString);
+                });
+
             ps.print("      ");
-            ps.println(ste);
+            ps.println(stackTrace[depth]);
+
+            depth++;
         }
         ps.println();
     }
@@ -273,13 +275,18 @@ public class ThreadDumper {
      * Dump the given thread and its stack trace to the print stream in JSON format.
      */
     private static void dumpThreadToJson(Thread thread, PrintStream out, boolean more) {
+        String now = Instant.now().toString();
+        ThreadSnapshot snapshot = ThreadSnapshot.of(thread);
+
         out.println("         {");
         out.println("           \"tid\": \"" + thread.threadId() + "\",");
-        out.println("           \"name\": \"" + escape(thread.getName()) + "\",");
-        out.println("           \"stack\": [");
+        out.println("           \"time\": \"" + escape(now)  + "\",");
+        out.println("           \"name\": \"" + escape(snapshot.threadName()) + "\",");
+        out.println("           \"state\": \"" + snapshot.threadState() + "\",");
 
+        out.println("           \"stack\": [");
+        StackTraceElement[] stackTrace = snapshot.stackTrace();
         int i = 0;
-        StackTraceElement[] stackTrace = thread.getStackTrace();
         while (i < stackTrace.length) {
             out.print("              \"");
             out.print(escape(stackTrace[i].toString()));
@@ -292,6 +299,7 @@ public class ThreadDumper {
             }
         }
         out.println("           ]");
+
         if (more) {
             out.println("         },");
         } else {
