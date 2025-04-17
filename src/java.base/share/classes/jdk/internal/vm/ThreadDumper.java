@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 /**
  * Thread dump support.
@@ -162,22 +163,38 @@ public class ThreadDumper {
 
     private static void dumpThread(Thread thread, PrintStream ps) {
         ThreadSnapshot snapshot = ThreadSnapshot.of(thread);
+        Thread.State state = snapshot.threadState();
         ps.println("#" + thread.threadId() + " \"" + snapshot.threadName()
-                +  "\" " + snapshot.threadState() + " " + Instant.now());
+                +  "\" " + state + " " + Instant.now());
+
+        // object that the thread is blocked/waiting on
+        String prefix = null;
+        Object blocker = null;
+        if (state == Thread.State.BLOCKED) {
+            prefix = "blocked on";
+            blocker = snapshot.blockedOn();
+        } else if (state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING) {
+            blocker = snapshot.waitingOn();
+            if (blocker != null) {
+                prefix = "waiting on";
+            } else {
+                blocker = snapshot.parkedOn();
+                prefix = "parked on";
+            }
+        }
+        if (blocker != null) {
+            ps.println("      // " + prefix + " " + Objects.toIdentityString(blocker));
+        }
+
         StackTraceElement[] stackTrace = snapshot.stackTrace();
         int depth = 0;
         while (depth < stackTrace.length) {
-
-            snapshot.locksAtDepth(depth)
-                .filter(lock -> lock.lockObject() != null)
-                .forEach(lock -> {
-                    String identityString = Objects.toIdentityString(lock.lockObject());
-                    ps.println("      // " + lock.lockOperation() + " " + identityString);
-                });
-
+            snapshot.lockedAt(depth).forEach(obj -> {
+                ps.print("      // locked ");
+                ps.println(Objects.toIdentityString(obj));
+            });
             ps.print("      ");
             ps.println(stackTrace[depth]);
-
             depth++;
         }
         ps.println();
@@ -277,15 +294,57 @@ public class ThreadDumper {
     private static void dumpThreadToJson(Thread thread, PrintStream out, boolean more) {
         String now = Instant.now().toString();
         ThreadSnapshot snapshot = ThreadSnapshot.of(thread);
+        Thread.State state = snapshot.threadState();
+        StackTraceElement[] stackTrace = snapshot.stackTrace();
 
         out.println("         {");
         out.println("           \"tid\": \"" + thread.threadId() + "\",");
         out.println("           \"time\": \"" + escape(now)  + "\",");
         out.println("           \"name\": \"" + escape(snapshot.threadName()) + "\",");
-        out.println("           \"state\": \"" + snapshot.threadState() + "\",");
+        out.println("           \"state\": \"" + state + "\",");
 
+        // object that the thread is blocked/waiting on
+        String key = null;
+        Object blocker = null;
+        if (state == Thread.State.BLOCKED) {
+            key = "blockedOn";
+            blocker = snapshot.blockedOn();
+        } else if (state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING) {
+            blocker = snapshot.waitingOn();
+            if (blocker != null) {
+                key = "waitingOn";
+            } else {
+                blocker = snapshot.parkedOn();
+                key = "parkedOn";
+            }
+        }
+        if (blocker != null) {
+            String identityString = Objects.toIdentityString(blocker);
+            out.println("           \"" + key + "\": \"" + escape(identityString) + "\",");
+        }
+
+        // monitors owned, skip if none
+        if (snapshot.ownsMonitors()) {
+            out.println("           \"monitorsOwned\": [");
+            int i = 0;
+            while (i < stackTrace.length) {
+                String locks = snapshot.lockedAt(i)
+                        .map(lock -> "\"" + Objects.toIdentityString(lock) + "\"")
+                        .collect(Collectors.joining(", ", "[", "]"));
+                out.print("               ");
+                out.print(locks);
+                i++;
+                if (i < stackTrace.length) {
+                    out.println(",");
+                } else {
+                    out.println();  // last element, no trailing comma
+                }
+            }
+            out.println("           ],");
+        }
+
+        // stack trace
         out.println("           \"stack\": [");
-        StackTraceElement[] stackTrace = snapshot.stackTrace();
         int i = 0;
         while (i < stackTrace.length) {
             out.print("              \"");

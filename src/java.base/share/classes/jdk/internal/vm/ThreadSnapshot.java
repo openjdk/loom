@@ -42,7 +42,7 @@ class ThreadSnapshot {
     // called by the VM
     private ThreadSnapshot(StackTraceElement[] stackTrace,
                            ThreadLock[] locks,
-                           String name,
+                           //String name,
                            int threadStatus) {
         this.stackTrace = stackTrace;
         this.locks = locks;
@@ -90,11 +90,67 @@ class ThreadSnapshot {
     }
 
     /**
-     * Returns a stream of the thread lock usage at the given stack depth.
+     * Returns the object that the thread is blocked on.
+     * @throws IllegalStateException if not in the blocked state
      */
-    Stream<ThreadLock> locksAtDepth(int depth) {
+    Object blockedOn() {
+        if (threadState() != Thread.State.BLOCKED) {
+            throw new IllegalStateException();
+        }
+        return find(0, LockType.WAITING_TO_LOCK)
+                .findAny()
+                .orElse(null);
+    }
+
+    /**
+     * Returns the object that the thread is waiting on.
+     * @throws IllegalStateException if not in the waiting state
+     */
+    Object waitingOn() {
+        if (threadState() != Thread.State.WAITING
+                && threadState() != Thread.State.TIMED_WAITING) {
+            throw new IllegalStateException();
+        }
+        return find(0, LockType.WAITING_ON)
+                .findAny()
+                .orElse(null);
+    }
+
+    /**
+     * Returns the object that the thread is parked on.
+     * @throws IllegalStateException if not in the waiting state
+     */
+    Object parkedOn() {
+        if (threadState() != Thread.State.WAITING
+                && threadState() != Thread.State.TIMED_WAITING) {
+            throw new IllegalStateException();
+        }
+        return find(0, LockType.PARKING_TO_WAIT)
+                .findAny()
+                .orElse(null);
+    }
+
+    /**
+     * Returns true if the thread owns any object monitors.
+     */
+    boolean ownsMonitors() {
         return Arrays.stream(locks)
-            .filter(lock -> lock.depth == depth);
+                .anyMatch(lock -> lock.type == LockType.LOCKED);
+    }
+
+    /**
+     * Returns the objects that the thread has blocked at the given depth.
+     */
+    Stream<Object> lockedAt(int depth) {
+        return find(depth, LockType.LOCKED);
+    }
+
+    private Stream<Object> find(int depth, LockType type) {
+        return Arrays.stream(locks)
+                .filter(lock -> lock.depth == depth
+                        && lock.type() == type
+                        && lock.lockObject() != null)
+                .map(ThreadLock::lockObject);
     }
 
     /**
@@ -102,45 +158,27 @@ class ThreadSnapshot {
      */
     private enum LockType {
         // Park blocker
-        PARKING_TO_WAIT("parked waiting on"),
+        PARKING_TO_WAIT,
         // Lock object is a class of the eliminated monitor
-        ELEMINATED_SCALAR_REPLACED(null),
-        ELEMINATED_MONITOR(null),
-        LOCKED("locked"),
-        WAITING_TO_LOCK("waiting to lock"),
-        WAITING_ON("waiting on"),
-        WAITING_TO_RELOCK(null),
+        ELEMINATED_SCALAR_REPLACED,
+        ELEMINATED_MONITOR,
+        LOCKED,
+        WAITING_TO_LOCK,
+        WAITING_ON,
+        WAITING_TO_RELOCK,
         // No corresponding stack frame, depth is always == -1
-        OWNABLE_SYNCHRONIZER(null);
-
-        private final String message;
-        LockType(String message) {
-            this.message = message;
-        }
-
-        @Override
-        public String toString() {
-            if (message != null) {
-                return message;
-            } else {
-                return super.toString();
-            }
-        }
+        OWNABLE_SYNCHRONIZER
     }
 
     /**
      * Represents a locking operation of a thread at a specific stack depth.
      */
-    record ThreadLock(int depth, LockType type, Object obj) {
+    private record ThreadLock(int depth, LockType type, Object obj) {
         private static final LockType[] lockTypeValues = LockType.values(); // cache
 
         // called by the VM
         private ThreadLock(int depth, int typeOrdinal, Object obj) {
             this(depth, lockTypeValues[typeOrdinal], obj);
-        }
-
-        String lockOperation() {
-            return type.toString();
         }
 
         Object lockObject() {

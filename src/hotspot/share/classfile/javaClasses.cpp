@@ -2335,7 +2335,7 @@ oop java_lang_Thread::get_thread_snapshot(jobject jthread, bool with_locks, TRAP
   JavaCallArguments args;
   args.push_oop(trace);
   args.push_oop(locks);
-  args.push_oop(Handle(THREAD, cl._name));
+  //args.push_oop(Handle(THREAD, cl._name));
   args.push_int((int)cl._thread_status);
   Handle snapshot = JavaCalls::construct_new_instance(InstanceKlass::cast(snapshot_klass),
       vmSymbols::jdk_internal_vm_ThreadSnapshot_ctor_signature(), &args, CHECK_NULL);
