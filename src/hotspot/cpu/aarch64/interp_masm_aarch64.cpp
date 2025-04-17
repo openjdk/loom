@@ -1581,7 +1581,7 @@ void InterpreterMacroAssembler::call_VM_preemptable_helper(Register oop_result,
 
   // get oop result if there is one and reset the value in the thread
   if (oop_result->is_valid()) {
-    get_vm_result(oop_result, rthread);
+    get_vm_result_oop(oop_result, rthread);
   }
 
   bind(not_preempted);
