@@ -2036,7 +2036,7 @@ public:
       int vt_state = java_lang_VirtualThread::state(_java_thread());
       _thread_status = java_lang_VirtualThread::map_state_to_thread_status(vt_state);
     }
-    _name = java_lang_Thread::name(_java_thread());
+    _name = nullptr; //java_lang_Thread::name(_java_thread());
 
     if (_thread != nullptr && !_thread->has_last_Java_frame()) {
       // stack trace is empty

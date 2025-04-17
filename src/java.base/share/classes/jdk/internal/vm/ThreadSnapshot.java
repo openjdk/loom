@@ -61,6 +61,9 @@ class ThreadSnapshot {
         if (snapshot.locks == null) {
             snapshot.locks = EMPTY_LOCKS;
         }
+        if (snapshot.name == null) {
+            snapshot.name = thread.getName();  // temp
+        }
         return snapshot;
     }
 
