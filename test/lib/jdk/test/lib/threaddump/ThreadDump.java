@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2022, 2025, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -62,6 +62,7 @@ import jdk.test.lib.json.JSONValue;
  *          {
  *            "tid": "8",
  *            "name": "Reference Handler",
+ *            "state": "RUNNABLE",
  *            "stack": [
  *               "java.base\/java.lang.ref.Reference.waitForReferencePendingList(Native Method)",
  *               "java.base\/java.lang.ref.Reference.processPendingReferences(Reference.java:245)",
@@ -216,12 +217,12 @@ public final class ThreadDump {
      */
     public static final class ThreadInfo {
         private final long tid;
-        private final String name;
+        private final Map<String, String> fields;
         private final List<String> stack;
 
-        ThreadInfo(long tid, String name, List<String> stack) {
+        ThreadInfo(long tid, Map<String, String> fields, List<String> stack) {
             this.tid = tid;
-            this.name = name;
+            this.fields = Map.copyOf(fields);
             this.stack = stack;
         }
 
@@ -236,7 +237,26 @@ public final class ThreadDump {
          * Returns the thread name.
          */
         public String name() {
-            return name;
+            return fields.get("name");
+        }
+
+        /**
+         * Returns the thread state.
+         */
+        public String state() {
+            return fields.get("state");
+        }
+
+        public String parkBlocker() {
+            return fields.get("parkBlocker");
+        }
+
+        public String blockedOn() {
+            return fields.get("blockedOn");
+        }
+
+        public String waitingOn() {
+            return fields.get("waitingOn");
         }
 
         /**
@@ -264,12 +284,24 @@ public final class ThreadDump {
         public String toString() {
             StringBuilder sb = new StringBuilder("#");
             sb.append(tid);
+            String name = name();
             if (name.length() > 0) {
                 sb.append(",");
                 sb.append(name);
             }
             return sb.toString();
         }
+    }
+
+    private Map<String, String> find(JSONValue json, String... names) {
+        var fields = new HashMap<String, String>();
+        for (String name : names) {
+            JSONValue value = json.get(name);
+            if (value != null) {
+                fields.put(name, value.asString());
+            }
+        }
+        return fields;
     }
 
     /**
@@ -293,13 +325,18 @@ public final class ThreadDump {
             Set<ThreadInfo> threadInfos = new HashSet<>();
             for (JSONValue threadObj : threadsObj) {
                 long tid = Long.parseLong(threadObj.get("tid").asString());
-                String threadName = threadObj.get("name").asString();
+
+                // thread fields, some are optional
+                Map<String, String> fields = find(threadObj, "time",
+                        "name", "state", "parkBlocker", "blockedOn", "waitingOn");
+
+                // stack trace
                 JSONValue.JSONArray stackObj = threadObj.get("stack").asArray();
                 List<String> stack = new ArrayList<>();
                 for (JSONValue steObject : stackObj) {
                     stack.add(steObject.asString());
                 }
-                threadInfos.add(new ThreadInfo(tid, threadName, stack));
+                threadInfos.add(new ThreadInfo(tid, fields, stack));
             }
 
             // add to map if not already encountered

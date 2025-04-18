@@ -46,6 +46,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.locks.LockSupport;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Stream;
 import com.sun.management.HotSpotDiagnosticMXBean;
 import com.sun.management.HotSpotDiagnosticMXBean.ThreadDumpFormat;
@@ -56,6 +57,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.*;
 
 class DumpThreads {
     private static boolean trackAllThreads;
@@ -201,14 +203,8 @@ class DumpThreads {
     private void testDumpThreadsJson(String containerName,
                                      Thread thread,
                                      boolean expectInDump) throws Exception {
-        Path file = genOutputPath(".json");
-        var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
-        mbean.dumpThreads(file.toString(), ThreadDumpFormat.JSON);
-        System.err.format("Dumped to %s%n", file);
-
-        // parse the JSON text
-        String jsonText = Files.readString(file);
-        ThreadDump threadDump = ThreadDump.parse(jsonText);
+        // dump threads to file and parse as JSON object
+        ThreadDump threadDump = dumpThreadsToJson();
 
         // test threadDump/processId
         assertTrue(threadDump.processId() == ProcessHandle.current().pid());
@@ -248,6 +244,119 @@ class DumpThreads {
     }
 
     /**
+     * Test that a JSON format thread dump includes a thread that is blocked waiting for
+     * a monitor lock.
+     */
+    @Test
+    void testBlockedThreadJsonFormat() throws Exception {
+        assumeTrue(trackAllThreads, "This test requires all virtual threads to be tracked");
+        var lock = new Object();
+        var started = new CountDownLatch(1);
+
+        Thread vthread = Thread.ofVirtual().unstarted(() -> {
+            started.countDown();
+            synchronized (lock) { }  // blocks
+        });
+
+        try {
+            synchronized (lock) {
+                // start thread and wait for it to block
+                vthread.start();
+                started.await();
+                await(vthread, Thread.State.BLOCKED);
+
+                ThreadDump threadDump = dumpThreadsToJson();
+                ThreadDump.ThreadInfo threadInfo = threadDump.rootThreadContainer()
+                        .findThread(vthread.threadId())
+                        .orElseThrow();
+
+                // check state and "blockedOn" object
+                assertEquals("BLOCKED", threadInfo.state());
+                assertEquals(Objects.toIdentityString(lock), threadInfo.blockedOn());
+            }
+        } finally {
+            vthread.join();
+        }
+    }
+
+    /**
+     * Test that a JSON format thread dump includes a thread waiting in Object.wait.
+     */
+    @Test
+    void testWaitingThreadJsonFormat() throws Exception {
+        assumeTrue(trackAllThreads, "This test requires all virtual threads to be tracked");
+        var lock = new Object();
+        var started = new CountDownLatch(1);
+
+        Thread vthread = Thread.ofVirtual().start(() -> {
+            synchronized (lock) {
+                started.countDown();
+                try {
+                    lock.wait();
+                } catch (InterruptedException e) { }
+            }
+        });
+
+        try {
+            // wait for thread to be waiting in Object.wait
+            started.await();
+            await(vthread, Thread.State.WAITING);
+
+            ThreadDump threadDump = dumpThreadsToJson();
+            ThreadDump.ThreadInfo threadInfo = threadDump.rootThreadContainer()
+                    .findThread(vthread.threadId())
+                    .orElseThrow();
+
+            // check state and "waitingOn" object
+            assertEquals("WAITING", threadInfo.state());
+            assertEquals(Objects.toIdentityString(lock), threadInfo.waitingOn());
+        } finally {
+            synchronized (lock) {
+                lock.notifyAll();
+            }
+            vthread.join();
+        }
+    }
+
+    /**
+     * Test that a JSON format thread dump includes a thread parked on a j.u.c. lock.
+     */
+    @Test
+    void testParkedJsonFormat() throws Exception {
+        assumeTrue(trackAllThreads, "This test requires all virtual threads to be tracked");
+        var lock = new ReentrantLock();
+        var started = new CountDownLatch(1);
+
+        Thread vthread = Thread.ofVirtual().unstarted(() -> {
+            started.countDown();
+            lock.lock();
+            lock.unlock();
+        });
+
+        lock.lock();
+        try {
+            // start thread and wait for it to park
+            vthread.start();
+            started.await();
+            await(vthread, Thread.State.WAITING);
+
+            ThreadDump threadDump = dumpThreadsToJson();
+            ThreadDump.ThreadInfo info = threadDump.rootThreadContainer()
+                    .findThread(vthread.threadId())
+                    .orElseThrow();
+
+            // check state and "parkBlocker" object
+            assertEquals("WAITING", info.state());
+            String parkBlocker = info.parkBlocker();
+            assertNotNull(parkBlocker);
+            assertTrue(parkBlocker.contains("java.util.concurrent.locks.ReentrantLock"));
+
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
      * Test that dumpThreads throws if the output file already exists.
      */
     @Test
@@ -282,6 +391,18 @@ class DumpThreads {
                 () -> mbean.dumpThreads(null, ThreadDumpFormat.TEXT_PLAIN));
         assertThrows(NullPointerException.class,
                 () -> mbean.dumpThreads(genOutputPath("txt").toString(), null));
+    }
+
+    /**
+     * Dump threads to a file and parse as a JSON object.
+     */
+    private static ThreadDump dumpThreadsToJson() throws Exception {
+        Path file = genOutputPath(".json");
+        var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
+        mbean.dumpThreads(file.toString(), HotSpotDiagnosticMXBean.ThreadDumpFormat.JSON);
+        System.err.format("Dumped to %s%n", file);
+        String jsonText = Files.readString(file);
+        return ThreadDump.parse(jsonText);
     }
 
     /**
@@ -338,6 +459,18 @@ class DumpThreads {
     private String line(Path file, long n) throws Exception {
         try (Stream<String> stream = Files.lines(file)) {
             return stream.skip(n).findFirst().orElseThrow();
+        }
+    }
+
+    /**
+     * Waits for the given thread to get to a given state.
+     */
+    private void await(Thread thread, Thread.State expectedState) throws InterruptedException {
+        Thread.State state = thread.getState();
+        while (state != expectedState) {
+            assertTrue(state != Thread.State.TERMINATED, "Thread has terminated");
+            Thread.sleep(10);
+            state = thread.getState();
         }
     }
 }
