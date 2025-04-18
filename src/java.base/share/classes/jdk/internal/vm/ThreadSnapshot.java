@@ -90,6 +90,15 @@ class ThreadSnapshot {
     }
 
     /**
+     * Returns the thread's parkBlocker.
+     */
+    Object parkBlocker() {
+        return findLockObject(0, LockType.PARKING_TO_WAIT)
+                .findAny()
+                .orElse(null);
+    }
+
+    /**
      * Returns the object that the thread is blocked on.
      * @throws IllegalStateException if not in the blocked state
      */
@@ -97,7 +106,7 @@ class ThreadSnapshot {
         if (threadState() != Thread.State.BLOCKED) {
             throw new IllegalStateException();
         }
-        return find(0, LockType.WAITING_TO_LOCK)
+        return findLockObject(0, LockType.WAITING_TO_LOCK)
                 .findAny()
                 .orElse(null);
     }
@@ -111,21 +120,7 @@ class ThreadSnapshot {
                 && threadState() != Thread.State.TIMED_WAITING) {
             throw new IllegalStateException();
         }
-        return find(0, LockType.WAITING_ON)
-                .findAny()
-                .orElse(null);
-    }
-
-    /**
-     * Returns the object that the thread is parked on.
-     * @throws IllegalStateException if not in the waiting state
-     */
-    Object parkedOn() {
-        if (threadState() != Thread.State.WAITING
-                && threadState() != Thread.State.TIMED_WAITING) {
-            throw new IllegalStateException();
-        }
-        return find(0, LockType.PARKING_TO_WAIT)
+        return findLockObject(0, LockType.WAITING_ON)
                 .findAny()
                 .orElse(null);
     }
@@ -139,13 +134,13 @@ class ThreadSnapshot {
     }
 
     /**
-     * Returns the objects that the thread has blocked at the given depth.
+     * Returns the objects that the thread locked at the given depth.
      */
-    Stream<Object> lockedAt(int depth) {
-        return find(depth, LockType.LOCKED);
+    Stream<Object> ownedMonitorsAt(int depth) {
+        return findLockObject(depth, LockType.LOCKED);
     }
 
-    private Stream<Object> find(int depth, LockType type) {
+    private Stream<Object> findLockObject(int depth, LockType type) {
         return Arrays.stream(locks)
                 .filter(lock -> lock.depth == depth
                         && lock.type() == type

@@ -167,31 +167,32 @@ public class ThreadDumper {
         ps.println("#" + thread.threadId() + " \"" + snapshot.threadName()
                 +  "\" " + state + " " + Instant.now());
 
-        // object that the thread is blocked/waiting on
+        // park blocker
+        Object parkBlocker = snapshot.parkBlocker();
+        if (parkBlocker != null) {
+            ps.println("      // parked on " + Objects.toIdentityString(parkBlocker));
+        }
+
+        // blocked on monitor enter or Object.wait
         String prefix = null;
-        Object blocker = null;
+        Object monitor = null;
         if (state == Thread.State.BLOCKED) {
             prefix = "blocked on";
-            blocker = snapshot.blockedOn();
+            monitor = snapshot.blockedOn();
         } else if (state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING) {
-            blocker = snapshot.waitingOn();
-            if (blocker != null) {
-                prefix = "waiting on";
-            } else {
-                blocker = snapshot.parkedOn();
-                prefix = "parked on";
-            }
+            prefix = "waiting on";
+            monitor = snapshot.waitingOn();
         }
-        if (blocker != null) {
-            ps.println("      // " + prefix + " " + Objects.toIdentityString(blocker));
+        if (monitor != null) {
+            ps.println("      // " + prefix + " " + Objects.toIdentityString(monitor));
         }
 
         StackTraceElement[] stackTrace = snapshot.stackTrace();
         int depth = 0;
         while (depth < stackTrace.length) {
-            snapshot.lockedAt(depth).forEach(obj -> {
+            snapshot.ownedMonitorsAt(depth).forEach(m -> {
                 ps.print("      // locked ");
-                ps.println(Objects.toIdentityString(obj));
+                ps.println(Objects.toIdentityString(m));
             });
             ps.print("      ");
             ps.println(stackTrace[depth]);
@@ -303,20 +304,22 @@ public class ThreadDumper {
         out.println("           \"name\": \"" + escape(snapshot.threadName()) + "\",");
         out.println("           \"state\": \"" + state + "\",");
 
-        // object that the thread is blocked/waiting on
+        // park blocker
+        Object parkBlocker = snapshot.parkBlocker();
+        if (parkBlocker != null) {
+            String identityString = Objects.toIdentityString(parkBlocker);
+            out.println("           \"parkBlocker\": \"" + escape(identityString) + "\",");
+        }
+
+        // blocked on monitor enter or Object.wait
         String key = null;
         Object blocker = null;
         if (state == Thread.State.BLOCKED) {
             key = "blockedOn";
             blocker = snapshot.blockedOn();
         } else if (state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING) {
+            key = "waitingOn";
             blocker = snapshot.waitingOn();
-            if (blocker != null) {
-                key = "waitingOn";
-            } else {
-                blocker = snapshot.parkedOn();
-                key = "parkedOn";
-            }
         }
         if (blocker != null) {
             String identityString = Objects.toIdentityString(blocker);
@@ -326,15 +329,15 @@ public class ThreadDumper {
         // monitors owned, skip if none
         if (snapshot.ownsMonitors()) {
             out.println("           \"monitorsOwned\": [");
-            int i = 0;
-            while (i < stackTrace.length) {
-                String locks = snapshot.lockedAt(i)
+            int depth = 0;
+            while (depth < stackTrace.length) {
+                String locks = snapshot.ownedMonitorsAt(depth)
                         .map(lock -> "\"" + Objects.toIdentityString(lock) + "\"")
                         .collect(Collectors.joining(", ", "[", "]"));
                 out.print("               ");
                 out.print(locks);
-                i++;
-                if (i < stackTrace.length) {
+                depth++;
+                if (depth < stackTrace.length) {
                     out.println(",");
                 } else {
                     out.println();  // last element, no trailing comma
