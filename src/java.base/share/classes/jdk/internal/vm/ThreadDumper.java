@@ -37,10 +37,10 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 /**
  * Thread dump support.
@@ -174,25 +174,24 @@ public class ThreadDumper {
         }
 
         // blocked on monitor enter or Object.wait
-        String prefix = null;
-        Object monitor = null;
         if (state == Thread.State.BLOCKED) {
-            prefix = "blocked on";
-            monitor = snapshot.blockedOn();
+            Object obj = snapshot.blockedOn();
+            if (obj != null) {
+                ps.println("      // blocked on " + Objects.toIdentityString(obj));
+            }
         } else if (state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING) {
-            prefix = "waiting on";
-            monitor = snapshot.waitingOn();
-        }
-        if (monitor != null) {
-            ps.println("      // " + prefix + " " + Objects.toIdentityString(monitor));
+            Object obj = snapshot.waitingOn();
+            if (obj != null) {
+                ps.println("      // waiting on " + Objects.toIdentityString(obj));
+            }
         }
 
         StackTraceElement[] stackTrace = snapshot.stackTrace();
         int depth = 0;
         while (depth < stackTrace.length) {
-            snapshot.ownedMonitorsAt(depth).forEach(m -> {
+            snapshot.ownedMonitorsAt(depth).forEach(obj -> {
                 ps.print("      // locked ");
-                ps.println(Objects.toIdentityString(m));
+                ps.println(Objects.toIdentityString(obj));
             });
             ps.print("      ");
             ps.println(stackTrace[depth]);
@@ -220,153 +219,112 @@ public class ThreadDumper {
      * Generate a thread dump to the given print stream in JSON format.
      */
     private static void dumpThreadsToJson(PrintStream out) {
-        out.println("{");
-        out.println("  \"threadDump\": {");
+        try (JsonWriter jsonWriter = JsonWriter.wrap(out)) {
+            jsonWriter.startObject("threadDump");
 
-        String now = Instant.now().toString();
-        String runtimeVersion = Runtime.version().toString();
-        out.format("    \"processId\": \"%d\",%n", processId());
-        out.format("    \"time\": \"%s\",%n", escape(now));
-        out.format("    \"runtimeVersion\": \"%s\",%n", escape(runtimeVersion));
+            jsonWriter.writeProperty("processId", processId());
+            jsonWriter.writeProperty("time", Instant.now());
+            jsonWriter.writeProperty("runtimeVersion", Runtime.version());
 
-        out.println("    \"threadContainers\": [");
-        List<ThreadContainer> containers = allContainers();
-        Iterator<ThreadContainer> iterator = containers.iterator();
-        while (iterator.hasNext()) {
-            ThreadContainer container = iterator.next();
-            boolean more = iterator.hasNext();
-            dumpThreadsToJson(container, out, more);
+            jsonWriter.startArray("threadContainers");
+            allContainers().forEach(c -> dumpThreadsToJson(c, jsonWriter));
+            jsonWriter.endArray();
+
+            jsonWriter.endObject();  // threadDump
         }
-        out.println("    ]");   // end of threadContainers
-
-        out.println("  }");   // end threadDump
-        out.println("}");  // end object
     }
 
     /**
-     * Dump the given thread container to the print stream in JSON format.
+     * Write a thread container to the given JSON writer.
      */
-    private static void dumpThreadsToJson(ThreadContainer container,
-                                          PrintStream out,
-                                          boolean more) {
-        out.println("      {");
-        out.format("        \"container\": \"%s\",%n", escape(container.toString()));
-
-        ThreadContainer parent = container.parent();
-        if (parent == null) {
-            out.format("        \"parent\": null,%n");
-        } else {
-            out.format("        \"parent\": \"%s\",%n", escape(parent.toString()));
-        }
+    private static void dumpThreadsToJson(ThreadContainer container, JsonWriter jsonWriter) {
+        jsonWriter.startObject();
+        jsonWriter.writeProperty("container", container);
+        jsonWriter.writeProperty("parent", container.parent());
 
         Thread owner = container.owner();
-        if (owner == null) {
-            out.format("        \"owner\": null,%n");
-        } else {
-            out.format("        \"owner\": \"%d\",%n", owner.threadId());
-        }
+        jsonWriter.writeProperty("owner", (owner != null) ? owner.threadId() : null);
 
         long threadCount = 0;
-        out.println("        \"threads\": [");
+        jsonWriter.startArray("threads");
         Iterator<Thread> threads = container.threads().iterator();
         while (threads.hasNext()) {
             Thread thread = threads.next();
-            dumpThreadToJson(thread, out, threads.hasNext());
+            dumpThreadToJson(thread, jsonWriter);
             threadCount++;
         }
-        out.println("        ],");   // end of threads
+        jsonWriter.endArray(); // threads
 
         // thread count
         if (!ThreadContainers.trackAllThreads()) {
             threadCount = Long.max(threadCount, container.threadCount());
         }
-        out.format("        \"threadCount\": \"%d\"%n", threadCount);
+        jsonWriter.writeProperty("threadCount", threadCount);
 
-        if (more) {
-            out.println("      },");
-        } else {
-            out.println("      }");  // last container, no trailing comma
-        }
+        jsonWriter.endObject();
     }
 
     /**
-     * Dump the given thread and its stack trace to the print stream in JSON format.
+     * Write a thread to the given JSON writer.
      */
-    private static void dumpThreadToJson(Thread thread, PrintStream out, boolean more) {
+    private static void dumpThreadToJson(Thread thread, JsonWriter jsonWriter) {
         String now = Instant.now().toString();
         ThreadSnapshot snapshot = ThreadSnapshot.of(thread);
         Thread.State state = snapshot.threadState();
         StackTraceElement[] stackTrace = snapshot.stackTrace();
 
-        out.println("         {");
-        out.println("           \"tid\": \"" + thread.threadId() + "\",");
-        out.println("           \"time\": \"" + escape(now)  + "\",");
-        out.println("           \"name\": \"" + escape(snapshot.threadName()) + "\",");
-        out.println("           \"state\": \"" + state + "\",");
+        jsonWriter.startObject();
+        jsonWriter.writeProperty("tid", thread.threadId());
+        jsonWriter.writeProperty("time", now);
+        jsonWriter.writeProperty("name", snapshot.threadName());
+        jsonWriter.writeProperty("state", state);
 
         // park blocker
         Object parkBlocker = snapshot.parkBlocker();
         if (parkBlocker != null) {
-            String identityString = Objects.toIdentityString(parkBlocker);
-            out.println("           \"parkBlocker\": \"" + escape(identityString) + "\",");
+            jsonWriter.writeProperty("parkBlocker", Objects.toIdentityString(parkBlocker));
         }
 
         // blocked on monitor enter or Object.wait
-        String key = null;
-        Object blocker = null;
         if (state == Thread.State.BLOCKED) {
-            key = "blockedOn";
-            blocker = snapshot.blockedOn();
-        } else if (state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING) {
-            key = "waitingOn";
-            blocker = snapshot.waitingOn();
-        }
-        if (blocker != null) {
-            String identityString = Objects.toIdentityString(blocker);
-            out.println("           \"" + key + "\": \"" + escape(identityString) + "\",");
-        }
-
-        // monitors owned, skip if none
-        if (snapshot.ownsMonitors()) {
-            out.println("           \"monitorsOwned\": [");
-            int depth = 0;
-            while (depth < stackTrace.length) {
-                String locks = snapshot.ownedMonitorsAt(depth)
-                        .map(lock -> "\"" + Objects.toIdentityString(lock) + "\"")
-                        .collect(Collectors.joining(", ", "[", "]"));
-                out.print("               ");
-                out.print(locks);
-                depth++;
-                if (depth < stackTrace.length) {
-                    out.println(",");
-                } else {
-                    out.println();  // last element, no trailing comma
-                }
+            Object obj = snapshot.blockedOn();
+            if (obj != null) {
+                jsonWriter.writeProperty("blockedOn", Objects.toIdentityString(obj));
             }
-            out.println("           ],");
+        } else if (state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING) {
+            Object obj = snapshot.waitingOn();
+            if (obj != null) {
+                jsonWriter.writeProperty("waitingOn", Objects.toIdentityString(obj));
+            }
         }
 
         // stack trace
-        out.println("           \"stack\": [");
-        int i = 0;
-        while (i < stackTrace.length) {
-            out.print("              \"");
-            out.print(escape(stackTrace[i].toString()));
-            out.print("\"");
-            i++;
-            if (i < stackTrace.length) {
-                out.println(",");
-            } else {
-                out.println();  // last element, no trailing comma
-            }
-        }
-        out.println("           ]");
+        jsonWriter.startArray("stack");
+        Arrays.stream(stackTrace).forEach(jsonWriter::writeProperty);
+        jsonWriter.endArray();
 
-        if (more) {
-            out.println("         },");
-        } else {
-            out.println("         }");  // last thread, no trailing comma
+        // monitors owned, skip if none
+        if (snapshot.ownsMonitors()) {
+            jsonWriter.startArray("monitorsOwned");
+            int depth = 0;
+            while (depth < stackTrace.length) {
+                List<Object> objs = snapshot.ownedMonitorsAt(depth).toList();
+                if (!objs.isEmpty()) {
+                    jsonWriter.startObject();
+                    jsonWriter.writeProperty("depth", depth);
+                    jsonWriter.startArray("locks");
+                    snapshot.ownedMonitorsAt(depth)
+                            .map(Objects::toIdentityString)
+                            .forEach(jsonWriter::writeProperty);
+                    jsonWriter.endArray();
+                    jsonWriter.endObject();
+                }
+                depth++;
+            }
+            jsonWriter.endArray();
         }
+
+        jsonWriter.endObject();
     }
 
     /**
@@ -385,31 +343,166 @@ public class ThreadDumper {
     }
 
     /**
-     * Escape any characters that need to be escape in the JSON output.
+     * Simple JSON writer to stream objects/arrays to a PrintStream.
      */
-    private static String escape(String value) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            switch (c) {
-                case '"'  -> sb.append("\\\"");
-                case '\\' -> sb.append("\\\\");
-                case '/'  -> sb.append("\\/");
-                case '\b' -> sb.append("\\b");
-                case '\f' -> sb.append("\\f");
-                case '\n' -> sb.append("\\n");
-                case '\r' -> sb.append("\\r");
-                case '\t' -> sb.append("\\t");
-                default -> {
-                    if (c <= 0x1f) {
-                        sb.append(String.format("\\u%04x", c));
-                    } else {
-                        sb.append(c);
+    private static class JsonWriter implements AutoCloseable {
+        private final PrintStream out;
+
+        // current depth and indentation
+        private int depth = -1;
+        private int indent;
+
+        // indicates if there are properties at depth N
+        private boolean[] hasProperties = new boolean[10];
+
+        private JsonWriter(PrintStream out) {
+            this.out = out;
+        }
+
+        static JsonWriter wrap(PrintStream out) {
+            var writer = new JsonWriter(out);
+            writer.startObject();
+            return writer;
+        }
+
+        /**
+         * Start of object or array.
+         */
+        private void startObject(String name, boolean array) {
+            if (depth >= 0) {
+                if (hasProperties[depth]) {
+                    out.println(",");
+                } else {
+                    hasProperties[depth] = true;  // first property at this depth
+                }
+            }
+            out.print(" ".repeat(indent));
+            if (name != null) {
+                out.print("\"" + name + "\": ");
+            }
+            if (array) {
+                out.println("[");
+            } else {
+                out.println("{");
+            }
+            indent += 2;
+            depth++;
+            hasProperties[depth] = false;
+        }
+
+        /**
+         * End of object or array.
+         */
+        private void endObject(boolean array) {
+            if (hasProperties[depth]) {
+                out.println();
+                hasProperties[depth] = false;
+            }
+            depth--;
+            indent -= 2;
+            out.print(" ".repeat(indent));
+            if (array) {
+                out.print("]");
+            } else {
+                out.print("}");
+            }
+        }
+
+        /**
+         * Write a named property.
+         */
+        void writeProperty(String name, Object obj) {
+            if (hasProperties[depth]) {
+                out.println(",");
+            } else {
+                hasProperties[depth] = true;
+            }
+            out.print(" ".repeat(indent));
+            if (name != null) {
+                out.print("\"" + name + "\": ");
+            }
+            if (obj != null) {
+                out.print("\"" + escape(obj.toString()) + "\"");
+            } else {
+                out.print("null");
+            }
+        }
+
+        /**
+         * Write an unnamed property.
+         */
+        void writeProperty(Object obj) {
+            writeProperty(null, obj);
+        }
+
+        /**
+         * Start named object.
+         */
+        void startObject(String name) {
+            startObject(name, false);
+        }
+
+        /**
+         * Start unnamed object.
+         */
+        void startObject() {
+            startObject(null);
+        }
+
+        /**
+         * End of object.
+         */
+        void endObject() {
+            endObject(false);
+        }
+
+        /**
+         * Start named array.
+         */
+        void startArray(String name) {
+            startObject(name, true);
+        }
+
+        /**
+         * End of array.
+         */
+        void endArray() {
+            endObject(true);
+        }
+
+        @Override
+        public void close() {
+            endObject();
+            out.flush();
+        }
+
+        /**
+         * Escape any characters that need to be escape in the JSON output.
+         */
+        private static String escape(String value) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < value.length(); i++) {
+                char c = value.charAt(i);
+                switch (c) {
+                    case '"'  -> sb.append("\\\"");
+                    case '\\' -> sb.append("\\\\");
+                    case '/'  -> sb.append("\\/");
+                    case '\b' -> sb.append("\\b");
+                    case '\f' -> sb.append("\\f");
+                    case '\n' -> sb.append("\\n");
+                    case '\r' -> sb.append("\\r");
+                    case '\t' -> sb.append("\\t");
+                    default -> {
+                        if (c <= 0x1f) {
+                            sb.append(String.format("\\u%04x", c));
+                        } else {
+                            sb.append(c);
+                        }
                     }
                 }
             }
+            return sb.toString();
         }
-        return sb.toString();
     }
 
     /**

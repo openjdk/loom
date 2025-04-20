@@ -219,11 +219,16 @@ public final class ThreadDump {
         private final long tid;
         private final Map<String, String> fields;
         private final List<String> stack;
+        private final Map<Integer, List<String>> ownedMonitors;
 
-        ThreadInfo(long tid, Map<String, String> fields, List<String> stack) {
+        ThreadInfo(long tid,
+                   Map<String, String> fields,
+                   List<String> stack,
+                   Map<Integer, List<String>> ownedMonitors) {
             this.tid = tid;
             this.fields = Map.copyOf(fields);
             this.stack = stack;
+            this.ownedMonitors = Map.copyOf(ownedMonitors);
         }
 
         /**
@@ -247,14 +252,23 @@ public final class ThreadDump {
             return fields.get("state");
         }
 
+        /**
+         * Returns the thread's parkBlocker.
+         */
         public String parkBlocker() {
             return fields.get("parkBlocker");
         }
 
+        /**
+         * Returns the object that the thread is blocked entering its monitor.
+         */
         public String blockedOn() {
             return fields.get("blockedOn");
         }
 
+        /**
+         * Return the object that is the therad is waiting on with Object.wait.
+         */
         public String waitingOn() {
             return fields.get("waitingOn");
         }
@@ -264,6 +278,13 @@ public final class ThreadDump {
          */
         public Stream<String> stack() {
             return stack.stream();
+        }
+
+        /**
+         * Return a map of monitors owned.
+         */
+        public Map<Integer, List<String>> ownedMonitors() {
+            return ownedMonitors;
         }
 
         @Override
@@ -336,7 +357,21 @@ public final class ThreadDump {
                 for (JSONValue steObject : stackObj) {
                     stack.add(steObject.asString());
                 }
-                threadInfos.add(new ThreadInfo(tid, fields, stack));
+
+                // monitors owned
+                Map<Integer, List<String>> ownedMonitors = new HashMap<>();
+                JSONValue monitorsOwnedObj = threadObj.get("monitorsOwned");
+                if (monitorsOwnedObj != null) {
+                    for (JSONValue obj : monitorsOwnedObj.asArray()) {
+                        int depth = Integer.parseInt(obj.get("depth").asString());
+                        for (JSONValue lock : obj.get("locks").asArray()) {
+                            ownedMonitors.computeIfAbsent(depth, _ -> new ArrayList<>())
+                                    .add(lock.asString());
+                        }
+                    }
+                }
+
+                threadInfos.add(new ThreadInfo(tid, fields, stack, ownedMonitors));
             }
 
             // add to map if not already encountered
