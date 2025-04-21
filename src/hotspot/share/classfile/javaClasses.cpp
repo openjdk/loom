@@ -2251,8 +2251,6 @@ oop java_lang_Thread::get_thread_snapshot(jobject jthread, bool with_locks, TRAP
     oop carrier_thread = java_lang_VirtualThread::carrier_thread(java_thread());
     if (carrier_thread != nullptr) {
       thread = java_lang_Thread::thread(carrier_thread);
-    } else {
-      // TODO: need to "suspend" the VT like VirtualThread.getStackTrace does
     }
   } else {
     thread = java_lang_Thread::thread(java_thread());
