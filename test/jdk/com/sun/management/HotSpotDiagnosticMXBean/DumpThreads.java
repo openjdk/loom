@@ -41,6 +41,7 @@ import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -49,6 +50,7 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import com.sun.management.HotSpotDiagnosticMXBean;
 import com.sun.management.HotSpotDiagnosticMXBean.ThreadDumpFormat;
@@ -278,7 +280,7 @@ class DumpThreads {
     }
 
     /**
-     * Test test thread with a thread parked on a j.u.c. lock.
+     * Test thread dump with a thread parked on a j.u.c. lock.
      */
     @Test
     void testParkedThread() throws Exception {
@@ -320,6 +322,47 @@ class DumpThreads {
             assertTrue(parkBlocker.contains("java.util.concurrent.locks.ReentrantLock"));
         } finally {
             lock.unlock();
+        }
+    }
+
+    /**
+     * Test thread dump wth a thread owning a monitor.
+     */
+    @Test
+    void testThreadOwnsMonitor() throws Exception {
+        assumeTrue(trackAllThreads, "This test requires all virtual threads to be tracked");
+        var lock = new Object();
+        var started = new CountDownLatch(1);
+
+        Thread vthread = Thread.ofVirtual().start(() -> {
+            synchronized (lock) {
+                started.countDown();
+                LockSupport.park();
+            }
+        });
+
+        long tid = vthread.threadId();
+        String lockAsString = Objects.toIdentityString(lock);
+
+        try {
+            // wait for thread to park
+            started.await();
+            await(vthread, Thread.State.WAITING);
+
+            ThreadDump threadDump = dumpThreadsToJson();
+            ThreadDump.ThreadInfo ti = threadDump.rootThreadContainer()
+                    .findThread(tid)
+                    .orElse(null);
+            assertNotNull(ti, "thread not found");
+
+            // the lock should be in the ownedMonitors array
+            Set<String> ownedMonitors = ti.ownedMonitors().values()
+                    .stream()
+                    .flatMap(List::stream)
+                    .collect(Collectors.toSet());
+            assertTrue(ownedMonitors.contains(lockAsString), lockAsString + " not found");
+        } finally {
+            LockSupport.unpark(vthread);
         }
     }
 
