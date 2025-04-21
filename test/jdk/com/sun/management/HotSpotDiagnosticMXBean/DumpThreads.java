@@ -349,12 +349,19 @@ class DumpThreads {
             started.await();
             await(vthread, Thread.State.WAITING);
 
+            // thread dump in plain text should include thread
+            List<String> lines = dumpThreadsToPlainText();
+            ThreadFields fields = findThread(tid, lines);
+            assertNotNull(fields, "thread not found");
+            assertEquals("WAITING", fields.state());
+            assertTrue(contains(lines, "// locked " + lockAsString));
+
+            // thread dump in JSON format should include thread in root container
             ThreadDump threadDump = dumpThreadsToJson();
             ThreadDump.ThreadInfo ti = threadDump.rootThreadContainer()
                     .findThread(tid)
                     .orElse(null);
             assertNotNull(ti, "thread not found");
-
             // the lock should be in the ownedMonitors array
             Set<String> ownedMonitors = ti.ownedMonitors().values()
                     .stream()
