@@ -88,6 +88,12 @@ import org.junit.jupiter.params.provider.Arguments;
 
 class KlassInit {
     static final int MAX_VTHREAD_COUNT = 8 * Runtime.getRuntime().availableProcessors();
+    static CountDownLatch finishInvokeStatic1 = new CountDownLatch(1);
+    static CountDownLatch finishInvokeStatic2 = new CountDownLatch(1);
+    static CountDownLatch finishInvokeStatic3 = new CountDownLatch(1);
+    static CountDownLatch finishNew = new CountDownLatch(1);
+    static CountDownLatch finishGetStatic = new CountDownLatch(1);
+    static CountDownLatch finishPutStatic = new CountDownLatch(1);
 
     /**
      * Test that threads blocked waiting for klass to be initialized
@@ -97,7 +103,9 @@ class KlassInit {
     void testReleaseAtKlassInitInvokeStatic1() throws Exception {
         class TestClass {
             static {
-                LockSupport.park();
+                try {
+                    finishInvokeStatic1.await();
+                } catch(InterruptedException e) {}
             }
             static void m() {
             }
@@ -112,18 +120,13 @@ class KlassInit {
                 started[id].countDown();
                 TestClass.m();
             });
-            // Make sure this is the initializer thread
-            if (i == 0) {
-                started[0].await();
-                await(vthreads[0], Thread.State.WAITING);
-            }
         }
-        for (int i = 1; i < MAX_VTHREAD_COUNT; i++) {
+        for (int i = 0; i < MAX_VTHREAD_COUNT; i++) {
             started[i].await();
             await(vthreads[i], Thread.State.WAITING);
         }
 
-        LockSupport.unpark(vthreads[0]);
+        finishInvokeStatic1.countDown();
         for (int i = 0; i < MAX_VTHREAD_COUNT; i++) {
             vthreads[i].join();
         }
@@ -136,7 +139,9 @@ class KlassInit {
     void testReleaseAtKlassInitInvokeStatic2() throws Exception {
         class TestClass {
             static {
-                LockSupport.park();
+                try {
+                    finishInvokeStatic2.await();
+                } catch(InterruptedException e) {}
             }
             static void m(ArrayList<String> list, int id) {
                 String str = list.get(0);
@@ -157,19 +162,14 @@ class KlassInit {
                 started[id].countDown();
                 TestClass.m(lists[id], id);
             });
-            // Make sure this is the initializer thread
-            if (i == 0) {
-                started[0].await();
-                await(vthreads[0], Thread.State.WAITING);
-            }
         }
-        for (int i = 1; i < MAX_VTHREAD_COUNT; i++) {
+        for (int i = 0; i < MAX_VTHREAD_COUNT; i++) {
             started[i].await();
             await(vthreads[i], Thread.State.WAITING);
         }
 
         System.gc();
-        LockSupport.unpark(vthreads[0]);
+        finishInvokeStatic2.countDown();
         for (int i = 0; i < MAX_VTHREAD_COUNT; i++) {
             vthreads[i].join();
             assertEquals(lists[i].get(1), "Success");
@@ -183,7 +183,9 @@ class KlassInit {
     void testReleaseAtKlassInitInvokeStatic3() throws Exception {
         class TestClass {
             static {
-                LockSupport.park();
+                try {
+                    finishInvokeStatic3.await();
+                } catch(InterruptedException e) {}
             }
             static void m() {
             }
@@ -217,7 +219,7 @@ class KlassInit {
             await(vthreads[i], Thread.State.WAITING);
         }
 
-        LockSupport.unpark(vthreads[0]);
+        finishInvokeStatic3.countDown();
         for (int i = 0; i < MAX_VTHREAD_COUNT; i++) {
             vthreads[i].join();
         }
@@ -231,7 +233,9 @@ class KlassInit {
     void testReleaseAtKlassInitNew() throws Exception {
         class TestClass {
             static {
-                LockSupport.park();
+                try {
+                    finishNew.await();
+                } catch(InterruptedException e) {}
             }
             void m() {
             }
@@ -247,18 +251,13 @@ class KlassInit {
                 TestClass x = new TestClass();
                 x.m();
             });
-            // Make sure this is the initializer thread
-            if (i == 0) {
-                started[0].await();
-                await(vthreads[0], Thread.State.WAITING);
-            }
         }
-        for (int i = 1; i < MAX_VTHREAD_COUNT; i++) {
+        for (int i = 0; i < MAX_VTHREAD_COUNT; i++) {
             started[i].await();
             await(vthreads[i], Thread.State.WAITING);
         }
 
-        LockSupport.unpark(vthreads[0]);
+        finishNew.countDown();
         for (int i = 0; i < MAX_VTHREAD_COUNT; i++) {
             vthreads[i].join();
         }
@@ -272,7 +271,9 @@ class KlassInit {
     void testReleaseAtKlassInitGetStatic() throws Exception {
         class TestClass {
             static {
-                LockSupport.park();
+                try {
+                    finishGetStatic.await();
+                } catch(InterruptedException e) {}
             }
             public static int NUMBER = 150;
         }
@@ -288,18 +289,13 @@ class KlassInit {
                 started[id].countDown();
                 result[id].set(TestClass.NUMBER);
             });
-            // Make sure this is the initializer thread
-            if (i == 0) {
-                started[0].await();
-                await(vthreads[0], Thread.State.WAITING);
-            }
         }
-        for (int i = 1; i < MAX_VTHREAD_COUNT; i++) {
+        for (int i = 0; i < MAX_VTHREAD_COUNT; i++) {
             started[i].await();
             await(vthreads[i], Thread.State.WAITING);
         }
 
-        LockSupport.unpark(vthreads[0]);
+        finishGetStatic.countDown();
         for (int i = 0; i < MAX_VTHREAD_COUNT; i++) {
             vthreads[i].join();
             assertEquals(result[i].get(), TestClass.NUMBER);
@@ -314,7 +310,9 @@ class KlassInit {
     void testReleaseAtKlassInitPutStatic() throws Exception {
         class TestClass {
             static {
-                LockSupport.park();
+                try {
+                    finishPutStatic.await();
+                } catch(InterruptedException e) {}
             }
             public static int NUMBER;
         }
@@ -328,19 +326,13 @@ class KlassInit {
                 started[id].countDown();
                 TestClass.NUMBER = id;
             });
-            // Make sure this is the initializer thread
-            if (i == 0) {
-                started[0].await();
-                await(vthreads[0], Thread.State.WAITING);
-            }
         }
-        for (int i = 1; i < MAX_VTHREAD_COUNT; i++) {
+        for (int i = 0; i < MAX_VTHREAD_COUNT; i++) {
             started[i].await();
             await(vthreads[i], Thread.State.WAITING);
         }
 
-        LockSupport.unpark(vthreads[0]);
-        boolean found = false;
+        finishPutStatic.countDown();
         for (int i = 0; i < MAX_VTHREAD_COUNT; i++) {
             vthreads[i].join();
         }
