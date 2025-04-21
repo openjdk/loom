@@ -2222,7 +2222,9 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
 oop java_lang_Thread::get_thread_snapshot(jobject jthread, bool with_locks, TRAPS) {
   ThreadsListHandle tlh(JavaThread::current());
 
-  oop java_thread = JNIHandles::resolve(jthread);
+  ResourceMark rm(THREAD);
+  HandleMark   hm(THREAD);
+  Handle java_thread(THREAD, JNIHandles::resolve(jthread));
 
   // wrapper to auto delete JvmtiVTMSTransitionDisabler
   class TransitionDisabler {
@@ -2240,26 +2242,24 @@ oop java_lang_Thread::get_thread_snapshot(jobject jthread, bool with_locks, TRAP
   } transition_disabler;
 
   JavaThread* thread = nullptr;
-  bool is_virtual = java_lang_VirtualThread::is_instance(java_thread);
+  bool is_virtual = java_lang_VirtualThread::is_instance(java_thread());
 
   if (is_virtual) {
     // 1st need to disable mount/unmount transitions
     transition_disabler.init(jthread);
 
-    oop carrier_thread = java_lang_VirtualThread::carrier_thread(java_thread);
+    oop carrier_thread = java_lang_VirtualThread::carrier_thread(java_thread());
     if (carrier_thread != nullptr) {
       thread = java_lang_Thread::thread(carrier_thread);
     } else {
       // TODO: need to "suspend" the VT like VirtualThread.getStackTrace does
     }
   } else {
-    thread = java_lang_Thread::thread(java_thread);
+    thread = java_lang_Thread::thread(java_thread());
   }
 
   // Handshake with target
-  ResourceMark rm(THREAD);
-  HandleMark   hm(THREAD);
-  GetThreadSnapshotClosure cl(Handle(THREAD, java_thread), thread, with_locks);
+  GetThreadSnapshotClosure cl(java_thread, thread, with_locks);
   if (thread == nullptr) {
     // unmounted vthread, execute on the current thread
     cl.do_thread(nullptr);
