@@ -603,6 +603,7 @@ final class VirtualThread extends BaseVirtualThread {
         // Object.wait
         if (s == WAITING || s == TIMED_WAITING) {
             int newState;
+            boolean interruptable = interruptableWait;
             if (s == WAITING) {
                 setState(newState = WAIT);
             } else {
@@ -632,7 +633,7 @@ final class VirtualThread extends BaseVirtualThread {
             }
 
             // may have been interrupted while in transition to wait state
-            if (interruptableWait && interrupted && compareAndSetState(newState, UNBLOCKED)) {
+            if (interruptable && interrupted && compareAndSetState(newState, UNBLOCKED)) {
                 submitRunContinuation();
                 return;
             }
@@ -1058,7 +1059,7 @@ final class VirtualThread extends BaseVirtualThread {
 
             // if thread is waiting in Object.wait then schedule to try to reenter
             int s = state();
-            if ((s == WAIT || s == TIMED_WAIT) && interruptableWait && compareAndSetState(s, UNBLOCKED)) {
+            if ((s == WAIT || s == TIMED_WAIT) && compareAndSetState(s, UNBLOCKED)) {
                 submitRunContinuation();
             }
 
