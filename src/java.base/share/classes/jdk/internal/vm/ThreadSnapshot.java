@@ -42,7 +42,7 @@ class ThreadSnapshot {
     // called by the VM
     private ThreadSnapshot(StackTraceElement[] stackTrace,
                            ThreadLock[] locks,
-                           //String name,
+                           String name,
                            int threadStatus) {
         this.stackTrace = stackTrace;
         this.locks = locks;
@@ -60,9 +60,6 @@ class ThreadSnapshot {
         }
         if (snapshot.locks == null) {
             snapshot.locks = EMPTY_LOCKS;
-        }
-        if (snapshot.name == null) {
-            snapshot.name = thread.getName();  // temp
         }
         return snapshot;
     }

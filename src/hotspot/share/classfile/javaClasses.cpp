@@ -2036,7 +2036,7 @@ public:
       int vt_state = java_lang_VirtualThread::state(_java_thread());
       _thread_status = java_lang_VirtualThread::map_state_to_thread_status(vt_state);
     }
-    _name = nullptr; //java_lang_Thread::name(_java_thread());
+    _name = java_lang_Thread::name(_java_thread());
 
     if (_thread != nullptr && !_thread->has_last_Java_frame()) {
       // stack trace is empty
@@ -2232,12 +2232,16 @@ oop java_lang_Thread::get_thread_snapshot(jobject jthread, bool with_locks, TRAP
   public:
     TransitionDisabler() : _transition_disabler(nullptr) {}
     ~TransitionDisabler() {
-      if (_transition_disabler != nullptr) {
-        delete _transition_disabler;
-      }
+      reset();
     }
     void init(jobject jthread) {
       _transition_disabler = new (mtInternal) JvmtiVTMSTransitionDisabler(jthread);
+    }
+    void reset() {
+      if (_transition_disabler != nullptr) {
+        delete _transition_disabler;
+        _transition_disabler = nullptr;
+      }
     }
   } transition_disabler;
 
@@ -2267,14 +2271,17 @@ oop java_lang_Thread::get_thread_snapshot(jobject jthread, bool with_locks, TRAP
     } while (cl.read_reset_retry());
   }
 
+  // Handle thread name
+  Handle thread_name(THREAD, cl._name);
+
   // Convert to StackTraceElement array
-  InstanceKlass* k = vmClasses::StackTraceElement_klass();
-  assert(k != nullptr, "must be loaded in 1.4+");
-  if (k->should_be_initialized()) {
-    k->initialize(CHECK_NULL);
+  InstanceKlass* ste_klass = vmClasses::StackTraceElement_klass();
+  assert(ste_klass != nullptr, "must be loaded in 1.4+");
+  if (ste_klass->should_be_initialized()) {
+    ste_klass->initialize(CHECK_NULL);
   }
 
-  objArrayHandle trace = oopFactory::new_objArray_handle(k, cl._depth, CHECK_NULL);
+  int max_locks = cl._locks != nullptr ? cl._locks->length() : 0;
 
   InstanceKlass* lock_klass = nullptr;
   if (with_locks) {
@@ -2283,7 +2290,8 @@ oop java_lang_Thread::get_thread_snapshot(jobject jthread, bool with_locks, TRAP
     lock_klass = InstanceKlass::cast(k);
   }
 
-  int max_locks = cl._locks != nullptr ? cl._locks->length() : 0;
+  objArrayHandle trace = oopFactory::new_objArray_handle(ste_klass, cl._depth, CHECK_NULL);
+
   for (int i = 0; i < cl._depth; i++) {
     methodHandle method(THREAD, cl._methods->at(i));
     oop element = java_lang_StackTraceElement::create(method, cl._bcis->at(i), CHECK_NULL);
@@ -2294,7 +2302,7 @@ oop java_lang_Thread::get_thread_snapshot(jobject jthread, bool with_locks, TRAP
   {
     JavaValue result(T_OBJECT);
     JavaCalls::call_static(&result,
-                           k, // vmClasses::StackTraceElement_klass()
+                           ste_klass,
                            vmSymbols::java_lang_StackTraceElement_of_name(),
                            vmSymbols::java_lang_StackTraceElement_of_signature(),
                            trace,
@@ -2323,6 +2331,9 @@ oop java_lang_Thread::get_thread_snapshot(jobject jthread, bool with_locks, TRAP
     }
   }
 
+  // all oops are handled, can enable transitions.
+  transition_disabler.reset();
+
   Symbol* snapshot_name = vmSymbols::jdk_internal_vm_ThreadSnapshot();
   Klass* snapshot_klass = SystemDictionary::resolve_or_fail(snapshot_name, true, CHECK_NULL);
   if (snapshot_klass->should_be_initialized()) {
@@ -2333,7 +2344,7 @@ oop java_lang_Thread::get_thread_snapshot(jobject jthread, bool with_locks, TRAP
   JavaCallArguments args;
   args.push_oop(trace);
   args.push_oop(locks);
-  //args.push_oop(Handle(THREAD, cl._name));
+  args.push_oop(thread_name);
   args.push_int((int)cl._thread_status);
   Handle snapshot = JavaCalls::construct_new_instance(InstanceKlass::cast(snapshot_klass),
       vmSymbols::jdk_internal_vm_ThreadSnapshot_ctor_signature(), &args, CHECK_NULL);
