@@ -45,7 +45,7 @@ import jdk.test.lib.json.JSONValue;
  * <pre>{@code
  * {
  *   "threadDump": {
- *     "processId": "63406",
+ *     "processId": 63406
  *     "time": "2022-05-20T07:37:16.308017Z",
  *     "runtimeVersion": "19",
  *     "threadContainers": [
@@ -55,12 +55,12 @@ import jdk.test.lib.json.JSONValue;
  *         "owner": null,
  *         "threads": [
  *          {
- *            "tid": "1",
+ *            "tid": 1,
  *            "name": "main",
  *            "stack": [...]
  *          },
  *          {
- *            "tid": "8",
+ *            "tid": 8,
  *            "name": "Reference Handler",
  *            "state": "RUNNABLE",
  *            "stack": [
@@ -75,21 +75,21 @@ import jdk.test.lib.json.JSONValue;
  *          {"name": "Monitor Ctrl-Break"...},
  *          {"name": "Notification Thread"...}
  *         ],
- *         "threadCount": "7"
+ *         "threadCount": 7
  *       },
  *       {
  *         "container": "ForkJoinPool.commonPool\/jdk.internal.vm.SharedThreadContainer@56aac163",
  *         "parent": "<root>",
  *         "owner": null,
  *         "threads": [...],
- *         "threadCount": "1"
+ *         "threadCount": 1
  *       },
  *       {
  *         "container": "java.util.concurrent.ThreadPoolExecutor@20322d26\/jdk.internal.vm.SharedThreadContainer@184f6be2",
  *         "parent": "<root>",
  *         "owner": null,
  *         "threads": [...],
- *         "threadCount": "1"
+ *         "threadCount": 1
  *       }
  *     ]
  *   }
@@ -217,18 +217,34 @@ public final class ThreadDump {
      */
     public static final class ThreadInfo {
         private final long tid;
-        private final Map<String, String> fields;
-        private final List<String> stack;
-        private final Map<Integer, List<String>> ownedMonitors;
+        private final JSONValue threadObj;
 
-        ThreadInfo(long tid,
-                   Map<String, String> fields,
-                   List<String> stack,
-                   Map<Integer, List<String>> ownedMonitors) {
-            this.tid = tid;
-            this.fields = Map.copyOf(fields);
-            this.stack = stack;
-            this.ownedMonitors = Map.copyOf(ownedMonitors);
+
+        ThreadInfo(JSONValue threadObj) {
+            this.tid = Long.parseLong(threadObj.get("tid").asString());
+            this.threadObj = threadObj;
+        }
+
+        /**
+         * Returns the value of a property of this thread object, as a string.
+         */
+        private String getStringProperty(String propertyName) {
+            JSONValue value = threadObj.get(propertyName);
+            return (value != null) ? value.asString() : null;
+        }
+
+        /**
+         * Returns the value of a property of an object in this thread object, as a string.
+         */
+        private String getStringProperty(String objectName, String propertyName) {
+            JSONValue obj = threadObj.get(objectName);
+            if (obj != null) {
+                JSONValue value = obj.asObject().get(propertyName);
+                if (value != null) {
+                    return value.asString();
+                }
+            }
+            return null;
         }
 
         /**
@@ -242,41 +258,46 @@ public final class ThreadDump {
          * Returns the thread name.
          */
         public String name() {
-            return fields.get("name");
+            return getStringProperty("name");
         }
 
         /**
          * Returns the thread state.
          */
         public String state() {
-            return fields.get("state");
+            return getStringProperty("state");
         }
 
         /**
          * Returns the thread's parkBlocker.
          */
         public String parkBlocker() {
-            return fields.get("parkBlocker");
+            return getStringProperty("parkBlocker", "object");
         }
 
         /**
          * Returns the object that the thread is blocked entering its monitor.
          */
         public String blockedOn() {
-            return fields.get("blockedOn");
+            return getStringProperty("blockedOn");
         }
 
         /**
          * Return the object that is the therad is waiting on with Object.wait.
          */
         public String waitingOn() {
-            return fields.get("waitingOn");
+            return getStringProperty("waitingOn");
         }
 
         /**
          * Returns the thread stack.
          */
         public Stream<String> stack() {
+            JSONValue.JSONArray stackObj = threadObj.get("stack").asArray();
+            List<String> stack = new ArrayList<>();
+            for (JSONValue steObject : stackObj) {
+                stack.add(steObject.asString());
+            }
             return stack.stream();
         }
 
@@ -284,6 +305,17 @@ public final class ThreadDump {
          * Return a map of monitors owned.
          */
         public Map<Integer, List<String>> ownedMonitors() {
+            Map<Integer, List<String>> ownedMonitors = new HashMap<>();
+            JSONValue monitorsOwnedObj = threadObj.get("monitorsOwned");
+            if (monitorsOwnedObj != null) {
+                for (JSONValue obj : monitorsOwnedObj.asArray()) {
+                    int depth = Integer.parseInt(obj.get("depth").asString());
+                    for (JSONValue lock : obj.get("locks").asArray()) {
+                        ownedMonitors.computeIfAbsent(depth, _ -> new ArrayList<>())
+                                .add(lock.asString());
+                    }
+                }
+            }
             return ownedMonitors;
         }
 
@@ -314,17 +346,6 @@ public final class ThreadDump {
         }
     }
 
-    private Map<String, String> find(JSONValue json, String... names) {
-        var fields = new HashMap<String, String>();
-        for (String name : names) {
-            JSONValue value = json.get(name);
-            if (value != null) {
-                fields.put(name, value.asString());
-            }
-        }
-        return fields;
-    }
-
     /**
      * Parses the given JSON text as a thread dump.
      */
@@ -345,33 +366,7 @@ public final class ThreadDump {
             // threads array
             Set<ThreadInfo> threadInfos = new HashSet<>();
             for (JSONValue threadObj : threadsObj) {
-                long tid = Long.parseLong(threadObj.get("tid").asString());
-
-                // thread fields, some are optional
-                Map<String, String> fields = find(threadObj, "time",
-                        "name", "state", "parkBlocker", "blockedOn", "waitingOn");
-
-                // stack trace
-                JSONValue.JSONArray stackObj = threadObj.get("stack").asArray();
-                List<String> stack = new ArrayList<>();
-                for (JSONValue steObject : stackObj) {
-                    stack.add(steObject.asString());
-                }
-
-                // monitors owned
-                Map<Integer, List<String>> ownedMonitors = new HashMap<>();
-                JSONValue monitorsOwnedObj = threadObj.get("monitorsOwned");
-                if (monitorsOwnedObj != null) {
-                    for (JSONValue obj : monitorsOwnedObj.asArray()) {
-                        int depth = Integer.parseInt(obj.get("depth").asString());
-                        for (JSONValue lock : obj.get("locks").asArray()) {
-                            ownedMonitors.computeIfAbsent(depth, _ -> new ArrayList<>())
-                                    .add(lock.asString());
-                        }
-                    }
-                }
-
-                threadInfos.add(new ThreadInfo(tid, fields, stack, ownedMonitors));
+                threadInfos.add(new ThreadInfo(threadObj));
             }
 
             // add to map if not already encountered

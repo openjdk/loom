@@ -218,8 +218,8 @@ public class ThreadDumper {
     /**
      * Generate a thread dump to the given print stream in JSON format.
      */
-    private static void dumpThreadsToJson(PrintStream out) {
-        try (JsonWriter jsonWriter = JsonWriter.wrap(out)) {
+    private static void dumpThreadsToJson(PrintStream ps) {
+        try (JsonWriter jsonWriter = JsonWriter.wrap(ps)) {
             jsonWriter.startObject("threadDump");
 
             jsonWriter.writeProperty("processId", processId());
@@ -268,7 +268,7 @@ public class ThreadDumper {
      * Write a thread to the given JSON writer.
      */
     private static void dumpThreadToJson(Thread thread, JsonWriter jsonWriter) {
-        String now = Instant.now().toString();
+        Instant now = Instant.now();
         ThreadSnapshot snapshot = ThreadSnapshot.of(thread);
         Thread.State state = snapshot.threadState();
         StackTraceElement[] stackTrace = snapshot.stackTrace();
@@ -282,7 +282,10 @@ public class ThreadDumper {
         // park blocker
         Object parkBlocker = snapshot.parkBlocker();
         if (parkBlocker != null) {
-            jsonWriter.writeProperty("parkBlocker", Objects.toIdentityString(parkBlocker));
+            jsonWriter.startObject("parkBlocker");
+            jsonWriter.writeProperty("object", Objects.toIdentityString(parkBlocker));
+            // TBD add exclusiveOwnerThread if AbstractOwnableSynchronizer
+            jsonWriter.endObject();
         }
 
         // blocked on monitor enter or Object.wait
@@ -409,7 +412,9 @@ public class ThreadDumper {
         }
 
         /**
-         * Write a named property.
+         * Write a property.
+         * @param name the property name, null for an unnamed property
+         * @param obj the value or null
          */
         void writeProperty(String name, Object obj) {
             if (hasProperties[depth]) {
@@ -421,10 +426,10 @@ public class ThreadDumper {
             if (name != null) {
                 out.print("\"" + name + "\": ");
             }
-            if (obj != null) {
-                out.print("\"" + escape(obj.toString()) + "\"");
-            } else {
-                out.print("null");
+            switch (obj) {
+                case Number _ -> out.print(obj);
+                case null     -> out.print("null");
+                default       -> out.print("\"" + escape(obj.toString()) + "\"");
             }
         }
 
