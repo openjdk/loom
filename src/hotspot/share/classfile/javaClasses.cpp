@@ -2421,7 +2421,7 @@ oop java_lang_Thread::get_thread_snapshot(jobject jthread, bool with_locks, TRAP
   if (snapshot_klass->should_be_initialized()) {
     snapshot_klass->initialize(CHECK_NULL);
   }
-  
+
   Handle snapshot = jdk_internal_vm_ThreadSnapshot::allocate(InstanceKlass::cast(snapshot_klass), CHECK_NULL);
   jdk_internal_vm_ThreadSnapshot::set_name(snapshot(), thread_name());
   jdk_internal_vm_ThreadSnapshot::set_thread_status(snapshot(), (int)cl._thread_status);
