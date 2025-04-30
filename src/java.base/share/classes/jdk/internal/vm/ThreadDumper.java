@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2023, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2020, 2025, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -36,7 +36,6 @@ import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
@@ -227,7 +226,7 @@ public class ThreadDumper {
             jsonWriter.writeProperty("runtimeVersion", Runtime.version());
 
             jsonWriter.startArray("threadContainers");
-            allContainers().forEach(c -> dumpThreadsToJson(c, jsonWriter));
+            dumpThreads(ThreadContainers.root(), jsonWriter);
             jsonWriter.endArray();
 
             jsonWriter.endObject();  // threadDump
@@ -237,7 +236,7 @@ public class ThreadDumper {
     /**
      * Write a thread container to the given JSON writer.
      */
-    private static void dumpThreadsToJson(ThreadContainer container, JsonWriter jsonWriter) {
+    private static void dumpThreads(ThreadContainer container, JsonWriter jsonWriter) {
         jsonWriter.startObject();
         jsonWriter.writeProperty("container", container);
         jsonWriter.writeProperty("parent", container.parent());
@@ -250,7 +249,7 @@ public class ThreadDumper {
         Iterator<Thread> threads = container.threads().iterator();
         while (threads.hasNext()) {
             Thread thread = threads.next();
-            dumpThreadToJson(thread, jsonWriter);
+            dumpThread(thread, jsonWriter);
             threadCount++;
         }
         jsonWriter.endArray(); // threads
@@ -262,12 +261,15 @@ public class ThreadDumper {
         jsonWriter.writeProperty("threadCount", threadCount);
 
         jsonWriter.endObject();
+
+        // the children of the thread container follow
+        container.children().forEach(c -> dumpThreads(c, jsonWriter));
     }
 
     /**
      * Write a thread to the given JSON writer.
      */
-    private static void dumpThreadToJson(Thread thread, JsonWriter jsonWriter) {
+    private static void dumpThread(Thread thread, JsonWriter jsonWriter) {
         Instant now = Instant.now();
         ThreadSnapshot snapshot = ThreadSnapshot.of(thread);
         Thread.State state = snapshot.threadState();
@@ -331,25 +333,10 @@ public class ThreadDumper {
     }
 
     /**
-     * Returns a list of all thread containers that are "reachable" from
-     * the root container.
-     */
-    private static List<ThreadContainer> allContainers() {
-        List<ThreadContainer> containers = new ArrayList<>();
-        collect(ThreadContainers.root(), containers);
-        return containers;
-    }
-
-    private static void collect(ThreadContainer container, List<ThreadContainer> containers) {
-        containers.add(container);
-        container.children().forEach(c -> collect(c, containers));
-    }
-
-    /**
      * Simple JSON writer to stream objects/arrays to a PrintStream.
      */
     private static class JsonWriter implements AutoCloseable {
-        private final PrintStream out;
+        private final PrintStream ps;
 
         // current depth and indentation
         private int depth = -1;
@@ -359,11 +346,11 @@ public class ThreadDumper {
         private boolean[] hasProperties = new boolean[10];
 
         private JsonWriter(PrintStream out) {
-            this.out = out;
+            this.ps = out;
         }
 
-        static JsonWriter wrap(PrintStream out) {
-            var writer = new JsonWriter(out);
+        static JsonWriter wrap(PrintStream ps) {
+            var writer = new JsonWriter(ps);
             writer.startObject();
             return writer;
         }
@@ -374,19 +361,19 @@ public class ThreadDumper {
         private void startObject(String name, boolean array) {
             if (depth >= 0) {
                 if (hasProperties[depth]) {
-                    out.println(",");
+                    ps.println(",");
                 } else {
                     hasProperties[depth] = true;  // first property at this depth
                 }
             }
-            out.print(" ".repeat(indent));
+            ps.print(" ".repeat(indent));
             if (name != null) {
-                out.print("\"" + name + "\": ");
+                ps.print("\"" + name + "\": ");
             }
             if (array) {
-                out.println("[");
+                ps.println("[");
             } else {
-                out.println("{");
+                ps.println("{");
             }
             indent += 2;
             depth++;
@@ -397,17 +384,18 @@ public class ThreadDumper {
          * End of object or array.
          */
         private void endObject(boolean array) {
+            assert depth >= 0;
             if (hasProperties[depth]) {
-                out.println();
+                ps.println();
                 hasProperties[depth] = false;
             }
             depth--;
             indent -= 2;
-            out.print(" ".repeat(indent));
+            ps.print(" ".repeat(indent));
             if (array) {
-                out.print("]");
+                ps.print("]");
             } else {
-                out.print("}");
+                ps.print("}");
             }
         }
 
@@ -417,19 +405,20 @@ public class ThreadDumper {
          * @param obj the value or null
          */
         void writeProperty(String name, Object obj) {
+            assert depth >= 0;
             if (hasProperties[depth]) {
-                out.println(",");
+                ps.println(",");
             } else {
                 hasProperties[depth] = true;
             }
-            out.print(" ".repeat(indent));
+            ps.print(" ".repeat(indent));
             if (name != null) {
-                out.print("\"" + name + "\": ");
+                ps.print("\"" + name + "\": ");
             }
             switch (obj) {
-                case Number _ -> out.print(obj);
-                case null     -> out.print("null");
-                default       -> out.print("\"" + escape(obj.toString()) + "\"");
+                case Number _ -> ps.print(obj);
+                case null     -> ps.print("null");
+                default       -> ps.print("\"" + escape(obj.toString()) + "\"");
             }
         }
 
@@ -478,7 +467,7 @@ public class ThreadDumper {
         @Override
         public void close() {
             endObject();
-            out.flush();
+            ps.flush();
         }
 
         /**
