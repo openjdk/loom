@@ -107,15 +107,6 @@ inline int StackChunkFrameStream<frame_kind>::interpreter_frame_stack_argsize() 
   return diff;
 }
 
-class InterpreterOopCount : public OopClosure {
-  int _count;
-public:
-  InterpreterOopCount() : _count(0) {}
-  void do_oop(oop* p) override { _count++; }
-  void do_oop(narrowOop* p) override { _count++; }
-  int count() { return _count; }
-};
-
 template <ChunkFrames frame_kind>
 template <typename RegisterMapT>
 inline int StackChunkFrameStream<frame_kind>::interpreter_frame_num_oops(RegisterMapT* map) const {

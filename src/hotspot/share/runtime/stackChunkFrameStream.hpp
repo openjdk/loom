@@ -26,6 +26,7 @@
 #define SHARE_RUNTIME_STACKCHUNKFRAMESTREAM_HPP
 
 #include "memory/allocation.hpp"
+#include "memory/iterator.hpp"
 #include "oops/oopsHierarchy.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
@@ -123,6 +124,15 @@ public:
   inline void iterate_oops(OopClosureType* closure, const RegisterMapT* map) const;
   template <class DerivedOopClosureType, class RegisterMapT>
   inline void iterate_derived_pointers(DerivedOopClosureType* closure, const RegisterMapT* map) const;
+};
+
+class InterpreterOopCount : public OopClosure {
+  int _count;
+public:
+  InterpreterOopCount() : _count(0) {}
+  void do_oop(oop* p) override { _count++; }
+  void do_oop(narrowOop* p) override { _count++; }
+  int count() { return _count; }
 };
 
 #endif // SHARE_RUNTIME_STACKCHUNKFRAMESTREAM_HPP
