@@ -316,10 +316,14 @@ class DumpThreads {
                     .findThread(vthread.threadId())
                     .orElse(null);
             assertNotNull(ti, "thread not found");
+
+            // thread should be waiting on the ReentrantLock, owned by the main thread.
             assertEquals("WAITING", ti.state());
             String parkBlocker = ti.parkBlocker();
             assertNotNull(parkBlocker);
             assertTrue(parkBlocker.contains("java.util.concurrent.locks.ReentrantLock"));
+            long ownerTid = ti.exclusiveOwnerThreadId().orElseThrow();
+            assertEquals(Thread.currentThread().threadId(), ownerTid);
         } finally {
             lock.unlock();
         }

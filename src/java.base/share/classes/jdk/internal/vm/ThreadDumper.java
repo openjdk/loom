@@ -40,6 +40,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.locks.AbstractOwnableSynchronizer;
 
 /**
  * Thread dump support.
@@ -169,7 +170,12 @@ public class ThreadDumper {
         // park blocker
         Object parkBlocker = snapshot.parkBlocker();
         if (parkBlocker != null) {
-            ps.println("      // parked on " + Objects.toIdentityString(parkBlocker));
+            ps.print("      // parked on " + Objects.toIdentityString(parkBlocker));
+            if (parkBlocker instanceof AbstractOwnableSynchronizer
+                    && snapshot.exclusiveOwnerThread() instanceof Thread owner) {
+                ps.print(", owned by #" + owner.threadId());
+            }
+            ps.println();
         }
 
         // blocked on monitor enter or Object.wait
@@ -286,7 +292,10 @@ public class ThreadDumper {
         if (parkBlocker != null) {
             jsonWriter.startObject("parkBlocker");
             jsonWriter.writeProperty("object", Objects.toIdentityString(parkBlocker));
-            // TBD add exclusiveOwnerThread if AbstractOwnableSynchronizer
+            if (parkBlocker instanceof AbstractOwnableSynchronizer
+                    && snapshot.exclusiveOwnerThread() instanceof Thread owner) {
+                jsonWriter.writeProperty("exclusiveOwnerThreadId", owner.threadId());
+            }
             jsonWriter.endObject();
         }
 

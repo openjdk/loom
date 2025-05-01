@@ -1874,9 +1874,8 @@ ByteSize java_lang_Thread::thread_id_offset() {
 }
 
 oop java_lang_Thread::park_blocker(oop java_thread) {
-  return java_thread->obj_field(_park_blocker_offset);
+  return java_thread->obj_field_acquire(_park_blocker_offset);
 }
-
 
 struct LockInfo {
   enum { // should be synced with jdk.internal.vm.ThreadSnapshot.ThreadLock constants
@@ -1964,6 +1963,12 @@ public:
         oop park_blocker = java_lang_Thread::park_blocker(_java_thread());
         if (park_blocker != nullptr) {
           _locks->push(LockInfo(depth, LockInfo::PARKING_TO_WAIT, park_blocker));
+          if (park_blocker->is_a(vmClasses::java_util_concurrent_locks_AbstractOwnableSynchronizer_klass())) {
+            oop owner = java_util_concurrent_locks_AbstractOwnableSynchronizer::get_owner_threadObj(park_blocker);
+            if (owner != nullptr) {
+              _locks->push(LockInfo(depth, LockInfo::OWNABLE_SYNCHRONIZER, owner));
+            }
+          }
           _found_first_lock = true;
         }
       }
@@ -5493,7 +5498,7 @@ void java_util_concurrent_locks_AbstractOwnableSynchronizer::compute_offsets() {
 
 oop java_util_concurrent_locks_AbstractOwnableSynchronizer::get_owner_threadObj(oop obj) {
   assert(_owner_offset != 0, "Must be initialized");
-  return obj->obj_field(_owner_offset);
+  return obj->obj_field_acquire(_owner_offset);
 }
 
 #if INCLUDE_CDS

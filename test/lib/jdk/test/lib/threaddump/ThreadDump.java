@@ -219,7 +219,6 @@ public final class ThreadDump {
         private final long tid;
         private final JSONValue threadObj;
 
-
         ThreadInfo(JSONValue threadObj) {
             this.tid = Long.parseLong(threadObj.get("tid").asString());
             this.threadObj = threadObj;
@@ -273,6 +272,18 @@ public final class ThreadDump {
          */
         public String parkBlocker() {
             return getStringProperty("parkBlocker", "object");
+        }
+
+        /**
+         * Returns the thread ID of the owner thread if the parkBlocker is an AQS.
+         */
+        public Optional<Long> exclusiveOwnerThreadId() {
+            String s = getStringProperty("parkBlocker", "exclusiveOwnerThreadId");
+            if (s != null) {
+                return Optional.of(Long.parseLong(s));
+            } else {
+                return Optional.empty();
+            }
         }
 
         /**

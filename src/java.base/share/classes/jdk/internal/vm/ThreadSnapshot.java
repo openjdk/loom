@@ -85,6 +85,15 @@ class ThreadSnapshot {
     }
 
     /**
+     * Returns the owner of exclusive mode synchronizer when the parkBlocker is an AQS.
+     */
+    Object exclusiveOwnerThread() {
+        return findLockObject(0, LockType.OWNABLE_SYNCHRONIZER)
+                .findAny()
+                .orElse(null);
+    }
+
+    /**
      * Returns the object that the thread is blocked on.
      * @throws IllegalStateException if not in the blocked state
      */
