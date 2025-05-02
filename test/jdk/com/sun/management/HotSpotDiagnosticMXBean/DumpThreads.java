@@ -47,6 +47,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
@@ -150,7 +151,7 @@ class DumpThreads {
     /**
      * Test that the JSON thread dump has a thread container for the given executor.
      */
-    void testThreadContainer(ExecutorService executor, String name) throws Exception {
+    private void testThreadContainer(ExecutorService executor, String name) throws Exception {
         var threadRef = new AtomicReference<Thread>();
 
         executor.submit(() -> {
@@ -185,28 +186,36 @@ class DumpThreads {
     }
 
     /**
+     * ThreadFactory implementations for tests.
+     */
+    static Stream<ThreadFactory> threadFactories() {
+        return Stream.of(Thread.ofPlatform().factory(), Thread.ofVirtual().factory());
+    }
+
+    /**
      * Test thread dump with a thread blocked on monitor enter.
      */
-    @Test
-    void testBlockedThread() throws Exception {
-        assumeTrue(trackAllThreads, "This test requires all virtual threads to be tracked");
+    @ParameterizedTest
+    @MethodSource("threadFactories")
+    void testBlockedThread(ThreadFactory factory) throws Exception {
+        assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
         var lock = new Object();
         var started = new CountDownLatch(1);
 
-        Thread vthread = Thread.ofVirtual().unstarted(() -> {
+        Thread thread = factory.newThread(() -> {
             started.countDown();
             synchronized (lock) { }  // blocks
         });
 
-        long tid = vthread.threadId();
+        long tid = thread.threadId();
         String lockAsString = Objects.toIdentityString(lock);
 
         try {
             synchronized (lock) {
                 // start thread and wait for it to block
-                vthread.start();
+                thread.start();
                 started.await();
-                await(vthread, Thread.State.BLOCKED);
+                await(thread, Thread.State.BLOCKED);
 
                 // thread dump in plain text should include thread
                 List<String> lines = dumpThreadsToPlainText();
@@ -225,20 +234,21 @@ class DumpThreads {
                 assertEquals(lockAsString, ti.blockedOn());
             }
         } finally {
-            vthread.join();
+            thread.join();
         }
     }
 
     /**
      * Test thread dump with a thread waiting in Object.wait.
      */
-    @Test
-    void testWaitingThread() throws Exception {
-        assumeTrue(trackAllThreads, "This test requires all virtual threads to be tracked");
+    @ParameterizedTest
+    @MethodSource("threadFactories")
+    void testWaitingThread(ThreadFactory factory) throws Exception {
+        assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
         var lock = new Object();
         var started = new CountDownLatch(1);
 
-        Thread vthread = Thread.ofVirtual().start(() -> {
+        Thread thread = factory.newThread(() -> {
             synchronized (lock) {
                 started.countDown();
                 try {
@@ -247,13 +257,14 @@ class DumpThreads {
             }
         });
 
-        long tid = vthread.threadId();
+        long tid = thread.threadId();
         String lockAsString = Objects.toIdentityString(lock);
 
         try {
-            // wait for thread to be waiting in Object.wait
+            // start thread and wait for it to wait in Object.wait
+            thread.start();
             started.await();
-            await(vthread, Thread.State.WAITING);
+            await(thread, Thread.State.WAITING);
 
             // thread dump in plain text should include thread
             List<String> lines = dumpThreadsToPlainText();
@@ -265,43 +276,43 @@ class DumpThreads {
             // thread dump in JSON format should include thread in root container
             ThreadDump threadDump = dumpThreadsToJson();
             ThreadDump.ThreadInfo ti = threadDump.rootThreadContainer()
-                    .findThread(vthread.threadId())
+                    .findThread(thread.threadId())
                     .orElse(null);
             assertNotNull(ti, "thread not found");
             assertEquals("WAITING", ti.state());
             assertEquals(Objects.toIdentityString(lock), ti.waitingOn());
-
         } finally {
             synchronized (lock) {
                 lock.notifyAll();
             }
-            vthread.join();
+            thread.join();
         }
     }
 
     /**
      * Test thread dump with a thread parked on a j.u.c. lock.
      */
-    @Test
-    void testParkedThread() throws Exception {
-        assumeTrue(trackAllThreads, "This test requires all virtual threads to be tracked");
+    @ParameterizedTest
+    @MethodSource("threadFactories")
+    void testParkedThread(ThreadFactory factory) throws Exception {
+        assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
         var lock = new ReentrantLock();
         var started = new CountDownLatch(1);
 
-        Thread vthread = Thread.ofVirtual().unstarted(() -> {
+        Thread thread = factory.newThread(() -> {
             started.countDown();
             lock.lock();
             lock.unlock();
         });
 
-        long tid = vthread.threadId();
+        long tid = thread.threadId();
 
         lock.lock();
         try {
             // start thread and wait for it to park
-            vthread.start();
+            thread.start();
             started.await();
-            await(vthread, Thread.State.WAITING);
+            await(thread, Thread.State.WAITING);
 
             // thread dump in plain text should include thread
             List<String> lines = dumpThreadsToPlainText();
@@ -313,7 +324,7 @@ class DumpThreads {
             // thread dump in JSON format should include thread in root container
             ThreadDump threadDump = dumpThreadsToJson();
             ThreadDump.ThreadInfo ti = threadDump.rootThreadContainer()
-                    .findThread(vthread.threadId())
+                    .findThread(thread.threadId())
                     .orElse(null);
             assertNotNull(ti, "thread not found");
 
@@ -332,26 +343,28 @@ class DumpThreads {
     /**
      * Test thread dump wth a thread owning a monitor.
      */
-    @Test
-    void testThreadOwnsMonitor() throws Exception {
-        assumeTrue(trackAllThreads, "This test requires all virtual threads to be tracked");
+    @ParameterizedTest
+    @MethodSource("threadFactories")
+    void testThreadOwnsMonitor(ThreadFactory factory) throws Exception {
+        assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
         var lock = new Object();
         var started = new CountDownLatch(1);
 
-        Thread vthread = Thread.ofVirtual().start(() -> {
+        Thread thread = factory.newThread(() -> {
             synchronized (lock) {
                 started.countDown();
                 LockSupport.park();
             }
         });
 
-        long tid = vthread.threadId();
+        long tid = thread.threadId();
         String lockAsString = Objects.toIdentityString(lock);
 
         try {
-            // wait for thread to park
+            // start thread and wait for it to park
+            thread.start();
             started.await();
-            await(vthread, Thread.State.WAITING);
+            await(thread, Thread.State.WAITING);
 
             // thread dump in plain text should include thread
             List<String> lines = dumpThreadsToPlainText();
@@ -373,7 +386,7 @@ class DumpThreads {
                     .collect(Collectors.toSet());
             assertTrue(ownedMonitors.contains(lockAsString), lockAsString + " not found");
         } finally {
-            LockSupport.unpark(vthread);
+            LockSupport.unpark(thread);
         }
     }
 
