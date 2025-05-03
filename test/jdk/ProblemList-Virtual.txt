@@ -116,3 +116,6 @@ java/lang/management/ThreadMXBean/ResetPeakThreadCount.java 0000000 generic-all
 sun/management/jmxremote/startstop/JMXStatusTest.java 0000000 generic-all
 sun/management/jmxremote/startstop/JMXStatusPerfCountersTest.java 0000000 generic-all
 sun/management/jmxremote/startstop/JMXStartStopTest.java 0000000 generic-all
+
+# FJP threads do not terminate
+java/foreign/TestBufferStackStress2.java 8356114 generic-all
