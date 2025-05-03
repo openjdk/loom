@@ -1874,9 +1874,8 @@ ByteSize java_lang_Thread::thread_id_offset() {
 }
 
 oop java_lang_Thread::park_blocker(oop java_thread) {
-  return java_thread->obj_field(_park_blocker_offset);
+  return java_thread->obj_field_acquire(_park_blocker_offset);
 }
-
 
 struct LockInfo {
   enum { // should be synced with jdk.internal.vm.ThreadSnapshot.ThreadLock constants
@@ -1964,6 +1963,12 @@ public:
         oop park_blocker = java_lang_Thread::park_blocker(_java_thread());
         if (park_blocker != nullptr) {
           _locks->push(LockInfo(depth, LockInfo::PARKING_TO_WAIT, park_blocker));
+          if (park_blocker->is_a(vmClasses::java_util_concurrent_locks_AbstractOwnableSynchronizer_klass())) {
+            oop owner = java_util_concurrent_locks_AbstractOwnableSynchronizer::get_owner_threadObj(park_blocker);
+            if (owner != nullptr) {
+              _locks->push(LockInfo(depth, LockInfo::OWNABLE_SYNCHRONIZER, owner));
+            }
+          }
           _found_first_lock = true;
         }
       }
@@ -2220,6 +2225,92 @@ oop java_lang_Thread::async_get_stack_trace(oop java_thread, TRAPS) {
   return trace();
 }
 
+class jdk_internal_vm_ThreadLock: AllStatic {
+  static bool _inited;
+  static int _depth_offset;
+  static int _typeOrdinal_offset;
+  static int _obj_offset;
+
+  static void compute_offsets(InstanceKlass * klass, TRAPS) {
+    JavaClasses::compute_offset(_depth_offset, klass, "depth", vmSymbols::int_signature(), false);
+    JavaClasses::compute_offset(_typeOrdinal_offset, klass, "typeOrdinal", vmSymbols::int_signature(), false);
+    JavaClasses::compute_offset(_obj_offset, klass, "obj", vmSymbols::object_signature(), false);
+  }
+public:
+  static void init(InstanceKlass* klass, TRAPS) {
+    if (!_inited) {
+      compute_offsets(klass, CHECK);
+      _inited = true;
+    }
+  }
+
+  static Handle allocate(InstanceKlass* klass, TRAPS) {
+    init(klass, CHECK_NH);
+    return klass->allocate_instance_handle(CHECK_NH);
+  }
+
+  static void set_depth(oop thread_lock, int depth) {
+    thread_lock->int_field_put(_depth_offset, depth);
+  }
+  static void set_type(oop thread_lock, int type_ordinal) {
+    thread_lock->int_field_put(_typeOrdinal_offset, type_ordinal);
+  }
+  static void set_lock_object(oop thread_lock, oop obj) {
+    thread_lock->obj_field_put(_obj_offset, obj);
+  }
+};
+
+bool jdk_internal_vm_ThreadLock::_inited = false;
+int jdk_internal_vm_ThreadLock::_depth_offset;
+int jdk_internal_vm_ThreadLock::_typeOrdinal_offset;
+int jdk_internal_vm_ThreadLock::_obj_offset;
+
+class jdk_internal_vm_ThreadSnapshot: AllStatic {
+  static bool _inited;
+  static int _name_offset;
+  static int _threadStatus_offset;
+  static int _stackTrace_offset;
+  static int _locks_offset;
+
+  static void compute_offsets(InstanceKlass* klass, TRAPS) {
+    JavaClasses::compute_offset(_name_offset, klass, "name", vmSymbols::string_signature(), false);
+    JavaClasses::compute_offset(_threadStatus_offset, klass, "threadStatus", vmSymbols::int_signature(), false);
+    JavaClasses::compute_offset(_stackTrace_offset, klass, "stackTrace", vmSymbols::java_lang_StackTraceElement_array(), false);
+    JavaClasses::compute_offset(_locks_offset, klass, "locks", vmSymbols::jdk_internal_vm_ThreadLock_array(), false);
+  }
+public:
+  static void init(InstanceKlass* klass, TRAPS) {
+    if (!_inited) {
+      compute_offsets(klass, CHECK);
+      _inited = true;
+    }
+  }
+
+  static Handle allocate(InstanceKlass* klass, TRAPS) {
+    init(klass, CHECK_NH);
+    return klass->allocate_instance_handle(CHECK_NH);
+  }
+
+  static void set_name(oop snapshot, oop name) {
+    snapshot->obj_field_put(_name_offset, name);
+  }
+  static void set_thread_status(oop snapshot, int status) {
+    snapshot->int_field_put(_threadStatus_offset, status);
+  }
+  static void set_stack_trace(oop snapshot, oop trace) {
+    snapshot->obj_field_put(_stackTrace_offset, trace);
+  }
+  static void set_locks(oop snapshot, oop locks) {
+    snapshot->obj_field_put(_locks_offset, locks);
+  }
+};
+
+bool jdk_internal_vm_ThreadSnapshot::_inited = false;
+int jdk_internal_vm_ThreadSnapshot::_name_offset;
+int jdk_internal_vm_ThreadSnapshot::_threadStatus_offset;
+int jdk_internal_vm_ThreadSnapshot::_stackTrace_offset;
+int jdk_internal_vm_ThreadSnapshot::_locks_offset;
+
 oop java_lang_Thread::get_thread_snapshot(jobject jthread, bool with_locks, TRAPS) {
   ThreadsListHandle tlh(JavaThread::current());
 
@@ -2298,7 +2389,24 @@ oop java_lang_Thread::get_thread_snapshot(jobject jthread, bool with_locks, TRAP
     oop element = java_lang_StackTraceElement::create(method, cl._bcis->at(i), CHECK_NULL);
     trace->obj_at_put(i, element);
   }
-  // call static StackTraceElement[] of(StackTraceElement[] stackTrace)
+
+  objArrayHandle locks;
+  int lock_index = 0;
+  if (with_locks && max_locks > 0) {
+    locks = oopFactory::new_objArray_handle(lock_klass, max_locks, CHECK_NULL);
+    for (int n = 0; n < max_locks; n++) {
+      LockInfo* lock_info = cl._locks->adr_at(lock_index++);
+      Handle lock_object = Handle(THREAD, lock_info->_obj);
+
+      Handle lock = jdk_internal_vm_ThreadLock::allocate(lock_klass, CHECK_NULL);
+      jdk_internal_vm_ThreadLock::set_depth(lock(), lock_info->_depth);
+      jdk_internal_vm_ThreadLock::set_type(lock(), lock_info->_type);
+      jdk_internal_vm_ThreadLock::set_lock_object(lock(), lock_object());
+      locks->obj_at_put(n, lock());
+    }
+  }
+
+  // call static StackTraceElement[] StackTraceElement.of(StackTraceElement[] stackTrace)
   // to properly initialize STE.
   {
     JavaValue result(T_OBJECT);
@@ -2311,27 +2419,6 @@ oop java_lang_Thread::get_thread_snapshot(jobject jthread, bool with_locks, TRAP
     // the method return the same trace object
   }
 
-  objArrayHandle locks;
-  int lock_index = 0;
-  if (with_locks && max_locks > 0) {
-    locks = oopFactory::new_objArray_handle(lock_klass, max_locks, CHECK_NULL);
-    for (int n = 0; n < max_locks; n++) {
-      LockInfo* lock_info = cl._locks->adr_at(lock_index++);
-      oop o = lock_info->_obj;
-      Handle lock_object = Handle(THREAD, o);
-
-      // TODO: allocate and fill in the VM
-      JavaCallArguments args;
-      args.push_int(lock_info->_depth);
-      args.push_int(lock_info->_type);
-      args.push_oop(lock_object);
-      Handle lock = JavaCalls::construct_new_instance(lock_klass,
-          vmSymbols::jdk_internal_vm_ThreadLock_ctor_signature(), &args, CHECK_NULL);
-
-      locks->obj_at_put(n, lock());
-    }
-  }
-
   // all oops are handled, can enable transitions.
   transition_disabler.reset();
 
@@ -2341,14 +2428,11 @@ oop java_lang_Thread::get_thread_snapshot(jobject jthread, bool with_locks, TRAP
     snapshot_klass->initialize(CHECK_NULL);
   }
 
-  // TODO: allocate and fill in the VM
-  JavaCallArguments args;
-  args.push_oop(trace);
-  args.push_oop(locks);
-  args.push_oop(thread_name);
-  args.push_int((int)cl._thread_status);
-  Handle snapshot = JavaCalls::construct_new_instance(InstanceKlass::cast(snapshot_klass),
-      vmSymbols::jdk_internal_vm_ThreadSnapshot_ctor_signature(), &args, CHECK_NULL);
+  Handle snapshot = jdk_internal_vm_ThreadSnapshot::allocate(InstanceKlass::cast(snapshot_klass), CHECK_NULL);
+  jdk_internal_vm_ThreadSnapshot::set_name(snapshot(), thread_name());
+  jdk_internal_vm_ThreadSnapshot::set_thread_status(snapshot(), (int)cl._thread_status);
+  jdk_internal_vm_ThreadSnapshot::set_stack_trace(snapshot(), trace());
+  jdk_internal_vm_ThreadSnapshot::set_locks(snapshot(), locks());
   return snapshot();
 }
 
@@ -5414,7 +5498,7 @@ void java_util_concurrent_locks_AbstractOwnableSynchronizer::compute_offsets() {
 
 oop java_util_concurrent_locks_AbstractOwnableSynchronizer::get_owner_threadObj(oop obj) {
   assert(_owner_offset != 0, "Must be initialized");
-  return obj->obj_field(_owner_offset);
+  return obj->obj_field_acquire(_owner_offset);
 }
 
 #if INCLUDE_CDS

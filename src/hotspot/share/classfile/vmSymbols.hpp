@@ -746,9 +746,8 @@ class SerializeClosure;
   template(dumpThreads_name,                       "dumpThreads")                                                 \
   template(dumpThreadsToJson_name,                 "dumpThreadsToJson")                                           \
   template(jdk_internal_vm_ThreadSnapshot,         "jdk/internal/vm/ThreadSnapshot")                              \
-  template(jdk_internal_vm_ThreadSnapshot_ctor_signature, "([Ljava/lang/StackTraceElement;[Ljdk/internal/vm/ThreadSnapshot$ThreadLock;Ljava/lang/String;I)V") \
   template(jdk_internal_vm_ThreadLock,             "jdk/internal/vm/ThreadSnapshot$ThreadLock")                   \
-  template(jdk_internal_vm_ThreadLock_ctor_signature, "(IILjava/lang/Object;)V")                                  \
+  template(jdk_internal_vm_ThreadLock_array,       "[Ljdk/internal/vm/ThreadSnapshot$ThreadLock;")                \
   template(java_lang_StackTraceElement_of_name,    "of")                                                          \
   template(java_lang_StackTraceElement_of_signature, "([Ljava/lang/StackTraceElement;)[Ljava/lang/StackTraceElement;") \
                                                                                                                   \

@@ -39,17 +39,6 @@ class ThreadSnapshot {
     private StackTraceElement[] stackTrace;
     private ThreadLock[] locks;
 
-    // called by the VM
-    private ThreadSnapshot(StackTraceElement[] stackTrace,
-                           ThreadLock[] locks,
-                           String name,
-                           int threadStatus) {
-        this.stackTrace = stackTrace;
-        this.locks = locks;
-        this.name = name;
-        this.threadStatus = threadStatus;
-    }
-
     /**
      * Take a snapshot of a Thread to get all information about the thread.
      */
@@ -58,9 +47,9 @@ class ThreadSnapshot {
         if (snapshot.stackTrace == null) {
             snapshot.stackTrace = EMPTY_STACK;
         }
-        if (snapshot.locks == null) {
-            snapshot.locks = EMPTY_LOCKS;
-        }
+        snapshot.locks = snapshot.locks == null
+                         ? snapshot.locks = EMPTY_LOCKS
+                         : ThreadLock.of(snapshot.locks);
         return snapshot;
     }
 
@@ -91,6 +80,15 @@ class ThreadSnapshot {
      */
     Object parkBlocker() {
         return findLockObject(0, LockType.PARKING_TO_WAIT)
+                .findAny()
+                .orElse(null);
+    }
+
+    /**
+     * Returns the owner of exclusive mode synchronizer when the parkBlocker is an AQS.
+     */
+    Object exclusiveOwnerThread() {
+        return findLockObject(0, LockType.OWNABLE_SYNCHRONIZER)
                 .findAny()
                 .orElse(null);
     }
@@ -127,7 +125,7 @@ class ThreadSnapshot {
      */
     boolean ownsMonitors() {
         return Arrays.stream(locks)
-                .anyMatch(lock -> lock.type == LockType.LOCKED);
+                .anyMatch(lock -> lock.type() == LockType.LOCKED);
     }
 
     /**
@@ -139,7 +137,7 @@ class ThreadSnapshot {
 
     private Stream<Object> findLockObject(int depth, LockType type) {
         return Arrays.stream(locks)
-                .filter(lock -> lock.depth == depth
+                .filter(lock -> lock.depth() == depth
                         && lock.type() == type
                         && lock.lockObject() != null)
                 .map(ThreadLock::lockObject);
@@ -165,12 +163,29 @@ class ThreadSnapshot {
     /**
      * Represents a locking operation of a thread at a specific stack depth.
      */
-    private record ThreadLock(int depth, LockType type, Object obj) {
+    private class ThreadLock {
         private static final LockType[] lockTypeValues = LockType.values(); // cache
 
-        // called by the VM
-        private ThreadLock(int depth, int typeOrdinal, Object obj) {
-            this(depth, lockTypeValues[typeOrdinal], obj);
+        // set by the VM
+        private int depth;
+        private int typeOrdinal;
+        private Object obj;
+
+        private LockType type;
+
+        static ThreadLock[] of(ThreadLock[] locks) {
+            for (ThreadLock lock: locks) {
+                lock.type = lockTypeValues[lock.typeOrdinal];
+            }
+            return locks;
+        }
+
+        int depth() {
+            return depth;
+        }
+
+        LockType type() {
+            return type;
         }
 
         Object lockObject() {
