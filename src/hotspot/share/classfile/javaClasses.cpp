@@ -2009,7 +2009,7 @@ public:
                   // we have marked ourself as pending on this monitor
                   mon == pending_moninor ||
                   // we are not the owner of this monitor
-                  false/*!mon->is_entered(thread())*/) {
+                  (_thread != nullptr && !mon->is_entered(_thread))) {
                 type = LockInfo::WAITING_TO_LOCK;
               }
             }
