@@ -153,7 +153,7 @@ public class HotSpotDiagnostic implements HotSpotDiagnosticMXBean {
             throw new IllegalArgumentException("'outputFile' not absolute path");
 
         try (OutputStream out = Files.newOutputStream(file, StandardOpenOption.CREATE_NEW)) {
-                dumpThreads(out, format);
+            dumpThreads(out, format);
         }
     }
 

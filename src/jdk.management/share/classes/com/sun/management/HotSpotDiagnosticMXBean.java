@@ -116,6 +116,13 @@ public interface HotSpotDiagnosticMXBean extends PlatformManagedObject {
      * {@code outputFile} parameter must be an absolute path to a file that
      * does not exist.
      *
+     * <p> When the format is specified as {@link ThreadDumpFormat#JSON JSON}, the
+     * thread dump is generated in JavaScript Object Notation.
+     * <a href="doc-files/threadDump.schema.json">threadDump.schema.json</a>
+     * describes the thread dump format in draft
+     * <a href="https://tools.ietf.org/html/draft-json-schema-language-02">
+     * JSON Schema Language version 2</a>.
+     *
      * <p> The thread dump will include output for all platform threads. It may
      * include output for some or all virtual threads.
      *
@@ -151,6 +158,7 @@ public interface HotSpotDiagnosticMXBean extends PlatformManagedObject {
         TEXT_PLAIN,
         /**
          * JSON (JavaScript Object Notation) format.
+         * @spec https://datatracker.ietf.org/doc/html/rfc8259 JavaScript Object Notation
          */
         JSON,
     }

@@ -46,8 +46,9 @@ import java.util.concurrent.locks.AbstractOwnableSynchronizer;
 /**
  * Thread dump support.
  *
- * This class defines methods to dump threads to an output stream or file in plain
- * text or JSON format.
+ * This class defines static methods to support the HotSpotDiagnosticMXBean.dumpThreads
+ * API and the Thread.dump_to_file diagnostic command. This class supports generating the
+ * thread dump to a file or byte array in plain text or JSON format.
  */
 public class ThreadDumper {
     private ThreadDumper() { }
@@ -94,11 +95,11 @@ public class ThreadDumper {
      */
     private static byte[] dumpThreadsToByteArray(boolean json, int maxSize) {
         try (var out = new BoundedByteArrayOutputStream(maxSize);
-             var writer = new PrintWriter(out, true, StandardCharsets.UTF_8)) {
+             var pw = new PrintWriter(out, false, StandardCharsets.UTF_8)) {
             if (json) {
-                dumpThreadsToJson(writer);
+                dumpThreadsToJson(pw);
             } else {
-                dumpThreads(writer);
+                dumpThreads(pw);
             }
             return out.toByteArray();
         }
@@ -114,11 +115,11 @@ public class ThreadDumper {
                 : new OpenOption[] { StandardOpenOption.CREATE_NEW };
         String reply;
         try (OutputStream out = Files.newOutputStream(path, options);
-             var writer = new PrintWriter(out, false, StandardCharsets.UTF_8)) {
+             var pw = new PrintWriter(out, false, StandardCharsets.UTF_8)) {
             if (json) {
-                dumpThreadsToJson(writer);
+                dumpThreadsToJson(pw);
             } else {
-                dumpThreads(writer);
+                dumpThreads(pw);
             }
             reply = String.format("Created %s%n", path);
         } catch (FileAlreadyExistsException e) {
@@ -136,54 +137,54 @@ public class ThreadDumper {
      * This method is invoked by HotSpotDiagnosticMXBean.dumpThreads.
      */
     public static void dumpThreads(OutputStream out) {
-        var writer = new PrintWriter(out, false, StandardCharsets.UTF_8);
-        dumpThreads(writer);
-        writer.flush();  // flushes underlying stream
+        var pw = new PrintWriter(out, false, StandardCharsets.UTF_8);
+        dumpThreads(pw);
+        pw.flush();  // flushes underlying stream
     }
 
     /**
      * Generate a thread dump in plain text format to the given print stream.
      */
-    private static void dumpThreads(PrintWriter writer) {
-        writer.println(processId());
-        writer.println(Instant.now());
-        writer.println(Runtime.version());
-        writer.println();
-        dumpThreads(ThreadContainers.root(), writer);
+    private static void dumpThreads(PrintWriter pw) {
+        pw.println(processId());
+        pw.println(Instant.now());
+        pw.println(Runtime.version());
+        pw.println();
+        dumpThreads(ThreadContainers.root(), pw);
     }
 
-    private static void dumpThreads(ThreadContainer container, PrintWriter writer) {
-        container.threads().forEach(t -> dumpThread(t, writer));
-        container.children().forEach(c -> dumpThreads(c, writer));
+    private static void dumpThreads(ThreadContainer container, PrintWriter pw) {
+        container.threads().forEach(t -> dumpThread(t, pw));
+        container.children().forEach(c -> dumpThreads(c, pw));
     }
 
-    private static void dumpThread(Thread thread, PrintWriter writer) {
+    private static void dumpThread(Thread thread, PrintWriter pw) {
         ThreadSnapshot snapshot = ThreadSnapshot.of(thread);
         Thread.State state = snapshot.threadState();
-        writer.println("#" + thread.threadId() + " \"" + snapshot.threadName()
+        pw.println("#" + thread.threadId() + " \"" + snapshot.threadName()
                 +  "\" " + state + " " + Instant.now());
 
         // park blocker
         Object parkBlocker = snapshot.parkBlocker();
         if (parkBlocker != null) {
-            writer.print("      // parked on " + Objects.toIdentityString(parkBlocker));
+            pw.print("      // parked on " + Objects.toIdentityString(parkBlocker));
             if (parkBlocker instanceof AbstractOwnableSynchronizer
                     && snapshot.exclusiveOwnerThread() instanceof Thread owner) {
-                writer.print(", owned by #" + owner.threadId());
+                pw.print(", owned by #" + owner.threadId());
             }
-            writer.println();
+            pw.println();
         }
 
         // blocked on monitor enter or Object.wait
         if (state == Thread.State.BLOCKED) {
             Object obj = snapshot.blockedOn();
             if (obj != null) {
-                writer.println("      // blocked on " + Objects.toIdentityString(obj));
+                pw.println("      // blocked on " + Objects.toIdentityString(obj));
             }
         } else if (state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING) {
             Object obj = snapshot.waitingOn();
             if (obj != null) {
-                writer.println("      // waiting on " + Objects.toIdentityString(obj));
+                pw.println("      // waiting on " + Objects.toIdentityString(obj));
             }
         }
 
@@ -191,14 +192,14 @@ public class ThreadDumper {
         int depth = 0;
         while (depth < stackTrace.length) {
             snapshot.ownedMonitorsAt(depth).forEach(obj -> {
-                writer.print("      // locked ");
-                writer.println(Objects.toIdentityString(obj));
+                pw.print("      // locked ");
+                pw.println(Objects.toIdentityString(obj));
             });
-            writer.print("      ");
-            writer.println(stackTrace[depth]);
+            pw.print("      ");
+            pw.println(stackTrace[depth]);
             depth++;
         }
-        writer.println();
+        pw.println();
     }
 
     /**
@@ -207,16 +208,16 @@ public class ThreadDumper {
      * This method is invoked by HotSpotDiagnosticMXBean.dumpThreads.
      */
     public static void dumpThreadsToJson(OutputStream out) {
-        var writer = new PrintWriter(out, false, StandardCharsets.UTF_8);
-        dumpThreadsToJson(writer);
-        writer.flush();  // flushes underlying stream
+        var pw = new PrintWriter(out,false, StandardCharsets.UTF_8);
+        dumpThreadsToJson(pw);
+        pw.flush();  // flushes underlying stream
     }
 
     /**
      * Generate a thread dump to the given print stream in JSON format.
      */
-    private static void dumpThreadsToJson(PrintWriter writer) {
-        try (JsonWriter jsonWriter = JsonWriter.wrap(writer)) {
+    private static void dumpThreadsToJson(PrintWriter pw) {
+        try (JsonWriter jsonWriter = JsonWriter.wrap(pw)) {
             jsonWriter.startObject("threadDump");
 
             jsonWriter.writeProperty("processId", processId());
@@ -334,8 +335,8 @@ public class ThreadDumper {
     }
 
     /**
-     * Simple JSON writer to stream objects/arrays to a PrintStream. This class
-     * is not intended to be a fully feature JSON writer.
+     * Simple JSON writer to stream objects/arrays to a PrintStream with formatting.
+     * This class is not intended to be a fully featured JSON writer.
      */
     private static class JsonWriter implements AutoCloseable {
         private static class Node {
@@ -357,22 +358,22 @@ public class ThreadDumper {
             }
         }
         private final Deque<Node> stack = new ArrayDeque<>();
-        private final PrintWriter writer;
+        private final PrintWriter pw;
         private boolean closed;
 
-        private JsonWriter(PrintWriter writer) {
-            this.writer = writer;
+        private JsonWriter(PrintWriter pw) {
+            this.pw = pw;
         }
 
-        static JsonWriter wrap(PrintWriter writer) {
-            var jonWriter = new JsonWriter(writer);
+        static JsonWriter wrap(PrintWriter pw) {
+            var jonWriter = new JsonWriter(pw);
             jonWriter.startObject();
             return jonWriter;
         }
 
         private void indent() {
             int indent = stack.size() * 2;
-            writer.print(" ".repeat(indent));
+            pw.print(" ".repeat(indent));
         }
 
         /**
@@ -382,14 +383,14 @@ public class ThreadDumper {
             if (!stack.isEmpty()) {
                 Node node = stack.peek();
                 if (node.getAndIncrementPropertyCount() > 0) {
-                    writer.println(",");
+                    pw.println(",");
                 }
             }
             indent();
             if (name != null) {
-                writer.print("\"" + name + "\": ");
+                pw.print("\"" + name + "\": ");
             }
-            writer.println(isArray ? "[" : "{");
+            pw.println(isArray ? "[" : "{");
             stack.push(new Node(isArray));
         }
 
@@ -401,10 +402,10 @@ public class ThreadDumper {
             if (node.isArray() != isArray)
                 throw new IllegalStateException();
             if (node.propertyCount() > 0) {
-                writer.println();
+                pw.println();
             }
             indent();
-            writer.print(isArray ? "]" : "}");
+            pw.print(isArray ? "]" : "}");
         }
 
         /**
@@ -415,16 +416,16 @@ public class ThreadDumper {
         void writeProperty(String name, Object obj) {
             Node node = stack.peek();
             if (node.getAndIncrementPropertyCount() > 0) {
-                writer.println(",");
+                pw.println(",");
             }
             indent();
             if (name != null) {
-                writer.print("\"" + name + "\": ");
+                pw.print("\"" + name + "\": ");
             }
             switch (obj) {
-                case Number _ -> writer.print(obj);
-                case null     -> writer.print("null");
-                default       -> writer.print("\"" + escape(obj.toString()) + "\"");
+                case Number _ -> pw.print(obj);
+                case null     -> pw.print("null");
+                default       -> pw.print("\"" + escape(obj.toString()) + "\"");
             }
         }
 
@@ -474,7 +475,7 @@ public class ThreadDumper {
         public void close() {
             if (!closed) {
                 endObject();
-                writer.flush();
+                pw.flush();
                 closed = true;
             }
         }
