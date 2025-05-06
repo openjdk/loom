@@ -122,10 +122,10 @@ public class ThreadDumper {
                 dumpThreads(pw);
             }
             reply = String.format("Created %s%n", path);
-        } catch (FileAlreadyExistsException e) {
+        } catch (FileAlreadyExistsException _) {
             reply = String.format("%s exists, use -overwrite to overwrite%n", path);
-        } catch (IOException ioe) {
-            reply = String.format("Failed: %s%n", ioe);
+        } catch (Throwable ex) {
+            reply = String.format("Failed: %s%n", ex);
         }
         return reply.getBytes(StandardCharsets.UTF_8);
     }
@@ -138,12 +138,15 @@ public class ThreadDumper {
      */
     public static void dumpThreads(OutputStream out) {
         var pw = new PrintWriter(out, false, StandardCharsets.UTF_8);
-        dumpThreads(pw);
-        pw.flush();  // flushes underlying stream
+        try {
+            dumpThreads(pw);
+        } finally {
+            pw.flush();  // flushes underlying stream
+        }
     }
 
     /**
-     * Generate a thread dump in plain text format to the given print stream.
+     * Generate a thread dump in plain text format to the given text stream.
      */
     private static void dumpThreads(PrintWriter pw) {
         pw.println(processId());
@@ -209,12 +212,16 @@ public class ThreadDumper {
      */
     public static void dumpThreadsToJson(OutputStream out) {
         var pw = new PrintWriter(out,false, StandardCharsets.UTF_8);
-        dumpThreadsToJson(pw);
-        pw.flush();  // flushes underlying stream
+        try {
+            dumpThreadsToJson(pw);
+        } finally {
+            pw.flush();  // flushes underlying stream
+        }
+
     }
 
     /**
-     * Generate a thread dump to the given print stream in JSON format.
+     * Generate a thread dump to the given text stream in JSON format.
      */
     private static void dumpThreadsToJson(PrintWriter pw) {
         try (JsonWriter jsonWriter = JsonWriter.wrap(pw)) {
