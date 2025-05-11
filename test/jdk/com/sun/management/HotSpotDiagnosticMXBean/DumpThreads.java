@@ -28,13 +28,16 @@
  * @requires vm.continuations
  * @modules jdk.management
  * @library /test/lib
- * @run junit/othervm DumpThreads
- * @run junit/othervm -Djdk.trackAllThreads DumpThreads
- * @run junit/othervm -Djdk.trackAllThreads=true DumpThreads
- * @run junit/othervm -Djdk.trackAllThreads=false DumpThreads
+ * @build jdk.test.whitebox.WhiteBox
+ * @run driver jdk.test.lib.helpers.ClassFileInstaller jdk.test.whitebox.WhiteBox
+ * @run junit/othervm -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI DumpThreads
+ * @run junit/othervm -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Djdk.trackAllThreads DumpThreads
+ * @run junit/othervm -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Djdk.trackAllThreads=true DumpThreads
+ * @run junit/othervm -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Djdk.trackAllThreads=false DumpThreads
  */
 
 import java.lang.management.ManagementFactory;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Path;
@@ -56,6 +59,7 @@ import java.util.stream.Stream;
 import com.sun.management.HotSpotDiagnosticMXBean;
 import com.sun.management.HotSpotDiagnosticMXBean.ThreadDumpFormat;
 import jdk.test.lib.threaddump.ThreadDump;
+import jdk.test.whitebox.WhiteBox;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
@@ -260,6 +264,10 @@ class DumpThreads {
         long tid = thread.threadId();
         String lockAsString = Objects.toIdentityString(lock);
 
+        // compiled native frames have no locals
+        Method wait0 = Object.class.getDeclaredMethod("wait0", long.class);
+        boolean expectWaitingOn = !WhiteBox.getWhiteBox().isMethodCompiled(wait0);
+
         try {
             // start thread and wait for it to wait in Object.wait
             thread.start();
@@ -271,7 +279,9 @@ class DumpThreads {
             ThreadFields fields = findThread(tid, lines);
             assertNotNull(fields, "thread not found");
             assertEquals("WAITING", fields.state());
-            assertTrue(contains(lines, "// waiting on " + lockAsString));
+            if (expectWaitingOn) {
+                assertTrue(contains(lines, "// waiting on " + lockAsString));
+            }
 
             // thread dump in JSON format should include thread in root container
             ThreadDump threadDump = dumpThreadsToJson();
@@ -280,7 +290,9 @@ class DumpThreads {
                     .orElse(null);
             assertNotNull(ti, "thread not found");
             assertEquals("WAITING", ti.state());
-            assertEquals(Objects.toIdentityString(lock), ti.waitingOn());
+            if (expectWaitingOn) {
+                assertEquals(Objects.toIdentityString(lock), ti.waitingOn());
+            }
         } finally {
             synchronized (lock) {
                 lock.notifyAll();

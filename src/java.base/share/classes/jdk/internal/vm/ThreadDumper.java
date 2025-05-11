@@ -94,12 +94,13 @@ public class ThreadDumper {
      * Generate a thread dump in plain text or JSON format to a byte array, UTF-8 encoded.
      */
     private static byte[] dumpThreadsToByteArray(boolean json, int maxSize) {
-        try (var out = new BoundedByteArrayOutputStream(maxSize);
-             var pw = new PrintWriter(out, false, StandardCharsets.UTF_8)) {
-            if (json) {
-                dumpThreadsToJson(pw);
-            } else {
-                dumpThreads(pw);
+        try (var out = new BoundedByteArrayOutputStream(maxSize)) {
+            try (var pw = new PrintWriter(out, false, StandardCharsets.UTF_8)) {
+                if (json) {
+                    dumpThreadsToJson(pw);
+                } else {
+                    dumpThreads(pw);
+                }
             }
             return out.toByteArray();
         }
@@ -211,7 +212,7 @@ public class ThreadDumper {
      * This method is invoked by HotSpotDiagnosticMXBean.dumpThreads.
      */
     public static void dumpThreadsToJson(OutputStream out) {
-        var pw = new PrintWriter(out,false, StandardCharsets.UTF_8);
+        var pw = new PrintWriter(out, false, StandardCharsets.UTF_8);
         try {
             dumpThreadsToJson(pw);
         } finally {
