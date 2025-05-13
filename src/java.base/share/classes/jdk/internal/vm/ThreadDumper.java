@@ -446,6 +446,8 @@ public class ThreadDumper {
                 writer.print("\"" + name + "\": ");
             }
             switch (obj) {
+                // Long may be larger than safe range of JSON integer value
+                case Long   _ -> writer.print("\"" + obj + "\"");
                 case Number _ -> writer.print(obj);
                 case null     -> writer.print("null");
                 default       -> writer.print("\"" + escape(obj.toString()) + "\"");

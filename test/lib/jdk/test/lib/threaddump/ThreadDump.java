@@ -45,7 +45,7 @@ import jdk.test.lib.json.JSONValue;
  * <pre>{@code
  * {
  *   "threadDump": {
- *     "processId": 63406
+ *     "processId": "63406"
  *     "time": "2022-05-20T07:37:16.308017Z",
  *     "runtimeVersion": "19",
  *     "threadContainers": [
@@ -55,12 +55,12 @@ import jdk.test.lib.json.JSONValue;
  *         "owner": null,
  *         "threads": [
  *          {
- *            "tid": 1,
+ *            "tid": "1",
  *            "name": "main",
  *            "stack": [...]
  *          },
  *          {
- *            "tid": 8,
+ *            "tid": "8",
  *            "name": "Reference Handler",
  *            "state": "RUNNABLE",
  *            "stack": [
@@ -75,21 +75,21 @@ import jdk.test.lib.json.JSONValue;
  *          {"name": "Monitor Ctrl-Break"...},
  *          {"name": "Notification Thread"...}
  *         ],
- *         "threadCount": 7
+ *         "threadCount": "7"
  *       },
  *       {
  *         "container": "ForkJoinPool.commonPool\/jdk.internal.vm.SharedThreadContainer@56aac163",
  *         "parent": "<root>",
  *         "owner": null,
  *         "threads": [...],
- *         "threadCount": 1
+ *         "threadCount": "1"
  *       },
  *       {
  *         "container": "java.util.concurrent.ThreadPoolExecutor@20322d26\/jdk.internal.vm.SharedThreadContainer@184f6be2",
  *         "parent": "<root>",
  *         "owner": null,
  *         "threads": [...],
- *         "threadCount": 1
+ *         "threadCount": "1"
  *       }
  *     ]
  *   }
