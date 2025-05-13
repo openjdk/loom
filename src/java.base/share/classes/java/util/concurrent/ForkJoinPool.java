@@ -4394,7 +4394,7 @@ public class ForkJoinPool extends AbstractExecutorService
         if ((scale & (scale - 1)) != 0)
             throw new Error("array index scale not a power of two");
 
-        U.ensureClassInitialized(LockSupport.class); // ensure loaded and initialized
+        Class<?> dep = LockSupport.class; // ensure loaded
         // allow access to non-public methods
         JLA = SharedSecrets.getJavaLangAccess();
         SharedSecrets.setJavaUtilConcurrentFJPAccess(
