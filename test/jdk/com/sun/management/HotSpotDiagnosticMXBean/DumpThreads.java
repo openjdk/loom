@@ -50,7 +50,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinWorkerThread;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
@@ -59,10 +61,12 @@ import java.util.stream.Stream;
 import com.sun.management.HotSpotDiagnosticMXBean;
 import com.sun.management.HotSpotDiagnosticMXBean.ThreadDumpFormat;
 import jdk.test.lib.threaddump.ThreadDump;
+import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.whitebox.WhiteBox;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import static org.junit.jupiter.api.Assertions.*;
@@ -75,6 +79,9 @@ class DumpThreads {
     static void setup() throws Exception {
         String s = System.getProperty("jdk.trackAllThreads");
         trackAllThreads = (s == null) || s.isEmpty() || Boolean.parseBoolean(s);
+
+        // need >=2 carriers for testing mounted virtual thread
+        VThreadRunner.ensureParallelism(2);
     }
 
     /**
@@ -119,6 +126,7 @@ class DumpThreads {
                     .findThread(currentThread.threadId())
                     .orElse(null);
             assertNotNull(ti, "current thread not found");
+            assertEquals(currentThread.isVirtual(), ti.isVirtual());
         }
     }
 
@@ -203,6 +211,7 @@ class DumpThreads {
     @MethodSource("threadFactories")
     void testBlockedThread(ThreadFactory factory) throws Exception {
         assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
+
         var lock = new Object();
         var started = new CountDownLatch(1);
 
@@ -289,6 +298,8 @@ class DumpThreads {
                     .findThread(thread.threadId())
                     .orElse(null);
             assertNotNull(ti, "thread not found");
+            assertEquals(ti.isVirtual(), thread.isVirtual());
+
             assertEquals("WAITING", ti.state());
             if (expectWaitingOn) {
                 assertEquals(Objects.toIdentityString(lock), ti.waitingOn());
@@ -308,6 +319,7 @@ class DumpThreads {
     @MethodSource("threadFactories")
     void testParkedThread(ThreadFactory factory) throws Exception {
         assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
+
         var lock = new ReentrantLock();
         var started = new CountDownLatch(1);
 
@@ -339,6 +351,7 @@ class DumpThreads {
                     .findThread(thread.threadId())
                     .orElse(null);
             assertNotNull(ti, "thread not found");
+            assertEquals(ti.isVirtual(), thread.isVirtual());
 
             // thread should be waiting on the ReentrantLock, owned by the main thread.
             assertEquals("WAITING", ti.state());
@@ -349,6 +362,7 @@ class DumpThreads {
             assertEquals(Thread.currentThread().threadId(), ownerTid);
         } finally {
             lock.unlock();
+            thread.join();
         }
     }
 
@@ -359,6 +373,7 @@ class DumpThreads {
     @MethodSource("threadFactories")
     void testThreadOwnsMonitor(ThreadFactory factory) throws Exception {
         assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
+
         var lock = new Object();
         var started = new CountDownLatch(1);
 
@@ -391,6 +406,8 @@ class DumpThreads {
                     .findThread(tid)
                     .orElse(null);
             assertNotNull(ti, "thread not found");
+            assertEquals(ti.isVirtual(), thread.isVirtual());
+
             // the lock should be in the ownedMonitors array
             Set<String> ownedMonitors = ti.ownedMonitors().values()
                     .stream()
@@ -399,6 +416,52 @@ class DumpThreads {
             assertTrue(ownedMonitors.contains(lockAsString), lockAsString + " not found");
         } finally {
             LockSupport.unpark(thread);
+            thread.join();
+        }
+    }
+
+    /**
+     * Test mounted virtual thread.
+     */
+    @Disabled
+    @Test
+    void testMountedVirtualThread() throws Exception {
+        assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
+
+        // start virtual thread that spins until done
+        var started = new AtomicBoolean();
+        var done = new AtomicBoolean();
+        var thread = Thread.ofVirtual().start(() -> {
+            started.set(true);
+            while (!done.get()) {
+                Thread.onSpinWait();
+            }
+        });
+
+        try {
+            // wait for thread to start
+            awaitTrue(started);
+
+            // thread dump in JSON format should include thread in root container
+            ThreadDump threadDump = dumpThreadsToJson();
+            ThreadDump.ThreadInfo ti = threadDump.rootThreadContainer()
+                    .findThread(thread.threadId())
+                    .orElse(null);
+            assertNotNull(ti, "thread not found");
+            assertTrue(ti.isVirtual());
+
+            // the carrier should be the thread identifier of a ForkJoinWorkerThread
+            long carrierTid = ti.carrier().orElseThrow();
+            boolean found = Thread.getAllStackTraces()
+                    .keySet()
+                    .stream()
+                    .filter(t -> t instanceof ForkJoinWorkerThread)
+                    .map(Thread::threadId)
+                    .anyMatch(tid -> tid == carrierTid);
+            assertTrue(found, carrierTid + " is not a ForkJoinWorkerThread");
+        } finally {
+            done.set(true);
+            thread.join();
         }
     }
 
@@ -515,6 +578,15 @@ class DumpThreads {
             assertTrue(state != Thread.State.TERMINATED, "Thread has terminated");
             Thread.sleep(10);
             state = thread.getState();
+        }
+    }
+
+    /**
+     * Waits for the boolean value to become true.
+     */
+    private static void awaitTrue(AtomicBoolean ref) throws Exception {
+        while (!ref.get()) {
+            Thread.sleep(20);
         }
     }
 }

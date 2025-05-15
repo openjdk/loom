@@ -268,6 +268,14 @@ public final class ThreadDump {
         }
 
         /**
+         * Returns true if virtual thread.
+         */
+        public boolean isVirtual() {
+            String s = getStringProperty("virtual");
+            return (s != null) ? Boolean.parseBoolean(s) : false;
+        }
+
+        /**
          * Returns the thread's parkBlocker.
          */
         public String parkBlocker() {
@@ -328,6 +336,19 @@ public final class ThreadDump {
                 }
             }
             return ownedMonitors;
+        }
+
+        /**
+         * If the thread is a mounted virtual thread, return the thread identifier of
+         * its carrier.
+         */
+        public OptionalLong carrier() {
+            String s = getStringProperty("carrier");
+            if (s != null) {
+                return OptionalLong.of(Long.parseLong(s));
+            } else {
+                return OptionalLong.empty();
+            }
         }
 
         @Override

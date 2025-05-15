@@ -1880,8 +1880,8 @@ oop java_lang_Thread::park_blocker(oop java_thread) {
 struct LockInfo {
   enum { // should be synced with jdk.internal.vm.ThreadSnapshot.ThreadLock constants
     PARKING_TO_WAIT = 0,
-    ELEMINATED_SCALAR_REPLACED = 1,
-    ELEMINATED_MONITOR = 2,
+    ELIMINATED_SCALAR_REPLACED = 1,
+    ELIMINATED_MONITOR = 2,
     LOCKED = 3,
     WAITING_TO_LOCK = 4,
     WAITING_ON = 5,
@@ -1981,11 +1981,11 @@ public:
         if (monitor->eliminated() && jvf->is_compiled_frame()) { // Eliminated in compiled code
           if (monitor->owner_is_scalar_replaced()) {
             Klass* k = java_lang_Class::as_Klass(monitor->owner_klass());
-            _locks->push(LockInfo(depth, LockInfo::ELEMINATED_SCALAR_REPLACED, k->klass_holder()));
+            _locks->push(LockInfo(depth, LockInfo::ELIMINATED_SCALAR_REPLACED, k->klass_holder()));
           } else {
             Handle obj(current, monitor->owner());
             if (obj() != nullptr) {
-              _locks->push(LockInfo(depth, LockInfo::ELEMINATED_MONITOR, obj()));
+              _locks->push(LockInfo(depth, LockInfo::ELIMINATED_MONITOR, obj()));
             }
           }
           continue;
@@ -2049,7 +2049,7 @@ public:
       return;
     }
 
-    bool carrier = false;
+    bool walk_cont = false;
 
     if (is_virtual) {
       if (_thread != nullptr) {
@@ -2060,7 +2060,7 @@ public:
         }
       }
     } else {
-      carrier = (_thread->vthread_continuation() != nullptr);
+      walk_cont = (_thread->vthread_continuation() != nullptr);
     }
 
     ResourceMark rm(Thread::current());
@@ -2079,7 +2079,7 @@ public:
     int total_count = 0;
 
     vframeStream vfst(_thread != nullptr
-        ? vframeStream(_thread, false, false, carrier)
+        ? vframeStream(_thread, false, false, walk_cont)
         : vframeStream(java_lang_VirtualThread::continuation(_java_thread())));
 
     for (;

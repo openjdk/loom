@@ -64,6 +64,10 @@
                           "type": "string",
                           "description": "The thread state (Thread::getState)."
                         },
+                        "virtual" : {
+                          "type": "boolean",
+                          "description": "true for a virtual thread."
+                        },
                         "parkBlocker": {
                           "type": [
                             "object"
@@ -123,6 +127,10 @@
                               "locks"
                             ]
                           }
+                        },
+                        "carrier":  {
+                          "type": "string",
+                          "description": "The thread identifier of the carrier thread if mounted."
                         }
                       },
                       "required": [

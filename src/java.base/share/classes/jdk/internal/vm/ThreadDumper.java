@@ -61,12 +61,11 @@ public class ThreadDumper {
 
     /**
      * Generate a thread dump in plain text format to a file or byte array, UTF-8 encoded.
-     *
      * This method is invoked by the VM for the Thread.dump_to_file diagnostic command.
      *
      * @param file the file path to the file, null or "-" to return a byte array
      * @param okayToOverwrite true to overwrite an existing file
-     * @return the UTF-8 encoded thread dump or message to return to the user
+     * @return the UTF-8 encoded thread dump or message to return to the tool user
      */
     public static byte[] dumpThreads(String file, boolean okayToOverwrite) {
         if (file == null || file.equals("-")) {
@@ -78,12 +77,11 @@ public class ThreadDumper {
 
     /**
      * Generate a thread dump in JSON format to a file or byte array, UTF-8 encoded.
-     *
      * This method is invoked by the VM for the Thread.dump_to_file diagnostic command.
      *
      * @param file the file path to the file, null or "-" to return a byte array
      * @param okayToOverwrite true to overwrite an existing file
-     * @return the UTF-8 encoded thread dump or message to return to the user
+     * @return the UTF-8 encoded thread dump or message to return to the tool user
      */
     public static byte[] dumpThreadsToJson(String file, boolean okayToOverwrite) {
         if (file == null || file.equals("-")) {
@@ -95,24 +93,32 @@ public class ThreadDumper {
 
     /**
      * Generate a thread dump in plain text or JSON format to a byte array, UTF-8 encoded.
+     * This method is the implementation of the Thread.dump_to_file diagnostic command
+     * when a file path is not specified. It returns the thread and/or message to send
+     * to the tool user.
      */
     private static byte[] dumpThreadsToByteArray(boolean json, int maxSize) {
-        try (var out = new BoundedByteArrayOutputStream(maxSize)) {
-            try (var writer = new TextWriter(out)) {
-                if (json) {
-                    dumpThreadsToJson(writer);
-                } else {
-                    dumpThreads(writer);
-                }
+        var out = new BoundedByteArrayOutputStream(maxSize);
+        try (out; var writer = new TextWriter(out)) {
+            if (json) {
+                dumpThreadsToJson(writer);
+            } else {
+                dumpThreads(writer);
             }
-            return out.toByteArray();
+        } catch (Exception ex) {
+            if (ex instanceof UncheckedIOException ioe) {
+                ex = ioe.getCause();
+            }
+            String reply = String.format("Failed: %s%n", ex);
+            return reply.getBytes(StandardCharsets.UTF_8);
         }
+        return out.toByteArray();
     }
 
     /**
      * Generate a thread dump in plain text or JSON format to the given file, UTF-8 encoded.
      * This method is the implementation of the Thread.dump_to_file diagnostic command.
-     * It returns the message to send to the user.
+     * It returns the thread and/or message to send to the tool user.
      */
     private static byte[] dumpThreadsToFile(String file, boolean okayToOverwrite, boolean json) {
         Path path = Path.of(file).toAbsolutePath();
@@ -133,18 +139,15 @@ public class ThreadDumper {
             }
         } catch (FileAlreadyExistsException _) {
             reply = String.format("%s exists, use -overwrite to overwrite%n", path);
-        } catch (Throwable ex) {
+        } catch (Exception ex) {
             reply = String.format("Failed: %s%n", ex);
         }
         return reply.getBytes(StandardCharsets.UTF_8);
     }
 
     /**
-     * Generate a thread dump in plain text format to the given output stream,
-     * UTF-8 encoded.
-     *
-     * This method is invoked by HotSpotDiagnosticMXBean.dumpThreads.
-     *
+     * Generate a thread dump in plain text format to the given output stream, UTF-8
+     * encoded. This method is invoked by HotSpotDiagnosticMXBean.dumpThreads.
      * @throws IOException if an I/O error occurs
      */
     public static void dumpThreads(OutputStream out) throws IOException {
@@ -160,6 +163,7 @@ public class ThreadDumper {
 
     /**
      * Generate a thread dump in plain text format to the given text stream.
+     * @throws UncheckedIOException if an I/O error occurs
      */
     private static void dumpThreads(TextWriter writer) {
         writer.println(processId());
@@ -176,9 +180,10 @@ public class ThreadDumper {
 
     private static void dumpThread(Thread thread, TextWriter writer) {
         ThreadSnapshot snapshot = ThreadSnapshot.of(thread);
+        Instant now = Instant.now();
         Thread.State state = snapshot.threadState();
         writer.println("#" + thread.threadId() + " \"" + snapshot.threadName()
-                +  "\" " + state + " " + Instant.now());
+                +  "\" " + state + " " + now);
 
         // park blocker
         Object parkBlocker = snapshot.parkBlocker();
@@ -220,9 +225,7 @@ public class ThreadDumper {
 
     /**
      * Generate a thread dump in JSON format to the given output stream, UTF-8 encoded.
-     *
      * This method is invoked by HotSpotDiagnosticMXBean.dumpThreads.
-     *
      * @throws IOException if an I/O error occurs
      */
     public static void dumpThreadsToJson(OutputStream out) throws IOException {
@@ -238,25 +241,31 @@ public class ThreadDumper {
 
     /**
      * Generate a thread dump to the given text stream in JSON format.
+     * @throws UncheckedIOException if an I/O error occurs
      */
-    private static void dumpThreadsToJson(TextWriter writer) {
-        try (JsonWriter jsonWriter = JsonWriter.wrap(writer)) {
-            jsonWriter.startObject("threadDump");
+    private static void dumpThreadsToJson(TextWriter textWriter) {
+        var jsonWriter = new JsonWriter(textWriter);
 
-            jsonWriter.writeProperty("processId", processId());
-            jsonWriter.writeProperty("time", Instant.now());
-            jsonWriter.writeProperty("runtimeVersion", Runtime.version());
+        jsonWriter.startObject();  // top-level object
 
-            jsonWriter.startArray("threadContainers");
-            dumpThreads(ThreadContainers.root(), jsonWriter);
-            jsonWriter.endArray();
+        jsonWriter.startObject("threadDump");
 
-            jsonWriter.endObject();  // threadDump
-        }
+        jsonWriter.writeProperty("processId", processId());
+        jsonWriter.writeProperty("time", Instant.now());
+        jsonWriter.writeProperty("runtimeVersion", Runtime.version());
+
+        jsonWriter.startArray("threadContainers");
+        dumpThreads(ThreadContainers.root(), jsonWriter);
+        jsonWriter.endArray();
+
+        jsonWriter.endObject();  // threadDump
+
+        jsonWriter.endObject();  // end of top-level object
     }
 
     /**
      * Write a thread container to the given JSON writer.
+     * @throws UncheckedIOException if an I/O error occurs
      */
     private static void dumpThreads(ThreadContainer container, JsonWriter jsonWriter) {
         jsonWriter.startObject();
@@ -290,6 +299,7 @@ public class ThreadDumper {
 
     /**
      * Write a thread to the given JSON writer.
+     * @throws UncheckedIOException if an I/O error occurs
      */
     private static void dumpThread(Thread thread, JsonWriter jsonWriter) {
         Instant now = Instant.now();
@@ -300,6 +310,9 @@ public class ThreadDumper {
         jsonWriter.startObject();
         jsonWriter.writeProperty("tid", thread.threadId());
         jsonWriter.writeProperty("time", now);
+        if (thread.isVirtual()) {
+            jsonWriter.writeProperty("virtual", Boolean.TRUE);
+        }
         jsonWriter.writeProperty("name", snapshot.threadName());
         jsonWriter.writeProperty("state", state);
 
@@ -354,6 +367,11 @@ public class ThreadDumper {
             jsonWriter.endArray();
         }
 
+        // thread identifier of carrier, when mounted
+        if (thread.isVirtual() && snapshot.carrierThread() instanceof Thread carrier) {
+            jsonWriter.writeProperty("carrier", carrier.threadId());
+        }
+
         jsonWriter.endObject();
     }
 
@@ -361,7 +379,7 @@ public class ThreadDumper {
      * Simple JSON writer to stream objects/arrays to a TextWriter with formatting.
      * This class is not intended to be a fully featured JSON writer.
      */
-    private static class JsonWriter implements AutoCloseable {
+    private static class JsonWriter {
         private static class Node {
             final boolean isArray;
             int propertyCount;
@@ -382,16 +400,9 @@ public class ThreadDumper {
         }
         private final Deque<Node> stack = new ArrayDeque<>();
         private final TextWriter writer;
-        private boolean closed;
 
-        private JsonWriter(TextWriter writer) {
+        JsonWriter(TextWriter writer) {
             this.writer = writer;
-        }
-
-        static JsonWriter wrap(TextWriter writer) {
-            var jonWriter = new JsonWriter(writer);
-            jonWriter.startObject();
-            return jonWriter;
         }
 
         private void indent() {
@@ -447,10 +458,11 @@ public class ThreadDumper {
             }
             switch (obj) {
                 // Long may be larger than safe range of JSON integer value
-                case Long   _ -> writer.print("\"" + obj + "\"");
-                case Number _ -> writer.print(obj);
-                case null     -> writer.print("null");
-                default       -> writer.print("\"" + escape(obj.toString()) + "\"");
+                case Long   _  -> writer.print("\"" + obj + "\"");
+                case Number _  -> writer.print(obj);
+                case Boolean _ -> writer.print(obj);
+                case null      -> writer.print("null");
+                default        -> writer.print("\"" + escape(obj.toString()) + "\"");
             }
         }
 
@@ -494,15 +506,6 @@ public class ThreadDumper {
          */
         void endArray() {
             endObject(true);
-        }
-
-        @Override
-        public void close() {
-            if (!closed) {
-                endObject();
-                writer.flush();
-                closed = true;
-            }
         }
 
         /**
@@ -562,8 +565,8 @@ public class ThreadDumper {
     }
 
     /**
-     * Simple Writer implementation for printing text. The print/flush/close methods
-     * throws UncheckedIOException if an I/O error occurs.
+     * Simple Writer implementation for printing text. The print/println methods
+     * throw UncheckedIOException if an I/O error occurs.
      */
     private static class TextWriter extends Writer {
         private final Writer delegate;
@@ -573,12 +576,8 @@ public class ThreadDumper {
         }
 
         @Override
-        public void write(char[] cbuf, int off, int len) {
-            try {
-                delegate.write(cbuf, off, len);
-            } catch (IOException ioe) {
-                throw new UncheckedIOException(ioe);
-            }
+        public void write(char[] cbuf, int off, int len) throws IOException {
+            delegate.write(cbuf, off, len);
         }
 
         void print(Object obj) {
@@ -605,21 +604,13 @@ public class ThreadDumper {
         }
 
         @Override
-        public void flush() {
-            try {
-                delegate.flush();
-            } catch (IOException ioe) {
-                throw new UncheckedIOException(ioe);
-            }
+        public void flush() throws IOException {
+            delegate.flush();
         }
 
         @Override
-        public void close() {
-            try {
-                delegate.close();
-            } catch (IOException ioe) {
-                throw new UncheckedIOException(ioe);
-            }
+        public void close() throws IOException {
+            delegate.close();
         }
     }
 
