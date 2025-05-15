@@ -144,14 +144,21 @@ class ThreadSnapshot {
     }
 
     /**
+     * If the thread is a mounted virtual thread then return its carrier.
+     */
+    Thread carrierThread() {
+        return null;
+    }
+
+    /**
      * Represents information about a locking operation.
      */
     private enum LockType {
         // Park blocker
         PARKING_TO_WAIT,
         // Lock object is a class of the eliminated monitor
-        ELEMINATED_SCALAR_REPLACED,
-        ELEMINATED_MONITOR,
+        ELIMINATED_SCALAR_REPLACED,
+        ELIMINATED_MONITOR,
         LOCKED,
         WAITING_TO_LOCK,
         WAITING_ON,
@@ -189,7 +196,7 @@ class ThreadSnapshot {
         }
 
         Object lockObject() {
-            if (type == LockType.ELEMINATED_SCALAR_REPLACED) {
+            if (type == LockType.ELIMINATED_SCALAR_REPLACED) {
                 // we have no lock object, lock contains lock class
                 return null;
             }
