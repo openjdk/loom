@@ -302,7 +302,7 @@ JNIEXPORT jobject JNICALL
 JVM_GetStackTrace(JNIEnv *env, jobject thread);
 
 JNIEXPORT jobject JNICALL
-JVM_CreateThreadSnapshot(JNIEnv* env, jobject thread, jboolean withLocks);
+JVM_CreateThreadSnapshot(JNIEnv* env, jobject thread);
 
 JNIEXPORT jobjectArray JNICALL
 JVM_GetAllThreads(JNIEnv *env, jclass dummy);

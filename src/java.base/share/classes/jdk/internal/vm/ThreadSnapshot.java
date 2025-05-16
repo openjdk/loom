@@ -34,22 +34,32 @@ class ThreadSnapshot {
     private static final StackTraceElement[] EMPTY_STACK = new StackTraceElement[0];
     private static final ThreadLock[] EMPTY_LOCKS = new ThreadLock[0];
 
+    // filled by VM
     private String name;
     private int threadStatus;
     private StackTraceElement[] stackTrace;
+    // owned monitors
     private ThreadLock[] locks;
+    // an object the thread is blocked/waiting on, converted to ThreadBlocker by ThreadSnapshot.of()
+    private ThreadLock blockerLock;
+    private Object blockerOwner;
+
+    // set by ThreadSnapshot.of()
+    private ThreadBlocker blocker;
 
     /**
      * Take a snapshot of a Thread to get all information about the thread.
      */
     static ThreadSnapshot of(Thread thread) {
-        ThreadSnapshot snapshot = create(thread, true);
+        ThreadSnapshot snapshot = create(thread);
         if (snapshot.stackTrace == null) {
             snapshot.stackTrace = EMPTY_STACK;
         }
         snapshot.locks = snapshot.locks == null
                          ? snapshot.locks = EMPTY_LOCKS
                          : ThreadLock.of(snapshot.locks);
+        snapshot.blocker = snapshot.blockerLock == null ? null : ThreadBlocker.of(snapshot.blockerLock);
+        snapshot.blockerLock = null; // release blockerLock
         return snapshot;
     }
 
@@ -79,18 +89,14 @@ class ThreadSnapshot {
      * Returns the thread's parkBlocker.
      */
     Object parkBlocker() {
-        return findLockObject(0, LockType.PARKING_TO_WAIT)
-                .findAny()
-                .orElse(null);
+        return getBlocker(BlockerLockType.PARKING_TO_WAIT);
     }
 
     /**
      * Returns the owner of exclusive mode synchronizer when the parkBlocker is an AQS.
      */
     Object exclusiveOwnerThread() {
-        return findLockObject(0, LockType.OWNABLE_SYNCHRONIZER)
-                .findAny()
-                .orElse(null);
+        return parkBlocker() != null ? blockerOwner : null;
     }
 
     /**
@@ -101,9 +107,7 @@ class ThreadSnapshot {
         if (threadState() != Thread.State.BLOCKED) {
             throw new IllegalStateException();
         }
-        return findLockObject(0, LockType.WAITING_TO_LOCK)
-                .findAny()
-                .orElse(null);
+        return getBlocker(BlockerLockType.WAITING_TO_LOCK);
     }
 
     /**
@@ -115,9 +119,7 @@ class ThreadSnapshot {
                 && threadState() != Thread.State.TIMED_WAITING) {
             throw new IllegalStateException();
         }
-        return findLockObject(0, LockType.WAITING_ON)
-                .findAny()
-                .orElse(null);
+        return getBlocker(BlockerLockType.WAITING_ON);
     }
 
     /**
@@ -125,22 +127,26 @@ class ThreadSnapshot {
      */
     boolean ownsMonitors() {
         return Arrays.stream(locks)
-                .anyMatch(lock -> lock.type() == LockType.LOCKED);
+                .anyMatch(lock -> lock.type() == OwnedLockType.LOCKED);
     }
 
     /**
      * Returns the objects that the thread locked at the given depth.
      */
     Stream<Object> ownedMonitorsAt(int depth) {
-        return findLockObject(depth, LockType.LOCKED);
+        return findLockObject(depth, OwnedLockType.LOCKED);
     }
 
-    private Stream<Object> findLockObject(int depth, LockType type) {
+    private Stream<Object> findLockObject(int depth, OwnedLockType type) {
         return Arrays.stream(locks)
                 .filter(lock -> lock.depth() == depth
                         && lock.type() == type
                         && lock.lockObject() != null)
                 .map(ThreadLock::lockObject);
+    }
+
+    private Object getBlocker(BlockerLockType type) {
+        return blocker != null && blocker.type == type ? blocker.obj : null;
     }
 
     /**
@@ -153,32 +159,35 @@ class ThreadSnapshot {
     /**
      * Represents information about a locking operation.
      */
-    private enum LockType {
+    private enum OwnedLockType {
+        // Lock object is a class of the eliminated monitor
+        ELEMINATED_SCALAR_REPLACED,
+        ELEMINATED_MONITOR,
+        LOCKED,
+    }
+
+    private enum BlockerLockType {
         // Park blocker
         PARKING_TO_WAIT,
-        // Lock object is a class of the eliminated monitor
-        ELIMINATED_SCALAR_REPLACED,
-        ELIMINATED_MONITOR,
-        LOCKED,
         WAITING_TO_LOCK,
+        // Object.wait()
         WAITING_ON,
-        WAITING_TO_RELOCK,
-        // No corresponding stack frame, depth is always == -1
-        OWNABLE_SYNCHRONIZER
     }
 
     /**
      * Represents a locking operation of a thread at a specific stack depth.
      */
     private class ThreadLock {
-        private static final LockType[] lockTypeValues = LockType.values(); // cache
+        private static final OwnedLockType[] lockTypeValues = OwnedLockType.values(); // cache
 
         // set by the VM
         private int depth;
+        // type depends on the lock type: OwnedLockType for owned monitors, BlockerLockType for ThreadBlocker
         private int typeOrdinal;
         private Object obj;
 
-        private LockType type;
+        // set by ThreadLock.of(), not used by ThreadBlocker
+        private OwnedLockType type;
 
         static ThreadLock[] of(ThreadLock[] locks) {
             for (ThreadLock lock: locks) {
@@ -191,12 +200,12 @@ class ThreadSnapshot {
             return depth;
         }
 
-        LockType type() {
+        OwnedLockType type() {
             return type;
         }
 
         Object lockObject() {
-            if (type == LockType.ELIMINATED_SCALAR_REPLACED) {
+            if (type == OwnedLockType.ELEMINATED_SCALAR_REPLACED) {
                 // we have no lock object, lock contains lock class
                 return null;
             }
@@ -204,5 +213,13 @@ class ThreadSnapshot {
         }
     }
 
-    private static native ThreadSnapshot create(Thread thread, boolean withLocks);
+    private record ThreadBlocker(BlockerLockType type, Object obj) {
+        private static final BlockerLockType[] lockTypeValues = BlockerLockType.values(); // cache
+
+        static ThreadBlocker of(ThreadLock blockerLock) {
+            return new ThreadBlocker(lockTypeValues[blockerLock.typeOrdinal], blockerLock.obj);
+        }
+    }
+
+    private static native ThreadSnapshot create(Thread thread);
 }
