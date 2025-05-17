@@ -2961,8 +2961,8 @@ JVM_ENTRY(jobject, JVM_GetStackTrace(JNIEnv *env, jobject jthread))
   return JNIHandles::make_local(THREAD, trace);
 JVM_END
 
-JVM_ENTRY(jobject, JVM_CreateThreadSnapshot(JNIEnv* env, jobject jthread, jboolean withLocks))
-  oop snapshot = java_lang_Thread::get_thread_snapshot(jthread, withLocks != JNI_FALSE, THREAD);
+JVM_ENTRY(jobject, JVM_CreateThreadSnapshot(JNIEnv* env, jobject jthread))
+  oop snapshot = java_lang_Thread::get_thread_snapshot(jthread, THREAD);
   return JNIHandles::make_local(THREAD, snapshot);
 JVM_END
 
