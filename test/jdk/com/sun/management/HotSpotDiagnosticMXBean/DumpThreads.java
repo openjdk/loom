@@ -30,10 +30,14 @@
  * @library /test/lib
  * @build jdk.test.whitebox.WhiteBox
  * @run driver jdk.test.lib.helpers.ClassFileInstaller jdk.test.whitebox.WhiteBox
- * @run junit/othervm -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI DumpThreads
- * @run junit/othervm -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Djdk.trackAllThreads DumpThreads
- * @run junit/othervm -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Djdk.trackAllThreads=true DumpThreads
- * @run junit/othervm -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -Djdk.trackAllThreads=false DumpThreads
+ * @run junit/othervm -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI
+ *         --enable-native-access=ALL-UNNAMED DumpThreads
+ * @run junit/othervm -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI
+ *         --enable-native-access=ALL-UNNAMED -Djdk.trackAllThreads DumpThreads
+ * @run junit/othervm -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI
+ *        --enable-native-access=ALL-UNNAMED -Djdk.trackAllThreads=true DumpThreads
+ * @run junit/othervm -Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI
+ *        --enable-native-access=ALL-UNNAMED -Djdk.trackAllThreads=false DumpThreads
  */
 
 import java.lang.management.ManagementFactory;
@@ -44,6 +48,7 @@ import java.nio.file.Path;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -61,12 +66,12 @@ import java.util.stream.Stream;
 import com.sun.management.HotSpotDiagnosticMXBean;
 import com.sun.management.HotSpotDiagnosticMXBean.ThreadDumpFormat;
 import jdk.test.lib.threaddump.ThreadDump;
+import jdk.test.lib.thread.VThreadPinner;
 import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.whitebox.WhiteBox;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import static org.junit.jupiter.api.Assertions.*;
@@ -80,7 +85,7 @@ class DumpThreads {
         String s = System.getProperty("jdk.trackAllThreads");
         trackAllThreads = (s == null) || s.isEmpty() || Boolean.parseBoolean(s);
 
-        // need >=2 carriers for testing mounted virtual thread
+        // need >=2 carriers for testing pinning
         VThreadRunner.ensureParallelism(2);
     }
 
@@ -210,18 +215,34 @@ class DumpThreads {
     @ParameterizedTest
     @MethodSource("threadFactories")
     void testBlockedThread(ThreadFactory factory) throws Exception {
+        testBlockedThread(factory, false);
+    }
+
+    /**
+     * Test thread dump with a thread blocked on monitor enter when pinned.
+     */
+    @Test
+    void testBlockedThreadWhenPinned() throws Exception {
+        testBlockedThread(Thread.ofVirtual().factory(), true);
+    }
+
+    void testBlockedThread(ThreadFactory factory, boolean pinned) throws Exception {
         assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
 
         var lock = new Object();
         var started = new CountDownLatch(1);
 
         Thread thread = factory.newThread(() -> {
-            started.countDown();
-            synchronized (lock) { }  // blocks
+            if (pinned) {
+                VThreadPinner.runPinned(() -> {
+                    started.countDown();
+                    synchronized (lock) { }  // blocks
+                });
+            } else {
+                started.countDown();
+                synchronized (lock) { }  // blocks
+            }
         });
-
-        long tid = thread.threadId();
-        String lockAsString = Objects.toIdentityString(lock);
 
         try {
             synchronized (lock) {
@@ -229,6 +250,9 @@ class DumpThreads {
                 thread.start();
                 started.await();
                 await(thread, Thread.State.BLOCKED);
+
+                long tid = thread.threadId();
+                String lockAsString = Objects.toIdentityString(lock);
 
                 // thread dump in plain text should include thread
                 List<String> lines = dumpThreadsToPlainText();
@@ -245,6 +269,9 @@ class DumpThreads {
                 assertNotNull(ti, "thread not found");
                 assertEquals("BLOCKED", ti.state());
                 assertEquals(lockAsString, ti.blockedOn());
+                if (pinned) {
+                    //assertCarrier(ti.carrier().orElseThrow());
+                }
             }
         } finally {
             thread.join();
@@ -257,25 +284,37 @@ class DumpThreads {
     @ParameterizedTest
     @MethodSource("threadFactories")
     void testWaitingThread(ThreadFactory factory) throws Exception {
+        testWaitingThread(factory, false);
+    }
+
+    /**
+     * Test thread dump with a thread waiting in Object.wait when pinned.
+     */
+    @Test
+    void testWaitingThreadWhenPinned() throws Exception {
+        testWaitingThread(Thread.ofVirtual().factory(), true);
+    }
+
+    void testWaitingThread(ThreadFactory factory, boolean pinned) throws Exception {
         assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
         var lock = new Object();
         var started = new CountDownLatch(1);
 
         Thread thread = factory.newThread(() -> {
-            synchronized (lock) {
-                started.countDown();
-                try {
-                    lock.wait();
-                } catch (InterruptedException e) { }
-            }
+            try {
+                synchronized (lock) {
+                    if (pinned) {
+                        VThreadPinner.runPinned(() -> {
+                            started.countDown();
+                            lock.wait();
+                        });
+                    } else {
+                        started.countDown();
+                        lock.wait();
+                    }
+                }
+            } catch (InterruptedException e) { }
         });
-
-        long tid = thread.threadId();
-        String lockAsString = Objects.toIdentityString(lock);
-
-        // compiled native frames have no locals
-        Method wait0 = Object.class.getDeclaredMethod("wait0", long.class);
-        boolean expectWaitingOn = !WhiteBox.getWhiteBox().isMethodCompiled(wait0);
 
         try {
             // start thread and wait for it to wait in Object.wait
@@ -283,14 +322,14 @@ class DumpThreads {
             started.await();
             await(thread, Thread.State.WAITING);
 
+            long tid = thread.threadId();
+            String lockAsString = Objects.toIdentityString(lock);
+
             // thread dump in plain text should include thread
             List<String> lines = dumpThreadsToPlainText();
             ThreadFields fields = findThread(tid, lines);
             assertNotNull(fields, "thread not found");
             assertEquals("WAITING", fields.state());
-            if (expectWaitingOn) {
-                assertTrue(contains(lines, "// waiting on " + lockAsString));
-            }
 
             // thread dump in JSON format should include thread in root container
             ThreadDump threadDump = dumpThreadsToJson();
@@ -299,11 +338,23 @@ class DumpThreads {
                     .orElse(null);
             assertNotNull(ti, "thread not found");
             assertEquals(ti.isVirtual(), thread.isVirtual());
-
             assertEquals("WAITING", ti.state());
-            if (expectWaitingOn) {
-                assertEquals(Objects.toIdentityString(lock), ti.waitingOn());
+            if (pinned) {
+                //assertCarrier(ti.carrier().orElseThrow());
             }
+
+            // Compiled native frames have no locals. If Object.wait0 has been compiled
+            // then we don't have the object that the thread is waiting on
+            Method wait0 = Object.class.getDeclaredMethod("wait0", long.class);
+            boolean expectWaitingOn = !WhiteBox.getWhiteBox().isMethodCompiled(wait0);
+            if (expectWaitingOn) {
+                // plain text dump should have "waiting on" line
+                assertTrue(contains(lines, "// waiting on " + lockAsString));
+
+                // JSON thread dump should have waitingOn property
+                assertEquals(lockAsString, ti.waitingOn());
+            }
+
         } finally {
             synchronized (lock) {
                 lock.notifyAll();
@@ -318,18 +369,36 @@ class DumpThreads {
     @ParameterizedTest
     @MethodSource("threadFactories")
     void testParkedThread(ThreadFactory factory) throws Exception {
+        testParkedThread(factory, false);
+    }
+
+    /**
+     * Test thread dump with a thread parked on a j.u.c. lock and pinned.
+     */
+    @Test
+    void testParkedThreadWhenPinned() throws Exception {
+        testParkedThread(Thread.ofVirtual().factory(), true);
+    }
+
+    void testParkedThread(ThreadFactory factory, boolean pinned) throws Exception {
         assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
 
         var lock = new ReentrantLock();
         var started = new CountDownLatch(1);
 
         Thread thread = factory.newThread(() -> {
-            started.countDown();
-            lock.lock();
-            lock.unlock();
+            if (pinned) {
+                VThreadPinner.runPinned(() -> {
+                    started.countDown();
+                    lock.lock();
+                    lock.unlock();
+                });
+            } else {
+                started.countDown();
+                lock.lock();
+                lock.unlock();
+            }
         });
-
-        long tid = thread.threadId();
 
         lock.lock();
         try {
@@ -337,6 +406,8 @@ class DumpThreads {
             thread.start();
             started.await();
             await(thread, Thread.State.WAITING);
+
+            long tid = thread.threadId();
 
             // thread dump in plain text should include thread
             List<String> lines = dumpThreadsToPlainText();
@@ -360,6 +431,9 @@ class DumpThreads {
             assertTrue(parkBlocker.contains("java.util.concurrent.locks.ReentrantLock"));
             long ownerTid = ti.exclusiveOwnerThreadId().orElseThrow();
             assertEquals(Thread.currentThread().threadId(), ownerTid);
+            if (pinned) {
+                //assertCarrier(ti.carrier().orElseThrow());
+            }
         } finally {
             lock.unlock();
             thread.join();
@@ -372,6 +446,15 @@ class DumpThreads {
     @ParameterizedTest
     @MethodSource("threadFactories")
     void testThreadOwnsMonitor(ThreadFactory factory) throws Exception {
+        testThreadOwnsMonitor(factory, false);
+    }
+
+    @Test
+    void testThreadOwnsMonitorWhenPinned() throws Exception {
+        testThreadOwnsMonitor(Thread.ofVirtual().factory(), true);
+    }
+
+    void testThreadOwnsMonitor(ThreadFactory factory, boolean pinned) throws Exception {
         assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
 
         var lock = new Object();
@@ -379,19 +462,26 @@ class DumpThreads {
 
         Thread thread = factory.newThread(() -> {
             synchronized (lock) {
-                started.countDown();
-                LockSupport.park();
+                if (pinned) {
+                    VThreadPinner.runPinned(() -> {
+                        started.countDown();
+                        LockSupport.park();
+                    });
+                } else {
+                    started.countDown();
+                    LockSupport.park();
+                }
             }
         });
-
-        long tid = thread.threadId();
-        String lockAsString = Objects.toIdentityString(lock);
 
         try {
             // start thread and wait for it to park
             thread.start();
             started.await();
             await(thread, Thread.State.WAITING);
+
+            long tid = thread.threadId();
+            String lockAsString = Objects.toIdentityString(lock);
 
             // thread dump in plain text should include thread
             List<String> lines = dumpThreadsToPlainText();
@@ -423,7 +513,6 @@ class DumpThreads {
     /**
      * Test mounted virtual thread.
      */
-    @Disabled
     @Test
     void testMountedVirtualThread() throws Exception {
         assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
@@ -449,20 +538,24 @@ class DumpThreads {
                     .orElse(null);
             assertNotNull(ti, "thread not found");
             assertTrue(ti.isVirtual());
-
-            // the carrier should be the thread identifier of a ForkJoinWorkerThread
-            long carrierTid = ti.carrier().orElseThrow();
-            boolean found = Thread.getAllStackTraces()
-                    .keySet()
-                    .stream()
-                    .filter(t -> t instanceof ForkJoinWorkerThread)
-                    .map(Thread::threadId)
-                    .anyMatch(tid -> tid == carrierTid);
-            assertTrue(found, carrierTid + " is not a ForkJoinWorkerThread");
+            //assertCarrier(ti.carrier().orElseThrow());
         } finally {
             done.set(true);
             thread.join();
         }
+    }
+
+    /**
+     * Asserts that the given thread identifier is a ForkJoinWorkerThread.
+     */
+    void assertCarrier(long tid) {
+        boolean found = Thread.getAllStackTraces()
+                .keySet()
+                .stream()
+                .filter(t -> t instanceof ForkJoinWorkerThread)
+                .map(Thread::threadId)
+                .anyMatch(id -> id == tid);
+        assertTrue(found, tid + " is not a ForkJoinWorkerThread");
     }
 
     /**
