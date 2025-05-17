@@ -423,7 +423,6 @@ class DumpThreads {
     /**
      * Test mounted virtual thread.
      */
-    @Disabled
     @Test
     void testMountedVirtualThread() throws Exception {
         assumeTrue(trackAllThreads, "This test requires all threads to be tracked");

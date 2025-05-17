@@ -37,11 +37,14 @@ class ThreadSnapshot {
     // filled by VM
     private String name;
     private int threadStatus;
+    private Thread carrierThread;
     private StackTraceElement[] stackTrace;
     // owned monitors
     private ThreadLock[] locks;
     // an object the thread is blocked/waiting on, converted to ThreadBlocker by ThreadSnapshot.of()
-    private ThreadLock blockerLock;
+    private int blockerTypeOrdinal;
+    private Object blockerObject;
+    // blocker owner (if known)
     private Object blockerOwner;
 
     // set by ThreadSnapshot.of()
@@ -58,8 +61,10 @@ class ThreadSnapshot {
         snapshot.locks = snapshot.locks == null
                          ? snapshot.locks = EMPTY_LOCKS
                          : ThreadLock.of(snapshot.locks);
-        snapshot.blocker = snapshot.blockerLock == null ? null : ThreadBlocker.of(snapshot.blockerLock);
-        snapshot.blockerLock = null; // release blockerLock
+        if (snapshot.blockerObject != null) {
+            snapshot.blocker = new ThreadBlocker(snapshot.blockerTypeOrdinal, snapshot.blockerObject);
+            snapshot.blockerObject = null; // release
+        }
         return snapshot;
     }
 
@@ -89,7 +94,7 @@ class ThreadSnapshot {
      * Returns the thread's parkBlocker.
      */
     Object parkBlocker() {
-        return getBlocker(BlockerLockType.PARKING_TO_WAIT);
+        return getBlocker(BlockerLockType.PARK_BLOCKER);
     }
 
     /**
@@ -153,7 +158,7 @@ class ThreadSnapshot {
      * If the thread is a mounted virtual thread then return its carrier.
      */
     Thread carrierThread() {
-        return null;
+        return carrierThread;
     }
 
     /**
@@ -168,7 +173,7 @@ class ThreadSnapshot {
 
     private enum BlockerLockType {
         // Park blocker
-        PARKING_TO_WAIT,
+        PARK_BLOCKER,
         WAITING_TO_LOCK,
         // Object.wait()
         WAITING_ON,
@@ -182,11 +187,10 @@ class ThreadSnapshot {
 
         // set by the VM
         private int depth;
-        // type depends on the lock type: OwnedLockType for owned monitors, BlockerLockType for ThreadBlocker
         private int typeOrdinal;
         private Object obj;
 
-        // set by ThreadLock.of(), not used by ThreadBlocker
+        // set by ThreadLock.of()
         private OwnedLockType type;
 
         static ThreadLock[] of(ThreadLock[] locks) {
@@ -216,8 +220,8 @@ class ThreadSnapshot {
     private record ThreadBlocker(BlockerLockType type, Object obj) {
         private static final BlockerLockType[] lockTypeValues = BlockerLockType.values(); // cache
 
-        static ThreadBlocker of(ThreadLock blockerLock) {
-            return new ThreadBlocker(lockTypeValues[blockerLock.typeOrdinal], blockerLock.obj);
+        ThreadBlocker(int typeOrdinal, Object obj) {
+            this(lockTypeValues[typeOrdinal], obj);
         }
     }
 
