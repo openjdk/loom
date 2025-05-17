@@ -1975,7 +1975,7 @@ private:
             lock_object = OopHandle(Universe::vm_global(), o());
           }
         }
-        
+
         _blocker = Blocker(Blocker::WAITING_ON, lock_object);
       }
     }
