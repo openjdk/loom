@@ -45,7 +45,7 @@ import jdk.test.lib.json.JSONValue;
  * <pre>{@code
  * {
  *   "threadDump": {
- *     "processId": "63406"
+ *     "processId": "63406",
  *     "time": "2022-05-20T07:37:16.308017Z",
  *     "runtimeVersion": "19",
  *     "threadContainers": [
@@ -285,12 +285,12 @@ public final class ThreadDump {
         /**
          * Returns the thread ID of the owner thread if the parkBlocker is an AQS.
          */
-        public Optional<Long> exclusiveOwnerThreadId() {
+        public OptionalLong exclusiveOwnerThreadId() {
             String s = getStringProperty("parkBlocker", "exclusiveOwnerThreadId");
             if (s != null) {
-                return Optional.of(Long.parseLong(s));
+                return OptionalLong.of(Long.parseLong(s));
             } else {
-                return Optional.empty();
+                return OptionalLong.empty();
             }
         }
 
