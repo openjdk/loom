@@ -274,7 +274,7 @@ class DumpThreads {
                 assertEquals("BLOCKED", ti.state());
                 assertEquals(lockAsString, ti.blockedOn());
                 if (pinned) {
-                    //assertCarrier(ti.carrier().orElseThrow());
+                    assertCarrier(ti.carrier().orElseThrow());
                 }
             }
         } finally {
@@ -344,7 +344,7 @@ class DumpThreads {
             assertEquals(ti.isVirtual(), thread.isVirtual());
             assertEquals("WAITING", ti.state());
             if (pinned) {
-                //assertCarrier(ti.carrier().orElseThrow());
+                assertCarrier(ti.carrier().orElseThrow());
             }
 
             // Compiled native frames have no locals. If Object.wait0 has been compiled
@@ -436,7 +436,7 @@ class DumpThreads {
             long ownerTid = ti.exclusiveOwnerThreadId().orElseThrow();
             assertEquals(Thread.currentThread().threadId(), ownerTid);
             if (pinned) {
-                //assertCarrier(ti.carrier().orElseThrow());
+                assertCarrier(ti.carrier().orElseThrow());
             }
         } finally {
             lock.unlock();
@@ -542,7 +542,7 @@ class DumpThreads {
                     .orElse(null);
             assertNotNull(ti, "thread not found");
             assertTrue(ti.isVirtual());
-            //assertCarrier(ti.carrier().orElseThrow());
+            assertCarrier(ti.carrier().orElseThrow());
         } finally {
             done.set(true);
             thread.join();
