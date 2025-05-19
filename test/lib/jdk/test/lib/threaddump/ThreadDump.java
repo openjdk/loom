@@ -26,6 +26,7 @@ package jdk.test.lib.threaddump;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -114,23 +115,46 @@ import jdk.test.lib.json.JSONValue;
  * }</pre>
  */
 public final class ThreadDump {
-    private final long processId;
-    private final String time;
-    private final String runtimeVersion;
-    private ThreadContainer rootThreadContainer;
+    private final ThreadContainer rootThreadContainer;
+    private final Map<String, ThreadContainer> nameToThreadContainer;
+    private final JSONValue threadDumpObj;
+
+    private ThreadDump(ThreadContainer rootThreadContainer,
+                       Map<String, ThreadContainer> nameToThreadContainer,
+                       JSONValue threadDumpObj) {
+        this.rootThreadContainer = rootThreadContainer;
+        this.nameToThreadContainer = nameToThreadContainer;
+        this.threadDumpObj = threadDumpObj;
+    }
 
     /**
      * Represents an element in the threadDump/threadContainers array.
      */
     public static class ThreadContainer {
         private final String name;
-        private long owner;
-        private ThreadContainer parent;
-        private Set<ThreadInfo> threads;
+        private final ThreadContainer parent;
         private final Set<ThreadContainer> children = new HashSet<>();
+        private final JSONValue containerObj;
 
-        ThreadContainer(String name) {
+        ThreadContainer(String name, ThreadContainer parent, JSONValue containerObj) {
             this.name = name;
+            this.parent = parent;
+            this.containerObj = containerObj;
+        }
+
+        /**
+         * Add a child thread container.
+         */
+        void addChild(ThreadContainer container) {
+            children.add(container);
+        }
+
+        /**
+         * Returns the value of a property of this thread container, as a string.
+         */
+        private String getStringProperty(String propertyName) {
+            JSONValue value = containerObj.get(propertyName);
+            return (value != null) ? value.asString() : null;
         }
 
         /**
@@ -144,7 +168,10 @@ public final class ThreadDump {
          * Return the thread identifier of the owner or empty OptionalLong if not owned.
          */
         public OptionalLong owner() {
-           return (owner != 0) ? OptionalLong.of(owner) : OptionalLong.empty();
+            String owner = getStringProperty("owner");
+            return (owner != null)
+                    ? OptionalLong.of(Long.parseLong(owner))
+                    : OptionalLong.empty();
         }
 
         /**
@@ -165,7 +192,12 @@ public final class ThreadDump {
          * Returns a stream of {@code ThreadInfo} objects for the threads in this container.
          */
         public Stream<ThreadInfo> threads() {
-            return threads.stream();
+            JSONValue.JSONArray threadsObj = containerObj.get("threads").asArray();
+            Set<ThreadInfo> threadInfos = new HashSet<>();
+            for (JSONValue threadObj : threadsObj) {
+                threadInfos.add(new ThreadInfo(threadObj));
+            }
+            return threadInfos.stream();
         }
 
         /**
@@ -175,21 +207,6 @@ public final class ThreadDump {
             return threads()
                     .filter(ti -> ti.tid() == tid)
                     .findAny();
-        }
-
-        /**
-         * Helper method to recursively find a container with the given name.
-         */
-        ThreadContainer findThreadContainer(String name) {
-            if (name().equals(name))
-                return this;
-            if (name().startsWith(name + "/"))
-                return this;
-            return children()
-                    .map(c -> c.findThreadContainer(name))
-                    .filter(c -> c != null)
-                    .findAny()
-                    .orElse(null);
         }
 
         @Override
@@ -236,12 +253,9 @@ public final class ThreadDump {
          * Returns the value of a property of an object in this thread object, as a string.
          */
         private String getStringProperty(String objectName, String propertyName) {
-            JSONValue obj = threadObj.get(objectName);
-            if (obj != null) {
-                JSONValue value = obj.asObject().get(propertyName);
-                if (value != null) {
-                    return value.asString();
-                }
+            if (threadObj.get(objectName) instanceof JSONValue.JSONObject obj
+                    && obj.get(propertyName) instanceof JSONValue value) {
+                return value.asString();
             }
             return null;
         }
@@ -287,11 +301,9 @@ public final class ThreadDump {
          */
         public OptionalLong exclusiveOwnerThreadId() {
             String s = getStringProperty("parkBlocker", "exclusiveOwnerThreadId");
-            if (s != null) {
-                return OptionalLong.of(Long.parseLong(s));
-            } else {
-                return OptionalLong.empty();
-            }
+            return (s != null)
+                    ? OptionalLong.of(Long.parseLong(s))
+                    : OptionalLong.empty();
         }
 
         /**
@@ -344,11 +356,9 @@ public final class ThreadDump {
          */
         public OptionalLong carrier() {
             String s = getStringProperty("carrier");
-            if (s != null) {
-                return OptionalLong.of(Long.parseLong(s));
-            } else {
-                return OptionalLong.empty();
-            }
+            return (s != null)
+                    ? OptionalLong.of(Long.parseLong(s))
+                    : OptionalLong.empty();
         }
 
         @Override
@@ -379,68 +389,32 @@ public final class ThreadDump {
     }
 
     /**
-     * Parses the given JSON text as a thread dump.
+     * Returns the value of a property of this thread dump, as a string.
      */
-    private ThreadDump(String json) {
-        JSONValue threadDumpObj = JSONValue.parse(json).get("threadDump");
-
-        // maps container name to ThreadContainer
-        Map<String, ThreadContainer> map = new HashMap<>();
-
-        // threadContainers array
-        JSONValue threadContainersObj = threadDumpObj.get("threadContainers");
-        for (JSONValue containerObj : threadContainersObj.asArray()) {
-            String name = containerObj.get("container").asString();
-            String parentName = containerObj.get("parent").asString();
-            String owner = containerObj.get("owner").asString();
-            JSONValue.JSONArray threadsObj = containerObj.get("threads").asArray();
-
-            // threads array
-            Set<ThreadInfo> threadInfos = new HashSet<>();
-            for (JSONValue threadObj : threadsObj) {
-                threadInfos.add(new ThreadInfo(threadObj));
-            }
-
-            // add to map if not already encountered
-            var container = map.computeIfAbsent(name, k -> new ThreadContainer(name));
-            if (owner != null)
-                container.owner = Long.parseLong(owner);
-            container.threads = threadInfos;
-
-            if (parentName == null) {
-                rootThreadContainer = container;
-            } else {
-                // add parent to map if not already encountered and add to its set of children
-                var parent = map.computeIfAbsent(parentName, k -> new ThreadContainer(parentName));
-                container.parent = parent;
-                parent.children.add(container);
-            }
-        }
-
-        this.processId = Long.parseLong(threadDumpObj.get("processId").asString());
-        this.time = threadDumpObj.get("time").asString();
-        this.runtimeVersion = threadDumpObj.get("runtimeVersion").asString();
+    private String getStringProperty(String propertyName) {
+        JSONValue value = threadDumpObj.get(propertyName);
+        return (value != null) ? value.asString() : null;
     }
 
     /**
      * Returns the value of threadDump/processId.
      */
     public long processId() {
-        return processId;
+        return Long.parseLong(getStringProperty("processId"));
     }
 
     /**
      * Returns the value of threadDump/time.
      */
     public String time() {
-        return time;
+        return getStringProperty("time");
     }
 
     /**
      * Returns the value of threadDump/runtimeVersion.
      */
     public String runtimeVersion() {
-        return runtimeVersion;
+        return getStringProperty("runtimeVersion");
     }
 
     /**
@@ -454,8 +428,17 @@ public final class ThreadDump {
      * Finds a container in the threadDump/threadContainers array with the given name.
      */
     public Optional<ThreadContainer> findThreadContainer(String name) {
-        ThreadContainer container = rootThreadContainer.findThreadContainer(name);
-        return Optional.ofNullable(container);
+        ThreadContainer container = nameToThreadContainer.get(name);
+        if (container == null) {
+            // may be name/identity format
+            container = nameToThreadContainer.entrySet()
+                    .stream()
+                    .filter(e -> e.getKey().startsWith(name + "/"))
+                    .map(e -> e.getValue())
+                    .findAny()
+                    .orElse(null);
+        }
+        return Optional.of(container);
     }
 
     /**
@@ -463,6 +446,36 @@ public final class ThreadDump {
      * @throws RuntimeException if an error occurs
      */
     public static ThreadDump parse(String json) {
-        return new ThreadDump(json);
+        JSONValue threadDumpObj = JSONValue.parse(json).get("threadDump");
+
+        // threadContainers array, preserve insertion order (parents are added before children)
+        Map<String, JSONValue> containerObjs = new LinkedHashMap<>();
+        JSONValue threadContainersObj = threadDumpObj.get("threadContainers");
+        for (JSONValue containerObj : threadContainersObj.asArray()) {
+            String name = containerObj.get("container").asString();
+            containerObjs.put(name, containerObj);
+        }
+
+        // find root and create tree of thread containers
+        ThreadContainer root = null;
+        Map<String, ThreadContainer> map = new HashMap<>();
+        for (String name : containerObjs.keySet()) {
+            JSONValue containerObj = containerObjs.get(name);
+            String parentName = containerObj.get("parent").asString();
+            if (parentName == null) {
+                root = new ThreadContainer(name, null, containerObj);
+                map.put(name, root);
+            } else {
+                var parent = map.get(parentName);
+                if (parent == null) {
+                    throw new RuntimeException("Thread container " + name + " found before " + parentName);
+                }
+                var container = new ThreadContainer(name, parent, containerObj);
+                parent.addChild(container);
+                map.put(name, container);
+            }
+        }
+
+        return new ThreadDump(root, map, threadDumpObj);
     }
 }

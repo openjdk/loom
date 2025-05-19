@@ -23,10 +23,10 @@
 
 /**
  * @test
- * @bug 8284161 8287008 8309406
+ * @bug 8284161 8287008 8309406 8356870
  * @summary Basic test for com.sun.management.HotSpotDiagnosticMXBean.dumpThreads
  * @requires vm.continuations
- * @modules jdk.management
+ * @modules java.base/jdk.internal.vm jdk.management
  * @library /test/lib
  * @build jdk.test.whitebox.WhiteBox
  * @run driver jdk.test.lib.helpers.ClassFileInstaller jdk.test.whitebox.WhiteBox
@@ -42,6 +42,8 @@
 
 import java.lang.management.ManagementFactory;
 import java.lang.reflect.Method;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Path;
@@ -63,6 +65,8 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 import com.sun.management.HotSpotDiagnosticMXBean;
 import com.sun.management.HotSpotDiagnosticMXBean.ThreadDumpFormat;
 import jdk.test.lib.threaddump.ThreadDump;
@@ -549,20 +553,21 @@ class DumpThreads {
      * Asserts that the given thread identifier is a ForkJoinWorkerThread.
      */
     void assertCarrier(long tid) {
-        boolean found = Thread.getAllStackTraces()
+        Thread thread = Thread.getAllStackTraces()
                 .keySet()
                 .stream()
-                .filter(t -> t instanceof ForkJoinWorkerThread)
-                .map(Thread::threadId)
-                .anyMatch(id -> id == tid);
-        assertTrue(found, tid + " is not a ForkJoinWorkerThread");
+                .filter(t -> t.threadId() == tid)
+                .findAny()
+                .orElse(null);
+        assertNotNull(thread, "thread " + tid + " not found");
+        assertTrue(thread instanceof ForkJoinWorkerThread, "not a ForkJoinWorkerThread");
     }
 
     /**
      * Test that dumpThreads throws if the output file already exists.
      */
     @Test
-    void testFileAlreadyExsists() throws Exception {
+    void testFileAlreadyExists() throws Exception {
         var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
         String file = Files.createFile(genOutputPath("txt")).toString();
         assertThrows(FileAlreadyExistsException.class,
@@ -572,10 +577,43 @@ class DumpThreads {
     }
 
     /**
+     * Test that dumpThreads throws IOException when the output file cannot be created.
+     */
+    @Test
+    void testFileCreateFails() {
+        var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
+        String badFile = Path.of(".").toAbsolutePath()
+                .resolve("does-not-exist")
+                .resolve("does-not-exist")
+                .resolve("threads.bad")
+                .toString();
+        assertThrows(IOException.class,
+                () -> mbean.dumpThreads(badFile, ThreadDumpFormat.TEXT_PLAIN));
+        assertThrows(IOException.class,
+                () -> mbean.dumpThreads(badFile, ThreadDumpFormat.JSON));
+    }
+
+    /**
+     * Test that dumpThreads throws IOException if writing to output file fails.
+     */
+    @Test
+    void testFileWriteFails() {
+        var out = new OutputStream() {
+            @Override
+            public void write(int b) throws IOException {
+                throw new IOException("There is not enough space on the disk");
+            }
+        };
+        // need to invoke internal API directly to test this
+        assertThrows(IOException.class, () -> jdk.internal.vm.ThreadDumper.dumpThreads(out));
+        assertThrows(IOException.class, () -> jdk.internal.vm.ThreadDumper.dumpThreadsToJson(out));
+    }
+
+    /**
      * Test that dumpThreads throws if the file path is relative.
      */
     @Test
-    void testRelativePath() throws Exception {
+    void testRelativePath() {
         var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
         assertThrows(IllegalArgumentException.class,
                 () -> mbean.dumpThreads("threads.txt", ThreadDumpFormat.TEXT_PLAIN));
@@ -587,7 +625,7 @@ class DumpThreads {
      * Test that dumpThreads throws with null parameters.
      */
     @Test
-    void testNull() throws Exception {
+    void testNull() {
         var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
         assertThrows(NullPointerException.class,
                 () -> mbean.dumpThreads(null, ThreadDumpFormat.TEXT_PLAIN));
@@ -613,11 +651,11 @@ class DumpThreads {
         }
 
         // #3 "main" RUNNABLE 2025-04-18T15:22:12.012450Z
-        String[] components = line.split("\\s+");  // assume no spaces in thread name
-        assertEquals(4, components.length);
-        String nameInQuotes = components[1];
-        String name = nameInQuotes.substring(1, nameInQuotes.length()-1);
-        String state = components[2];
+        Pattern pattern = Pattern.compile("#(\\d+)\\s+\"([^\"]*)\"\\s+(\\w+)\\s+(.*)");
+        Matcher matcher = pattern.matcher(line);
+        assertTrue(matcher.matches());
+        String name = matcher.group(2);
+        String state = matcher.group(3);
         return new ThreadFields(tid, name, state);
     }
 

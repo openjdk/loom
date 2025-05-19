@@ -197,16 +197,11 @@ public class ThreadDumper {
         }
 
         // blocked on monitor enter or Object.wait
-        if (state == Thread.State.BLOCKED) {
-            Object obj = snapshot.blockedOn();
-            if (obj != null) {
-                writer.println("      // blocked on " + Objects.toIdentityString(obj));
-            }
-        } else if (state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING) {
-            Object obj = snapshot.waitingOn();
-            if (obj != null) {
-                writer.println("      // waiting on " + Objects.toIdentityString(obj));
-            }
+        if (state == Thread.State.BLOCKED && snapshot.blockedOn() instanceof Object obj) {
+            writer.println("      // blocked on " + Objects.toIdentityString(obj));
+        } else if ((state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING)
+                && snapshot.waitingOn() instanceof Object obj) {
+            writer.println("      // waiting on " + Objects.toIdentityString(obj));
         }
 
         StackTraceElement[] stackTrace = snapshot.stackTrace();
@@ -329,16 +324,11 @@ public class ThreadDumper {
         }
 
         // blocked on monitor enter or Object.wait
-        if (state == Thread.State.BLOCKED) {
-            Object obj = snapshot.blockedOn();
-            if (obj != null) {
-                jsonWriter.writeProperty("blockedOn", Objects.toIdentityString(obj));
-            }
-        } else if (state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING) {
-            Object obj = snapshot.waitingOn();
-            if (obj != null) {
-                jsonWriter.writeProperty("waitingOn", Objects.toIdentityString(obj));
-            }
+        if (state == Thread.State.BLOCKED && snapshot.blockedOn() instanceof Object obj) {
+            jsonWriter.writeProperty("blockedOn", Objects.toIdentityString(obj));
+        } else if ((state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING)
+                && snapshot.waitingOn() instanceof Object obj) {
+            jsonWriter.writeProperty("waitingOn", Objects.toIdentityString(obj));
         }
 
         // stack trace
