@@ -127,6 +127,10 @@ class ThreadSnapshot {
         return getBlocker(BlockerLockType.WAITING_ON);
     }
 
+    private Object getBlocker(BlockerLockType type) {
+        return (blocker != null && blocker.type == type) ? blocker.obj : null;
+    }
+
     /**
      * Returns true if the thread owns any object monitors.
      */
@@ -136,22 +140,15 @@ class ThreadSnapshot {
     }
 
     /**
-     * Returns the objects that the thread locked at the given depth.
+     * Returns the objects that the thread locked at the given depth. The stream
+     * will contain a null element for a monitor that has been eliminated.
      */
     Stream<Object> ownedMonitorsAt(int depth) {
-        return findLockObject(depth, OwnedLockType.LOCKED);
-    }
-
-    private Stream<Object> findLockObject(int depth, OwnedLockType type) {
         return Arrays.stream(locks)
-                .filter(lock -> lock.depth() == depth
-                        && lock.type() == type
-                        && lock.lockObject() != null)
-                .map(ThreadLock::lockObject);
-    }
-
-    private Object getBlocker(BlockerLockType type) {
-        return blocker != null && blocker.type == type ? blocker.obj : null;
+                .filter(lock -> lock.depth() == depth)
+                .map(lock -> (lock.type == OwnedLockType.LOCKED)
+                        ? lock.lockObject()
+                        : /*eliminated*/ null);
     }
 
     /**

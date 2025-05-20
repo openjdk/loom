@@ -117,8 +117,11 @@
                               "locks": {
                                 "type": "array",
                                 "items": {
-                                  "type": "string",
-                                  "description": "The object for which the monitor is owned by the thread."
+                                  "type": [
+                                    "string",
+                                    null
+                                  ],
+                                  "description": "The object for which the monitor is owned by the thread, null if eliminated"
                                 }
                               }
                             },
