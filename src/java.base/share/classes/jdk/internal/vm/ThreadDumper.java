@@ -207,9 +207,12 @@ public class ThreadDumper {
         StackTraceElement[] stackTrace = snapshot.stackTrace();
         int depth = 0;
         while (depth < stackTrace.length) {
-            snapshot.ownedMonitorsAt(depth).forEach(obj -> {
-                writer.print("      // locked ");
-                writer.println(Objects.toIdentityString(obj));
+            snapshot.ownedMonitorsAt(depth).forEach(o -> {
+                if (o != null) {
+                    writer.println("      // locked " + Objects.toIdentityString(o));
+                } else {
+                    writer.println("      // lock is eliminated");
+                }
             });
             writer.print("      ");
             writer.println(stackTrace[depth]);
@@ -347,7 +350,7 @@ public class ThreadDumper {
                     jsonWriter.writeProperty("depth", depth);
                     jsonWriter.startArray("locks");
                     snapshot.ownedMonitorsAt(depth)
-                            .map(Objects::toIdentityString)
+                            .map(o -> (o != null) ? Objects.toIdentityString(o) : null)
                             .forEach(jsonWriter::writeProperty);
                     jsonWriter.endArray();
                     jsonWriter.endObject();
