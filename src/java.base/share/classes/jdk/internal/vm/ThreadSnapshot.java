@@ -58,9 +58,11 @@ class ThreadSnapshot {
         if (snapshot.stackTrace == null) {
             snapshot.stackTrace = EMPTY_STACK;
         }
-        snapshot.locks = snapshot.locks == null
-                         ? snapshot.locks = EMPTY_LOCKS
-                         : ThreadLock.of(snapshot.locks);
+        if (snapshot.locks != null) {
+            Arrays.stream(snapshot.locks).forEach(ThreadLock::finishInit);
+        } else {
+            snapshot.locks = EMPTY_LOCKS;
+        }
         if (snapshot.blockerObject != null) {
             snapshot.blocker = new ThreadBlocker(snapshot.blockerTypeOrdinal, snapshot.blockerObject);
             snapshot.blockerObject = null; // release
@@ -79,7 +81,6 @@ class ThreadSnapshot {
      * Returns the thread state.
      */
     Thread.State threadState() {
-        // is this valid for virtual threads
         return jdk.internal.misc.VM.toThreadState(threadStatus);
     }
 
@@ -135,8 +136,7 @@ class ThreadSnapshot {
      * Returns true if the thread owns any object monitors.
      */
     boolean ownsMonitors() {
-        return Arrays.stream(locks)
-                .anyMatch(lock -> lock.type() == OwnedLockType.LOCKED);
+        return locks.length > 0;
     }
 
     /**
@@ -190,11 +190,8 @@ class ThreadSnapshot {
         // set by ThreadLock.of()
         private OwnedLockType type;
 
-        static ThreadLock[] of(ThreadLock[] locks) {
-            for (ThreadLock lock: locks) {
-                lock.type = lockTypeValues[lock.typeOrdinal];
-            }
-            return locks;
+        void finishInit() {
+            type = lockTypeValues[typeOrdinal];
         }
 
         int depth() {

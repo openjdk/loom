@@ -47,10 +47,10 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Objects;
-import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -194,7 +194,7 @@ class DumpThreads {
             var container = threadDump.findThreadContainer(name).orElse(null);
             assertNotNull(container, name + " not found");
             assertFalse(container.owner().isPresent());
-            var parent = container.parent().orElseThrow();
+            var parent = container.parent().orElse(null);
             assertEquals(threadDump.rootThreadContainer(), parent);
 
             // find the thread in the thread container
@@ -274,7 +274,7 @@ class DumpThreads {
                 assertEquals("BLOCKED", ti.state());
                 assertEquals(lockAsString, ti.blockedOn());
                 if (pinned) {
-                    assertCarrier(ti.carrier().orElseThrow());
+                    assertTrue(ti.carrier().isPresent(), "carrier not found");
                 }
             }
         } finally {
@@ -344,7 +344,7 @@ class DumpThreads {
             assertEquals(ti.isVirtual(), thread.isVirtual());
             assertEquals("WAITING", ti.state());
             if (pinned) {
-                assertCarrier(ti.carrier().orElseThrow());
+                assertTrue(ti.carrier().isPresent(), "carrier not found");
             }
 
             // Compiled native frames have no locals. If Object.wait0 has been compiled
@@ -433,10 +433,10 @@ class DumpThreads {
             String parkBlocker = ti.parkBlocker();
             assertNotNull(parkBlocker);
             assertTrue(parkBlocker.contains("java.util.concurrent.locks.ReentrantLock"));
-            long ownerTid = ti.exclusiveOwnerThreadId().orElseThrow();
+            long ownerTid = ti.exclusiveOwnerThreadId().orElse(-1L);
             assertEquals(Thread.currentThread().threadId(), ownerTid);
             if (pinned) {
-                assertCarrier(ti.carrier().orElseThrow());
+                assertTrue(ti.carrier().isPresent(), "carrier not found");
             }
         } finally {
             lock.unlock();
@@ -515,6 +515,58 @@ class DumpThreads {
     }
 
     /**
+     * Test thread dump wth a thread owning a monitor for an object that is scalar replaced.
+     */
+    @ParameterizedTest
+    @MethodSource("threadFactories")
+    void testThreadOwnsEliminatedMonitor(ThreadFactory factory) throws Exception {
+        assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
+        if (WhiteBox.getWhiteBox().getVMFlag("TieredStopAtLevel") instanceof Long level) {
+            assumeTrue(level == 4, "This test requires full optimmization");
+        }
+
+        // spin adding to a StringBuffer until done
+        // StringBuffer is synchronized, the test expects it to be scalar replaced
+        var done = new AtomicBoolean();
+        Thread thread = factory.newThread(() -> {
+            while (!done.get()) {
+                StringBuffer sb = new StringBuffer();
+                sb.append(System.currentTimeMillis());
+            }
+        });
+
+        try {
+            thread.start();
+            long tid = thread.threadId();
+
+            // thread dump in plain text format until "lock is eliminated" is found
+            boolean found = false;
+            while (!found) {
+                List<String> lines = dumpThreadsToPlainText(/*keep*/ false);
+                found = contains(lines, "// lock is eliminated");
+            }
+
+            // thread dump in JSON format until a lock of "null" is found
+            found = false;
+            while (!found) {
+                ThreadDump threadDump = dumpThreadsToJson(/*keep*/ false);
+                ThreadDump.ThreadInfo ti = threadDump.rootThreadContainer()
+                        .findThread(tid)
+                        .orElse(null);
+                assertNotNull(ti, "thread not found");
+                found = ti.ownedMonitors()
+                        .values()
+                        .stream()
+                        .flatMap(List::stream)
+                        .anyMatch(o -> o == null);
+            }
+        } finally {
+            done.set(true);
+            thread.join();
+        }
+    }
+
+    /**
      * Test mounted virtual thread.
      */
     @Test
@@ -542,7 +594,7 @@ class DumpThreads {
                     .orElse(null);
             assertNotNull(ti, "thread not found");
             assertTrue(ti.isVirtual());
-            assertCarrier(ti.carrier().orElseThrow());
+            assertTrue(ti.carrier().isPresent(), "carrier not found");
         } finally {
             done.set(true);
             thread.join();
@@ -669,25 +721,48 @@ class DumpThreads {
 
     /**
      * Dump threads to a file in plain text format, return the lines in the file.
+     * @param keep true to keep the file, false to delete
      */
-    private List<String> dumpThreadsToPlainText() throws Exception {
+    private List<String> dumpThreadsToPlainText(boolean keep) throws Exception {
         Path file = genOutputPath(".txt");
         var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
         mbean.dumpThreads(file.toString(), HotSpotDiagnosticMXBean.ThreadDumpFormat.TEXT_PLAIN);
-        System.err.format("Dumped to %s%n", file);
-        return Files.readAllLines(file);
+        System.err.format("%s Dumped to %s%n", Instant.now(), file);
+        List<String> lines = Files.readAllLines(file);
+        if (!keep) {
+            Files.delete(file);
+        }
+        return lines;
+    }
+
+    /**
+     * Dump threads to a file in plain text format, return the lines in the file.
+     */
+    private List<String> dumpThreadsToPlainText() throws Exception {
+        return dumpThreadsToPlainText(true);
+    }
+
+    /**
+     * Dump threads to a file in JSON format, parse and return as JSON object.
+     * @param keep true to keep the file, false to delete
+     */
+    private static ThreadDump dumpThreadsToJson(boolean keep) throws Exception {
+        Path file = genOutputPath(".json");
+        var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
+        mbean.dumpThreads(file.toString(), HotSpotDiagnosticMXBean.ThreadDumpFormat.JSON);
+        System.err.format("%s Dumped to %s%n", Instant.now(), file);
+        String jsonText = Files.readString(file);
+        if (!keep) {
+            Files.delete(file);
+        }
+        return ThreadDump.parse(jsonText);
     }
 
     /**
      * Dump threads to a file in JSON format, parse and return as JSON object.
      */
     private static ThreadDump dumpThreadsToJson() throws Exception {
-        Path file = genOutputPath(".json");
-        var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
-        mbean.dumpThreads(file.toString(), HotSpotDiagnosticMXBean.ThreadDumpFormat.JSON);
-        System.err.format("Dumped to %s%n", file);
-        String jsonText = Files.readString(file);
-        return ThreadDump.parse(jsonText);
+        return dumpThreadsToJson(true);
     }
 
     /**
