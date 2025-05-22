@@ -162,10 +162,9 @@ class ThreadSnapshot {
      * Represents information about a locking operation.
      */
     private enum OwnedLockType {
-        // Lock object is a class of the eliminated monitor
-        ELIMINATED_SCALAR_REPLACED,
-        ELIMINATED_MONITOR,
         LOCKED,
+        // Lock object is a class of the eliminated monitor
+        ELIMINATED,
     }
 
     private enum BlockerLockType {
@@ -203,7 +202,7 @@ class ThreadSnapshot {
         }
 
         Object lockObject() {
-            if (type == OwnedLockType.ELIMINATED_SCALAR_REPLACED) {
+            if (type == OwnedLockType.ELIMINATED) {
                 // we have no lock object, lock contains lock class
                 return null;
             }
