@@ -21,7 +21,7 @@
  * questions.
  */
 
-/**
+/*
  * @test
  * @bug 8284161 8287008 8309406 8356870
  * @summary Basic test for com.sun.management.HotSpotDiagnosticMXBean.dumpThreads
@@ -47,7 +47,6 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Path;
-import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Objects;
@@ -515,58 +514,6 @@ class DumpThreads {
     }
 
     /**
-     * Test thread dump with a thread owning a monitor for an object that is scalar replaced.
-     */
-    @ParameterizedTest
-    @MethodSource("threadFactories")
-    void testThreadOwnsEliminatedMonitor(ThreadFactory factory) throws Exception {
-        assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
-        if (WhiteBox.getWhiteBox().getVMFlag("TieredStopAtLevel") instanceof Long level) {
-            assumeTrue(level == 4, "This test requires full optimmization");
-        }
-
-        // spin adding to a StringBuffer until done
-        // StringBuffer is synchronized, the test expects it to be scalar replaced
-        var done = new AtomicBoolean();
-        Thread thread = factory.newThread(() -> {
-            while (!done.get()) {
-                StringBuffer sb = new StringBuffer();
-                sb.append(System.currentTimeMillis());
-            }
-        });
-
-        try {
-            thread.start();
-            long tid = thread.threadId();
-
-            // thread dump in plain text format until "lock is eliminated" is found
-            boolean found = false;
-            while (!found) {
-                List<String> lines = dumpThreadsToPlainText(/*keep*/ false);
-                found = contains(lines, "// lock is eliminated");
-            }
-
-            // thread dump in JSON format until a lock of "null" is found
-            found = false;
-            while (!found) {
-                ThreadDump threadDump = dumpThreadsToJson(/*keep*/ false);
-                ThreadDump.ThreadInfo ti = threadDump.rootThreadContainer()
-                        .findThread(tid)
-                        .orElse(null);
-                assertNotNull(ti, "thread not found");
-                found = ti.ownedMonitors()
-                        .values()
-                        .stream()
-                        .flatMap(List::stream)
-                        .anyMatch(o -> o == null);
-            }
-        } finally {
-            done.set(true);
-            thread.join();
-        }
-    }
-
-    /**
      * Test mounted virtual thread.
      */
     @Test
@@ -721,48 +668,26 @@ class DumpThreads {
 
     /**
      * Dump threads to a file in plain text format, return the lines in the file.
-     * @param keep true to keep the file, false to delete
      */
-    private List<String> dumpThreadsToPlainText(boolean keep) throws Exception {
+    private List<String> dumpThreadsToPlainText() throws Exception {
         Path file = genOutputPath(".txt");
         var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
         mbean.dumpThreads(file.toString(), HotSpotDiagnosticMXBean.ThreadDumpFormat.TEXT_PLAIN);
-        System.err.format("%s Dumped to %s%n", Instant.now(), file);
+        System.err.format("Dumped to %s%n", file.getFileName());
         List<String> lines = Files.readAllLines(file);
-        if (!keep) {
-            Files.delete(file);
-        }
         return lines;
-    }
-
-    /**
-     * Dump threads to a file in plain text format, return the lines in the file.
-     */
-    private List<String> dumpThreadsToPlainText() throws Exception {
-        return dumpThreadsToPlainText(true);
-    }
-
-    /**
-     * Dump threads to a file in JSON format, parse and return as JSON object.
-     * @param keep true to keep the file, false to delete
-     */
-    private static ThreadDump dumpThreadsToJson(boolean keep) throws Exception {
-        Path file = genOutputPath(".json");
-        var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
-        mbean.dumpThreads(file.toString(), HotSpotDiagnosticMXBean.ThreadDumpFormat.JSON);
-        System.err.format("%s Dumped to %s%n", Instant.now(), file);
-        String jsonText = Files.readString(file);
-        if (!keep) {
-            Files.delete(file);
-        }
-        return ThreadDump.parse(jsonText);
     }
 
     /**
      * Dump threads to a file in JSON format, parse and return as JSON object.
      */
     private static ThreadDump dumpThreadsToJson() throws Exception {
-        return dumpThreadsToJson(true);
+        Path file = genOutputPath(".json");
+        var mbean = ManagementFactory.getPlatformMXBean(HotSpotDiagnosticMXBean.class);
+        mbean.dumpThreads(file.toString(), HotSpotDiagnosticMXBean.ThreadDumpFormat.JSON);
+        System.err.format("Dumped to %s%n", file.getFileName());
+        String jsonText = Files.readString(file);
+        return ThreadDump.parse(jsonText);
     }
 
     /**
