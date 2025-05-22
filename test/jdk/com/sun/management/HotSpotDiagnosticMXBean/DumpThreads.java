@@ -445,7 +445,7 @@ class DumpThreads {
     }
 
     /**
-     * Test thread dump wth a thread owning a monitor.
+     * Test thread dump with a thread owning a monitor.
      */
     @ParameterizedTest
     @MethodSource("threadFactories")
@@ -515,7 +515,7 @@ class DumpThreads {
     }
 
     /**
-     * Test thread dump wth a thread owning a monitor for an object that is scalar replaced.
+     * Test thread dump with a thread owning a monitor for an object that is scalar replaced.
      */
     @ParameterizedTest
     @MethodSource("threadFactories")
