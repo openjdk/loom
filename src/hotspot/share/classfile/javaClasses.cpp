@@ -1883,9 +1883,8 @@ public:
     // should be synced with ordinals of jdk.internal.vm.ThreadSnapshot.OwnedLockType enum
     enum Type {
       NOTHING = -1,
-      ELIMINATED_SCALAR_REPLACED = 0,
-      ELIMINATED_MONITOR = 1,
-      LOCKED = 2,
+      LOCKED = 0,
+      ELIMINATED = 1,
     };
 
     int _depth;
@@ -1987,11 +1986,12 @@ private:
         if (monitor->eliminated() && jvf->is_compiled_frame()) { // Eliminated in compiled code
           if (monitor->owner_is_scalar_replaced()) {
             Klass* k = java_lang_Class::as_Klass(monitor->owner_klass());
-            _locks->push(OwnedLock(depth, OwnedLock::ELIMINATED_SCALAR_REPLACED, OopHandle(Universe::vm_global(), k->klass_holder())));
+            _locks->push(OwnedLock(depth, OwnedLock::ELIMINATED, OopHandle(Universe::vm_global(), k->klass_holder())));
           } else {
-            oop owner = monitor->owner();
-            if (owner != nullptr) {
-              _locks->push(OwnedLock(depth, OwnedLock::ELIMINATED_MONITOR, OopHandle(Universe::vm_global(), owner)));
+            Handle owner(current, monitor->owner());
+            if (owner.not_null()) {
+              Klass* k = owner->klass();
+              _locks->push(OwnedLock(depth, OwnedLock::ELIMINATED, OopHandle(Universe::vm_global(), k->klass_holder())));
             }
           }
           continue;
