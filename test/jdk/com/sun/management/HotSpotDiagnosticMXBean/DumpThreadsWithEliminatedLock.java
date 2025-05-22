@@ -45,6 +45,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import com.sun.management.HotSpotDiagnosticMXBean;
 import jdk.test.lib.threaddump.ThreadDump;
@@ -73,10 +74,13 @@ public class DumpThreadsWithEliminatedLock {
         // A thread that spins creating and adding to a StringBuffer. StringBuffer is
         // synchronized, assume object will be scalar replaced and the lock eliminated.
         var done = new AtomicBoolean();
+        var ref = new AtomicReference<String>();
         Thread thread = factory.newThread(() -> {
             while (!done.get()) {
                 StringBuffer sb = new StringBuffer();
                 sb.append(System.currentTimeMillis());
+                String s = sb.toString();
+                ref.set(s);
             }
         });
         try {
