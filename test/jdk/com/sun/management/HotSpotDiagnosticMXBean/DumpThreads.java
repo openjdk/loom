@@ -117,6 +117,7 @@ class DumpThreads {
             ThreadFields fields = findThread(currentThread.threadId(), lines);
             assertNotNull(fields, "current thread not found");
             assertEquals(currentThread.getName(), fields.name());
+            assertEquals(currentThread.isVirtual(), fields.isVirtual());
         }
     }
 
@@ -209,7 +210,12 @@ class DumpThreads {
      * ThreadFactory implementations for tests.
      */
     static Stream<ThreadFactory> threadFactories() {
-        return Stream.of(Thread.ofPlatform().factory(), Thread.ofVirtual().factory());
+        Stream<ThreadFactory> s = Stream.of(Thread.ofPlatform().factory());
+        if (trackAllThreads) {
+            return Stream.concat(s, Stream.of(Thread.ofVirtual().factory()));
+        } else {
+            return s;
+        }
     }
 
     /**
@@ -226,12 +232,11 @@ class DumpThreads {
      */
     @Test
     void testBlockedThreadWhenPinned() throws Exception {
+        assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
         testBlockedThread(Thread.ofVirtual().factory(), true);
     }
 
     void testBlockedThread(ThreadFactory factory, boolean pinned) throws Exception {
-        assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
-
         var lock = new Object();
         var started = new CountDownLatch(1);
 
@@ -295,11 +300,11 @@ class DumpThreads {
      */
     @Test
     void testWaitingThreadWhenPinned() throws Exception {
+        assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
         testWaitingThread(Thread.ofVirtual().factory(), true);
     }
 
     void testWaitingThread(ThreadFactory factory, boolean pinned) throws Exception {
-        assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
         var lock = new Object();
         var started = new CountDownLatch(1);
 
@@ -380,12 +385,11 @@ class DumpThreads {
      */
     @Test
     void testParkedThreadWhenPinned() throws Exception {
+        assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
         testParkedThread(Thread.ofVirtual().factory(), true);
     }
 
     void testParkedThread(ThreadFactory factory, boolean pinned) throws Exception {
-        assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
-
         var lock = new ReentrantLock();
         var started = new CountDownLatch(1);
 
@@ -454,12 +458,11 @@ class DumpThreads {
 
     @Test
     void testThreadOwnsMonitorWhenPinned() throws Exception {
+        assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
         testThreadOwnsMonitor(Thread.ofVirtual().factory(), true);
     }
 
     void testThreadOwnsMonitor(ThreadFactory factory, boolean pinned) throws Exception {
-        assumeTrue(trackAllThreads, "This test requires all threads to be tracked");
-
         var lock = new Object();
         var started = new CountDownLatch(1);
 
@@ -533,11 +536,18 @@ class DumpThreads {
         try {
             // wait for thread to start
             awaitTrue(started);
+            long tid = thread.threadId();
+
+            // thread dump in plain text should include thread
+            List<String> lines = dumpThreadsToPlainText();
+            ThreadFields fields = findThread(tid, lines);
+            assertNotNull(fields, "thread not found");
+            assertTrue(fields.isVirtual());
 
             // thread dump in JSON format should include thread in root container
             ThreadDump threadDump = dumpThreadsToJson();
             ThreadDump.ThreadInfo ti = threadDump.rootThreadContainer()
-                    .findThread(thread.threadId())
+                    .findThread(tid)
                     .orElse(null);
             assertNotNull(ti, "thread not found");
             assertTrue(ti.isVirtual());
@@ -635,7 +645,7 @@ class DumpThreads {
     /**
      * Represents the data for a thread found in a plain text thread dump.
      */
-    private record ThreadFields(long tid, String name, String state) { }
+    private record ThreadFields(long tid, String name, boolean isVirtual, String state) { }
 
     /**
      * Find a thread in the lines of a plain text thread dump.
@@ -650,12 +660,14 @@ class DumpThreads {
         }
 
         // #3 "main" RUNNABLE 2025-04-18T15:22:12.012450Z
-        Pattern pattern = Pattern.compile("#(\\d+)\\s+\"([^\"]*)\"\\s+(\\w+)\\s+(.*)");
+        // #36 "" virtual WAITING 2025-04-18T15:22:12.012450Z
+        Pattern pattern = Pattern.compile("#(\\d+)\\s+\"([^\"]*)\"\\s+(virtual\\s+)?(\\w+)\\s+(.*)");
         Matcher matcher = pattern.matcher(line);
         assertTrue(matcher.matches());
         String name = matcher.group(2);
-        String state = matcher.group(3);
-        return new ThreadFields(tid, name, state);
+        boolean isVirtual = "virtual ".equals(matcher.group(3));
+        String state = matcher.group(4);
+        return new ThreadFields(tid, name, isVirtual, state);
     }
 
     /**

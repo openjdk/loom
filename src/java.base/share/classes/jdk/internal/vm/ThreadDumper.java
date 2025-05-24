@@ -183,7 +183,7 @@ public class ThreadDumper {
         Instant now = Instant.now();
         Thread.State state = snapshot.threadState();
         writer.println("#" + thread.threadId() + " \"" + snapshot.threadName()
-                +  "\" " + state + " " + now);
+                +  "\" " + (thread.isVirtual() ? "virtual " : "") + state + " " + now);
 
         // park blocker
         Object parkBlocker = snapshot.parkBlocker();
