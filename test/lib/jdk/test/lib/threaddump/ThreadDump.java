@@ -381,7 +381,7 @@ public final class ThreadDump {
             sb.append(tid);
             String name = name();
             if (name.length() > 0) {
-                sb.append(",");
+                sb.append(",")
                   .append(name);
             }
             return sb.toString();
