@@ -44,7 +44,6 @@ import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.locks.AbstractOwnableSynchronizer;
 
 /**
  * Thread dump support.
@@ -188,12 +187,7 @@ public class ThreadDumper {
         // park blocker
         Object parkBlocker = snapshot.parkBlocker();
         if (parkBlocker != null) {
-            writer.print("      // parked on " + Objects.toIdentityString(parkBlocker));
-            if (parkBlocker instanceof AbstractOwnableSynchronizer
-                    && snapshot.exclusiveOwnerThread() instanceof Thread owner) {
-                writer.print(", owned by #" + owner.threadId());
-            }
-            writer.println();
+            writer.println("      // parked on " + Objects.toIdentityString(parkBlocker));
         }
 
         // blocked on monitor enter or Object.wait
@@ -317,12 +311,9 @@ public class ThreadDumper {
         // park blocker
         Object parkBlocker = snapshot.parkBlocker();
         if (parkBlocker != null) {
+            // parkBlocker is an object to allow for exclusiveOwnerThread in the future
             jsonWriter.startObject("parkBlocker");
             jsonWriter.writeProperty("object", Objects.toIdentityString(parkBlocker));
-            if (parkBlocker instanceof AbstractOwnableSynchronizer
-                    && snapshot.exclusiveOwnerThread() instanceof Thread owner) {
-                jsonWriter.writeProperty("exclusiveOwnerThreadId", owner.threadId());
-            }
             jsonWriter.endObject();
         }
 
