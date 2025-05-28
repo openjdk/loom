@@ -278,7 +278,9 @@ class DumpThreads {
                 assertEquals("BLOCKED", ti.state());
                 assertEquals(lockAsString, ti.blockedOn());
                 if (pinned) {
-                    assertTrue(ti.carrier().isPresent(), "carrier not found");
+                    long carrierTid = ti.carrier().orElse(-1L);
+                    assertNotEquals(-1L, carrierTid, "carrier not found");
+                    assertForkJoinWorkerThread(carrierTid);
                 }
             }
         } finally {
@@ -348,7 +350,9 @@ class DumpThreads {
             assertEquals(ti.isVirtual(), thread.isVirtual());
             assertEquals("WAITING", ti.state());
             if (pinned) {
-                assertTrue(ti.carrier().isPresent(), "carrier not found");
+                long carrierTid = ti.carrier().orElse(-1L);
+                assertNotEquals(-1L, carrierTid, "carrier not found");
+                assertForkJoinWorkerThread(carrierTid);
             }
 
             // Compiled native frames have no locals. If Object.wait0 has been compiled
@@ -439,7 +443,9 @@ class DumpThreads {
             long ownerTid = ti.exclusiveOwnerThreadId().orElse(-1L);
             assertEquals(Thread.currentThread().threadId(), ownerTid);
             if (pinned) {
-                assertTrue(ti.carrier().isPresent(), "carrier not found");
+                long carrierTid = ti.carrier().orElse(-1L);
+                assertNotEquals(-1L, carrierTid, "carrier not found");
+                assertForkJoinWorkerThread(carrierTid);
             }
         } finally {
             lock.unlock();
@@ -551,7 +557,9 @@ class DumpThreads {
                     .orElse(null);
             assertNotNull(ti, "thread not found");
             assertTrue(ti.isVirtual());
-            assertTrue(ti.carrier().isPresent(), "carrier not found");
+            long carrierTid = ti.carrier().orElse(-1L);
+            assertNotEquals(-1L, carrierTid, "carrier not found");
+            assertForkJoinWorkerThread(carrierTid);
         } finally {
             done.set(true);
             thread.join();
@@ -561,7 +569,7 @@ class DumpThreads {
     /**
      * Asserts that the given thread identifier is a ForkJoinWorkerThread.
      */
-    void assertCarrier(long tid) {
+    private void assertForkJoinWorkerThread(long tid) {
         Thread thread = Thread.getAllStackTraces()
                 .keySet()
                 .stream()
