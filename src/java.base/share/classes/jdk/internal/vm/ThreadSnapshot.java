@@ -44,11 +44,11 @@ class ThreadSnapshot {
     // an object the thread is blocked/waiting on, converted to ThreadBlocker by ThreadSnapshot.of()
     private int blockerTypeOrdinal;
     private Object blockerObject;
-    // blocker owner (if known)
-    private Object blockerOwner;
 
     // set by ThreadSnapshot.of()
     private ThreadBlocker blocker;
+
+    private ThreadSnapshot() {}
 
     /**
      * Take a snapshot of a Thread to get all information about the thread.
@@ -96,13 +96,6 @@ class ThreadSnapshot {
      */
     Object parkBlocker() {
         return getBlocker(BlockerLockType.PARK_BLOCKER);
-    }
-
-    /**
-     * Returns the owner of exclusive mode synchronizer when the parkBlocker is an AQS.
-     */
-    Object exclusiveOwnerThread() {
-        return parkBlocker() != null ? blockerOwner : null;
     }
 
     /**
@@ -188,6 +181,8 @@ class ThreadSnapshot {
 
         // set by ThreadLock.of()
         private OwnedLockType type;
+
+        private ThreadLock() {}
 
         void finishInit() {
             type = lockTypeValues[typeOrdinal];

@@ -2962,8 +2962,12 @@ JVM_ENTRY(jobject, JVM_GetStackTrace(JNIEnv *env, jobject jthread))
 JVM_END
 
 JVM_ENTRY(jobject, JVM_CreateThreadSnapshot(JNIEnv* env, jobject jthread))
-  oop snapshot = java_lang_Thread::get_thread_snapshot(jthread, THREAD);
+#if INCLUDE_JVMTI
+  oop snapshot = VMThreadSnapshot::get_thread_snapshot(jthread, THREAD);
   return JNIHandles::make_local(THREAD, snapshot);
+#else
+  return nullptr;
+#endif
 JVM_END
 
 JVM_ENTRY(void, JVM_SetNativeThreadName(JNIEnv* env, jobject jthread, jstring name))
@@ -3807,7 +3811,6 @@ JVM_ENTRY(jobject, JVM_TakeVirtualThreadListToUnblock(JNIEnv* env, jclass ignore
     parkEvent->park();
   }
 JVM_END
-
 /*
  * Return the current class's class file version.  The low order 16 bits of the
  * returned jint contain the class's major version.  The high order 16 bits
