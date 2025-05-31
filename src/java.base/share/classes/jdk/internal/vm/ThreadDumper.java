@@ -184,20 +184,6 @@ public class ThreadDumper {
         writer.println("#" + thread.threadId() + " \"" + snapshot.threadName()
                 + "\" " + (thread.isVirtual() ? "virtual " : "") + state + " " + now);
 
-        // park blocker
-        Object parkBlocker = snapshot.parkBlocker();
-        if (parkBlocker != null) {
-            writer.println("    - parked on " + Objects.toIdentityString(parkBlocker));
-        }
-
-        // blocked on monitor enter or Object.wait
-        if (state == Thread.State.BLOCKED && snapshot.blockedOn() instanceof Object obj) {
-            writer.println("    - waiting to lock " + Objects.toIdentityString(obj));
-        } else if ((state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING)
-                && snapshot.waitingOn() instanceof Object obj) {
-            writer.println("    - waiting on " + Objects.toIdentityString(obj));
-        }
-
         StackTraceElement[] stackTrace = snapshot.stackTrace();
         int depth = 0;
         while (depth < stackTrace.length) {
@@ -205,14 +191,40 @@ public class ThreadDumper {
             writer.println(stackTrace[depth]);
             snapshot.ownedMonitorsAt(depth).forEach(o -> {
                 if (o != null) {
-                    writer.println("    - locked " + Objects.toIdentityString(o));
+                    writer.println("    - locked " + decorateObject(o));
                 } else {
                     writer.println("    - lock is eliminated");
                 }
             });
+
+            // if parkBlocker set, or blocked/waiting on monitor, then print after top frame
+            if (depth == 0) {
+                // park blocker
+                Object parkBlocker = snapshot.parkBlocker();
+                if (parkBlocker != null) {
+                    writer.println("    - parking to wait for " + decorateObject(parkBlocker));
+                }
+
+                // blocked on monitor enter or Object.wait
+                if (state == Thread.State.BLOCKED && snapshot.blockedOn() instanceof Object obj) {
+                    writer.println("    - waiting to lock " + decorateObject(obj));
+                } else if ((state == Thread.State.WAITING || state == Thread.State.TIMED_WAITING)
+                        && snapshot.waitingOn() instanceof Object obj) {
+                    writer.println("    - waiting on " + decorateObject(obj));
+                }
+            }
+
             depth++;
         }
         writer.println();
+    }
+
+    /**
+     * Returns the identity string for the given object in a form suitable for the plain
+     * text format thread dump.
+     */
+    private static String decorateObject(Object obj) {
+        return "<" + Objects.toIdentityString(obj) + ">";
     }
 
     /**
