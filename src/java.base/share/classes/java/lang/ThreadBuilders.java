@@ -268,6 +268,12 @@ class ThreadBuilders {
             return new VirtualThreadFactory(scheduler, name(), counter(), characteristics(),
                     uncaughtExceptionHandler());
         }
+
+        @Override
+        public OfVirtual scheduler(Executor scheduler) {
+            this.scheduler = Objects.requireNonNull(scheduler);
+            return this;
+        }
     }
 
     /**

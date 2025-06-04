@@ -24,6 +24,8 @@
  */
 package java.lang;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Constructor;
 import java.util.Locale;
 import java.util.Objects;
@@ -41,6 +43,7 @@ import java.util.concurrent.TimeUnit;
 import jdk.internal.event.VirtualThreadEndEvent;
 import jdk.internal.event.VirtualThreadStartEvent;
 import jdk.internal.event.VirtualThreadSubmitFailedEvent;
+import jdk.internal.invoke.MhUtil;
 import jdk.internal.misc.CarrierThread;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
@@ -202,13 +205,9 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Creates a new {@code VirtualThread} to run the given task with the given
-     * scheduler. If the given scheduler is {@code null} and the current thread
-     * is a platform thread then the newly created virtual thread will use the
-     * default scheduler. If given scheduler is {@code null} and the current
-     * thread is a virtual thread then the current thread's scheduler is used.
+     * Creates a new {@code VirtualThread} to run the given task with the given scheduler.
      *
-     * @param scheduler the scheduler or null
+     * @param scheduler the scheduler or null for default scheduler
      * @param name thread name
      * @param characteristics characteristics
      * @param task the task to execute
@@ -217,19 +216,18 @@ final class VirtualThread extends BaseVirtualThread {
         super(name, characteristics, /*bound*/ false);
         Objects.requireNonNull(task);
 
-        // choose scheduler if not specified
+        // use default scheduler if not specified
         if (scheduler == null) {
-            Thread parent = Thread.currentThread();
-            if (parent instanceof VirtualThread vparent) {
-                scheduler = vparent.scheduler;
-            } else {
-                scheduler = DEFAULT_SCHEDULER;
-            }
+            scheduler = DEFAULT_SCHEDULER;
         }
 
         this.scheduler = scheduler;
         this.cont = new VThreadContinuation(this, task);
-        this.runContinuation = this::runContinuation;
+        if (scheduler == DEFAULT_SCHEDULER) {
+            this.runContinuation = this::runContinuation;
+        } else {
+            this.runContinuation = new CustomRunner(this);
+        }
     }
 
     /**
@@ -255,6 +253,39 @@ final class VirtualThread extends BaseVirtualThread {
                     }
                 }
             };
+        }
+    }
+
+    /**
+     * The task to execute when using a custom scheduler.
+     */
+    private static class CustomRunner implements VirtualThreadTask {
+        private static final VarHandle ATTACHMENT =
+                MhUtil.findVarHandle(MethodHandles.lookup(), "attachment", Object.class);
+        private final VirtualThread vthread;
+        private volatile Object attachment;
+        CustomRunner(VirtualThread vthread) {
+            this.vthread = vthread;
+        }
+        @Override
+        public void run() {
+            vthread.runContinuation();
+        }
+        @Override
+        public Thread thread() {
+            return vthread;
+        }
+        @Override
+        public Object attach(Object ob) {
+            return ATTACHMENT.getAndSet(this, ob);
+        }
+        @Override
+        public Object attachment() {
+            return attachment;
+        }
+        @Override
+        public String toString() {
+            return vthread.toString();
         }
     }
 

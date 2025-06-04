@@ -88,33 +88,11 @@ class CustomScheduler {
     }
 
     /**
-     * Test virtual thread using custom scheduler creating a virtual thread.
-     * The scheduler should be inherited.
-     */
-    @Test
-    void testCustomScheduler3() throws Exception {
-        var ref = new AtomicReference<Executor>();
-        ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler1);
-        Thread thread = factory.newThread(() -> {
-            try {
-                Thread.ofVirtual().start(() -> {
-                    ref.set(VThreadScheduler.scheduler(Thread.currentThread()));
-                }).join();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
-        thread.start();
-        thread.join();
-        assertTrue(ref.get() == scheduler1);
-    }
-
-    /**
      * Test virtual thread using custom scheduler creating a virtual thread
      * that uses a different custom scheduler.
      */
     @Test
-    void testCustomScheduler4() throws Exception {
+    void testCustomScheduler3() throws Exception {
         var ref = new AtomicReference<Executor>();
         ThreadFactory factory1 = VThreadScheduler.virtualThreadFactory(scheduler1);
         ThreadFactory factory2 = VThreadScheduler.virtualThreadFactory(scheduler2);
