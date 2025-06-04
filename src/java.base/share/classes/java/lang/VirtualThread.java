@@ -1355,7 +1355,7 @@ final class VirtualThread extends BaseVirtualThread {
 
     // -- wrappers for get/set of state, parking permit, and carrier thread --
 
-    int state() {
+    private int state() {
         return state;  // volatile read
     }
 
@@ -1383,10 +1383,6 @@ final class VirtualThread extends BaseVirtualThread {
         } else {
             return newValue;
         }
-    }
-
-    Thread carrierThread() {
-        return carrierThread;
     }
 
     private void setCarrierThread(Thread carrier) {
