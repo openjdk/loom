@@ -176,8 +176,8 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * or method in this class will cause a {@link NullPointerException} to be thrown.
  *
  * @implNote
- * In the JDK Reference Implementation, the virtual thread scheduler may be configured
- * with the following system properties:
+ * In the JDK Reference Implementation, the following system properties may be used to
+ * configure the default virtual thread scheduler:
  * <table class="striped">
  * <caption style="display:none">System properties</caption>
  *   <thead>
@@ -191,14 +191,14 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  *     <th scope="row">
  *       {@systemProperty jdk.virtualThreadScheduler.parallelism}
  *     </th>
- *     <td> The scheduler's target parallelism. It defaults to the number of
+ *     <td> The default scheduler's target parallelism. It defaults to the number of
  *       available processors. </td>
  *   </tr>
  *   <tr>
  *     <th scope="row">
  *       {@systemProperty jdk.virtualThreadScheduler.maxPoolSize}
  *     </th>
- *     <td> The maximum number of platform threads available to the scheduler.
+ *     <td> The maximum number of platform threads available to the default scheduler.
  *       It defaults to 256. </td>
  *   </tr>
  *   </tbody>
@@ -685,7 +685,6 @@ public class Thread implements Runnable {
      *        zero to indicate that this parameter is to be ignored.
      */
     Thread(ThreadGroup g, String name, int characteristics, Runnable task, long stackSize) {
-
         Thread parent = currentThread();
         boolean attached = (parent == this);   // primordial or JNI attached
 
@@ -774,14 +773,20 @@ public class Thread implements Runnable {
      * a user-provided {@link Thread.Builder.OfVirtual#scheduler(Executor) scheduler}.
      *
      * @apiNote The following example creates a scheduler that uses a small set of
-     * platform threads. It prints the name of each virtual thread before executing
-     * its task.
+     * platform threads.
      * <pre>{@code
      *     ExecutorService pool = Executors.newFixedThreadPool(4);
      *     Executor scheduler = (task) -> {
-     *         Thread vthread = ((Thread.VirtualThreadTask) task).thread();
-     *         System.out.println(vthread);
-     *         pool.execute(task);
+     *         // invoke pool.execute in the context of the caller
+     *         pool.execute(() -> {
+     *             Thread carrier = Thread.currentThread();
+     *             Thread vthread = ((Thread.VirtualThreadTask) task).thread();
+     *
+     *             // runs virtual thread task
+     *             task.run();
+     *
+     *             assert Thread.currentThread() == carrier;
+     *         }));
      *     };
      * }</pre>
      *
@@ -789,6 +794,7 @@ public class Thread implements Runnable {
      * @since 99
      */
     public interface VirtualThreadTask extends Runnable {
+
         /**
          * Return the virtual thread that this task was submitted to run
          * @return the virtual thread
@@ -808,6 +814,25 @@ public class Thread implements Runnable {
          *         there is no attachment
          */
         Object attachment();
+
+        /**
+         * Returns the object currently attached to the {@code VirtualThreadTask} for
+         * the current virtual thread.
+         * @return the object currently attached to current virtual thread's task
+         * @throws IllegalCallerException if the current thread is a platform thread
+         */
+        static Object currentVirtualThreadTaskAttachment() {
+            Thread t = Thread.currentThread();
+            if (t instanceof VirtualThread vthread) {
+                return vthread.currentTaskAttachment();
+            } else if (t.isVirtual()) {
+                // not supported with BoundVirtualThread
+                return null;
+            } else {
+                // platform thread
+                throw new IllegalCallerException();
+            }
+        }
 
         /**
          * Runs the task on the current thread as the carrier thread.
@@ -1087,14 +1112,15 @@ public class Thread implements Runnable {
              * may be invoked in the context of a virtual thread. The scheduler should
              * arrange to execute these tasks on a platform thread. Attempting to execute
              * the task on a virtual thread causes an exception to be thrown (see
-             * {@link Thread.VirtualThreadTask#run()}). The {@code execute} method may be
-             * invoked at sensitive times (e.g. when unparking a thread) so care should
-             * be taken to not directly execute the task on the <em>current thread</em>.
+             * {@link Thread.VirtualThreadTask#run() VirtualThreadTask.run}). The {@code
+             * execute} method may be invoked at sensitive times (e.g. when unparking a
+             * thread) so care should be taken to not directly execute the task on the
+             * <em>current thread</em>.
              *
              * @param scheduler the scheduler
              * @return this builder
-             * @throws UnsupportedOperationException if scheduling threads to a
-             *         user-provided scheduler is not supported
+             * @throws UnsupportedOperationException if scheduling virtual threads to a
+             *         user-provided scheduler is not supported by this VM
              */
             OfVirtual scheduler(Executor scheduler);
         }
@@ -1447,7 +1473,7 @@ public class Thread implements Runnable {
 
     /**
      * Creates a virtual thread to execute a task and schedules it to execute.
-     * The thread is scheduled to the default scheduler.
+     * The thread is scheduled to the default virtual thread scheduler.
      *
      * <p> This method is equivalent to:
      * <pre>{@code Thread.ofVirtual().start(task); }</pre>
