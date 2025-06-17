@@ -172,7 +172,7 @@ final class VirtualThread extends BaseVirtualThread {
     // notified by Object.notify/notifyAll while waiting in Object.wait
     private volatile boolean notified;
 
-    // true when virtual thread is executing Java level Object.wait, false on VM internal Object.wait
+    // true when waiting in Object.wait, false for VM internal uninterruptible Object.wait
     private volatile boolean interruptableWait;
 
     // timed-wait support
@@ -216,7 +216,7 @@ final class VirtualThread extends BaseVirtualThread {
         super(name, characteristics, /*bound*/ false);
         Objects.requireNonNull(task);
 
-        // use default scheduler if not specified
+        // use default scheduler if not provided
         if (scheduler == null) {
             scheduler = DEFAULT_SCHEDULER;
         }
@@ -286,6 +286,18 @@ final class VirtualThread extends BaseVirtualThread {
         @Override
         public String toString() {
             return vthread.toString();
+        }
+    }
+
+    /**
+     * Returns the object attached to the virtual thread's task.
+     */
+    Object currentTaskAttachment() {
+        assert Thread.currentThread() == this;
+        if (runContinuation instanceof CustomRunner runner) {
+            return runner.attachment();
+        } else {
+            return null;
         }
     }
 

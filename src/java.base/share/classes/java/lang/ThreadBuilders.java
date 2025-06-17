@@ -215,7 +215,6 @@ class ThreadBuilders {
         VirtualThreadBuilder() {
         }
 
-        // invoked by tests
         VirtualThreadBuilder(Executor scheduler) {
             if (!ContinuationSupport.isSupported())
                 throw new UnsupportedOperationException();
