@@ -27,6 +27,7 @@
  * @summary Exercise JvmtiThreadState creation concurrently with terminating vthreads
  * @requires vm.continuations
  * @modules java.base/java.lang:+open
+ * @library /test/lib
  * @run main/othervm/native -agentlib:ThreadStateTest ThreadStateTest
  */
 
@@ -34,8 +35,7 @@ import java.util.concurrent.*;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
+import jdk.test.lib.thread.VThreadScheduler;
 
 public class ThreadStateTest {
     static final int VTHREAD_COUNT = 64;
@@ -59,7 +59,7 @@ public class ThreadStateTest {
 
         while (tryCount-- > 0) {
             ExecutorService scheduler = Executors.newFixedThreadPool(8);
-            ThreadFactory factory = virtualThreadBuilder(scheduler).factory();
+            ThreadFactory factory = VThreadScheduler.virtualThreadBuilder(scheduler).factory();
 
             List<Thread> virtualThreads = new ArrayList<>();
             for (int i = 0; i < VTHREAD_COUNT; i++) {
@@ -97,23 +97,5 @@ public class ThreadStateTest {
     public static void main(String[] args) throws Exception {
         ThreadStateTest obj = new ThreadStateTest();
         obj.runTest();
-    }
-
-    private static Thread.Builder.OfVirtual virtualThreadBuilder(Executor scheduler) {
-        Thread.Builder.OfVirtual builder = Thread.ofVirtual();
-        try {
-            Class<?> clazz = Class.forName("java.lang.ThreadBuilders$VirtualThreadBuilder");
-            Constructor<?> ctor = clazz.getDeclaredConstructor(Executor.class);
-            ctor.setAccessible(true);
-            return (Thread.Builder.OfVirtual) ctor.newInstance(scheduler);
-        } catch (InvocationTargetException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof RuntimeException re) {
-                throw re;
-            }
-            throw new RuntimeException(e);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
     }
 }

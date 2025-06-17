@@ -23,8 +23,8 @@
 
 package jdk.test.lib.thread;
 
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.reflect.InvocationTargetException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -37,6 +37,26 @@ import java.util.concurrent.ThreadFactory;
  */
 public class VThreadScheduler {
     private VThreadScheduler() { }
+
+    /**
+     * Returns the default virtual thread scheduler.
+     */
+    public static Executor defaultScheduler() {
+        try {
+            Method m = Class.forName("java.lang.VirtualThread")
+                    .getDeclaredMethod("defaultScheduler");
+            m.setAccessible(true);
+            return (Executor) m.invoke(null);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException re) {
+                throw re;
+            }
+            throw new RuntimeException(e);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     /**
      * Returns the scheduler for the given virtual thread.
@@ -73,11 +93,11 @@ public class VThreadScheduler {
      * @throws UnsupportedOperationException if custom schedulers are not supported
      */
     public static Thread.Builder.OfVirtual virtualThreadBuilder(Executor scheduler) {
+        var builder = Thread.ofVirtual();
         try {
-            Class<?> clazz = Class.forName("java.lang.ThreadBuilders$VirtualThreadBuilder");
-            Constructor<?> ctor = clazz.getDeclaredConstructor(Executor.class);
-            ctor.setAccessible(true);
-            return (Thread.Builder.OfVirtual) ctor.newInstance(scheduler);
+            Method m = Thread.Builder.OfVirtual.class.getMethod("scheduler", Executor.class);
+            m.setAccessible(true);
+            m.invoke(builder, scheduler);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
             if (cause instanceof RuntimeException re) {
@@ -87,6 +107,7 @@ public class VThreadScheduler {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+        return builder;
     }
 
     /**

@@ -36,6 +36,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import jdk.test.lib.thread.VThreadScheduler;
+
 /*
  * Tests that JNI monitors work correctly with virtual threads,
  * There are multiple test scenarios that we check using unified logging output
@@ -112,7 +114,7 @@ public class JNIMonitor {
         String test = args[0];
         String[] cmdArgs = new String[] {
             "-Djava.library.path=" + Utils.TEST_NATIVE_PATH,
-            // Grant access to ThreadBuilders$VirtualThreadBuilder
+            // Need to open java.lang to use VThreadScheduler.virtualThreadBuilder
             "--add-opens=java.base/java.lang=ALL-UNNAMED",
             // Enable the JNI warning
             "-Xcheck:jni",
@@ -199,29 +201,6 @@ public class JNIMonitor {
             System.loadLibrary("JNIMonitor");
         }
 
-        // This gives us a way to control the scheduler used for our virtual threads. The test
-        // only works as intended when the virtual threads run on the same carrier thread (as
-        // that carrier maintains ownership of the monitor if the virtual thread fails to unlock it).
-        // The original issue was also only discovered due to the carrier thread terminating
-        // unexpectedly, so we can force that condition too by shutting down our custom scheduler.
-        private static Thread.Builder.OfVirtual virtualThreadBuilder(Executor scheduler) {
-            Thread.Builder.OfVirtual builder = Thread.ofVirtual();
-            try {
-                Class<?> clazz = Class.forName("java.lang.ThreadBuilders$VirtualThreadBuilder");
-                Constructor<?> ctor = clazz.getDeclaredConstructor(Executor.class);
-                ctor.setAccessible(true);
-                return (Thread.Builder.OfVirtual) ctor.newInstance(scheduler);
-            } catch (InvocationTargetException e) {
-                Throwable cause = e.getCause();
-                if (cause instanceof RuntimeException re) {
-                    throw re;
-                }
-                throw new RuntimeException(e);
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        }
-
         static void runTest(int nThreads, boolean skipUnlock, boolean throwOnExit) throws Throwable {
             final Object[] monitors = new Object[nThreads];
             for (int i = 0; i < nThreads; i++) {
@@ -230,7 +209,7 @@ public class JNIMonitor {
             final AtomicReference<Throwable> exception = new AtomicReference();
             // Ensure all our VT's operate of the same carrier, sequentially.
             ExecutorService scheduler = Executors.newSingleThreadExecutor();
-            ThreadFactory factory = virtualThreadBuilder(scheduler).factory();
+            ThreadFactory factory = VThreadScheduler.virtualThreadBuilder(scheduler).factory();
             for (int i = 0 ; i < nThreads; i++) {
                 Object monitor = skipUnlock ? monitors[i] : monitors[0];
                 Thread th = factory.newThread(() -> {
