@@ -93,21 +93,22 @@ public class VThreadScheduler {
      * @throws UnsupportedOperationException if custom schedulers are not supported
      */
     public static Thread.Builder.OfVirtual virtualThreadBuilder(Executor scheduler) {
-        var builder = Thread.ofVirtual();
-        try {
-            Method m = Thread.Builder.OfVirtual.class.getMethod("scheduler", Executor.class);
-            m.setAccessible(true);
-            m.invoke(builder, scheduler);
-        } catch (InvocationTargetException e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof RuntimeException re) {
-                throw re;
-            }
-            throw new RuntimeException(e);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        return builder;
+        return Thread.ofVirtual().scheduler(scheduler);
+//        var builder = Thread.ofVirtual();
+//        try {
+//            Method m = Thread.Builder.OfVirtual.class.getMethod("scheduler", Executor.class);
+//            m.setAccessible(true);
+//            m.invoke(builder, scheduler);
+//        } catch (InvocationTargetException e) {
+//            Throwable cause = e.getCause();
+//            if (cause instanceof RuntimeException re) {
+//                throw re;
+//            }
+//            throw new RuntimeException(e);
+//        } catch (Exception e) {
+//            throw new RuntimeException(e);
+//        }
+//        return builder;
     }
 
     /**
