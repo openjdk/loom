@@ -36,6 +36,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.StructureViolationException;
 import java.util.concurrent.locks.LockSupport;
 import jdk.internal.event.ThreadSleepEvent;
+import jdk.internal.javac.Restricted;
 import jdk.internal.misc.TerminatingThreadLocal;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.misc.VM;
@@ -1122,6 +1123,7 @@ public class Thread implements Runnable {
              * @throws UnsupportedOperationException if scheduling virtual threads to a
              *         user-provided scheduler is not supported by this VM
              */
+            @Restricted
             OfVirtual scheduler(Executor scheduler);
         }
     }

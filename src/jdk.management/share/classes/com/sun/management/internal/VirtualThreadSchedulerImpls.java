@@ -102,7 +102,7 @@ public class VirtualThreadSchedulerImpls {
             if (Scheduler.instance() instanceof ForkJoinPool pool) {
                 return pool.getParallelism();
             }
-            throw new InternalError();  // should not get here
+            return 0;  // TBD
         }
 
         @Override
@@ -116,7 +116,7 @@ public class VirtualThreadSchedulerImpls {
 
                 return;
             }
-            throw new UnsupportedOperationException();  // should not get here
+            throw new UnsupportedOperationException();
         }
 
         @Override
@@ -124,7 +124,7 @@ public class VirtualThreadSchedulerImpls {
             if (Scheduler.instance() instanceof ForkJoinPool pool) {
                 return pool.getPoolSize();
             }
-            return -1;  // should not get here
+            return -1;  // unknown
         }
 
         @Override
@@ -132,7 +132,7 @@ public class VirtualThreadSchedulerImpls {
             if (Scheduler.instance() instanceof ForkJoinPool pool) {
                 return pool.getActiveThreadCount();
             }
-            return -1;  // should not get here
+            return -1;  // unknown
         }
 
         @Override
@@ -140,7 +140,7 @@ public class VirtualThreadSchedulerImpls {
             if (Scheduler.instance() instanceof ForkJoinPool pool) {
                 return pool.getQueuedTaskCount() + pool.getQueuedSubmissionCount();
             }
-            return -1L;  // should not get here
+            return -1L;  // unknown
         }
     }
 

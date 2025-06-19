@@ -35,6 +35,8 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.invoke.MhUtil;
+import jdk.internal.reflect.CallerSensitive;
+import jdk.internal.reflect.Reflection;
 import jdk.internal.vm.ContinuationSupport;
 
 /**
@@ -262,8 +264,11 @@ class ThreadBuilders {
                     uncaughtExceptionHandler());
         }
 
+        @CallerSensitive
         @Override
         public OfVirtual scheduler(Executor scheduler) {
+            Class<?> caller = Reflection.getCallerClass();
+            caller.getModule().ensureNativeAccess(OfVirtual.class, "scheduler", caller, false);
             if (!ContinuationSupport.isSupported()) {
                 throw new UnsupportedOperationException();
             }

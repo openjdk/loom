@@ -24,6 +24,7 @@ import jdk.test.lib.Asserts;
 import jdk.test.lib.Utils;
 import jdk.test.lib.process.ProcessTools;
 import jdk.test.lib.process.OutputAnalyzer;
+import jdk.test.lib.thread.VThreadScheduler;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -35,8 +36,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import jdk.test.lib.thread.VThreadScheduler;
 
 /*
  * Tests that JNI monitors work correctly with virtual threads,
@@ -208,6 +207,11 @@ public class JNIMonitor {
             }
             final AtomicReference<Throwable> exception = new AtomicReference();
             // Ensure all our VT's operate of the same carrier, sequentially.
+            // This gives us a way to control the scheduler used for our virtual threads. The test
+            // only works as intended when the virtual threads run on the same carrier thread (as
+            // that carrier maintains ownership of the monitor if the virtual thread fails to unlock it).
+            // The original issue was also only discovered due to the carrier thread terminating
+            // unexpectedly, so we can force that condition too by shutting down our custom scheduler.
             ExecutorService scheduler = Executors.newSingleThreadExecutor();
             ThreadFactory factory = VThreadScheduler.virtualThreadBuilder(scheduler).factory();
             for (int i = 0 ; i < nThreads; i++) {

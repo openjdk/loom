@@ -67,7 +67,20 @@ import static java.util.concurrent.TimeUnit.*;
 final class VirtualThread extends BaseVirtualThread {
     private static final Unsafe U = Unsafe.getUnsafe();
     private static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
-    private static final Executor DEFAULT_SCHEDULER = createDefaultScheduler();
+
+    private static final Executor DEFAULT_SCHEDULER;
+    private static final boolean USE_CUSTOM_RUNNER;
+    static {
+        // experimental
+        String propValue = System.getProperty("jdk.virtualThreadScheduler.implClass");
+        if (propValue != null) {
+            DEFAULT_SCHEDULER = createCustomDefaultScheduler(propValue);
+            USE_CUSTOM_RUNNER = true;
+        } else {
+            DEFAULT_SCHEDULER = createDefaultForkJoinPoolScheduler();
+            USE_CUSTOM_RUNNER = false;
+        }
+    }
 
     private static final long STATE = U.objectFieldOffset(VirtualThread.class, "state");
     private static final long PARK_PERMIT = U.objectFieldOffset(VirtualThread.class, "parkPermit");
@@ -223,10 +236,10 @@ final class VirtualThread extends BaseVirtualThread {
 
         this.scheduler = scheduler;
         this.cont = new VThreadContinuation(this, task);
-        if (scheduler == DEFAULT_SCHEDULER) {
-            this.runContinuation = this::runContinuation;
-        } else {
+        if (USE_CUSTOM_RUNNER || (scheduler != DEFAULT_SCHEDULER)) {
             this.runContinuation = new CustomRunner(this);
+        } else {
+            this.runContinuation = this::runContinuation;
         }
     }
 
@@ -1463,30 +1476,20 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Creates the default scheduler.
-     * If the system property {@code jdk.virtualThreadScheduler.implClass} is set then
-     * its value is the name of a class that implements java.util.concurrent.Executor.
-     * The class is public in an exported package, has a public no-arg constructor,
-     * and is visible to the system class loader.
-     * If the system property is not set then the default scheduler will be a
-     * ForkJoinPool instance.
+     * Loads a java.util.concurrent.Executor with the given class name to use at the
+     * default scheduler. The class is public in an exported package, has a public
+     * no-arg constructor, and is visible to the system class loader.
      */
-    private static Executor createDefaultScheduler() {
-        String propValue = System.getProperty("jdk.virtualThreadScheduler.implClass");
-        if (propValue != null) {
-            try {
-                Class<?> clazz = Class.forName(propValue, true,
-                        ClassLoader.getSystemClassLoader());
-                Constructor<?> ctor = clazz.getConstructor();
-                var scheduler = (Executor) ctor.newInstance();
-                System.err.println("""
-                    WARNING: Using custom scheduler, this is an experimental feature.""");
-                return scheduler;
-            } catch (Exception ex) {
-                throw new Error(ex);
-            }
-        } else {
-            return createDefaultForkJoinPoolScheduler();
+    private static Executor createCustomDefaultScheduler(String cn) {
+        try {
+            Class<?> clazz = Class.forName(cn, true, ClassLoader.getSystemClassLoader());
+            Constructor<?> ctor = clazz.getConstructor();
+            var scheduler = (Executor) ctor.newInstance();
+            System.err.println("""
+                WARNING: Using custom default scheduler, this is an experimental feature!""");
+            return scheduler;
+        } catch (Exception ex) {
+            throw new Error(ex);
         }
     }
 
