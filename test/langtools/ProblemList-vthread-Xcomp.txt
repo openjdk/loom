@@ -31,4 +31,3 @@
 ## Timeouts
 
 tools/javac/failover/CheckAttributedTree.java
-tools/sjavac/IdleShutdown.java
