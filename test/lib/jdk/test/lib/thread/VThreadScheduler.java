@@ -92,6 +92,7 @@ public class VThreadScheduler {
      * Returns a builder to create virtual threads that use the given scheduler.
      * @throws UnsupportedOperationException if custom schedulers are not supported
      */
+    @SuppressWarnings("restricted")
     public static Thread.Builder.OfVirtual virtualThreadBuilder(Executor scheduler) {
         return Thread.ofVirtual().scheduler(scheduler);
 //        var builder = Thread.ofVirtual();
