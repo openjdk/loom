@@ -53,6 +53,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -92,7 +93,8 @@ public class TestRestricted {
             RestrictedMethod.of(System.class, "load", void.class, String.class),
             RestrictedMethod.of(System.class, "loadLibrary", void.class, String.class),
             RestrictedMethod.of(Runtime.class, "load", void.class, String.class),
-            RestrictedMethod.of(Runtime.class, "loadLibrary", void.class, String.class)
+            RestrictedMethod.of(Runtime.class, "loadLibrary", void.class, String.class),
+            RestrictedMethod.of(Thread.Builder.OfVirtual.class, "scheduler", Thread.Builder.OfVirtual.class, Executor.class)
     );
 
     @Test

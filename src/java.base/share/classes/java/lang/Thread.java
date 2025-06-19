@@ -40,6 +40,7 @@ import jdk.internal.javac.Restricted;
 import jdk.internal.misc.TerminatingThreadLocal;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.misc.VM;
+import jdk.internal.reflect.CallerSensitive;
 import jdk.internal.vm.Continuation;
 import jdk.internal.vm.ScopedValueContainer;
 import jdk.internal.vm.StackableScope;
@@ -1123,6 +1124,7 @@ public class Thread implements Runnable {
              * @throws UnsupportedOperationException if scheduling virtual threads to a
              *         user-provided scheduler is not supported by this VM
              */
+            @CallerSensitive
             @Restricted
             OfVirtual scheduler(Executor scheduler);
         }
