@@ -2300,12 +2300,20 @@ public final class System {
                 if (thread instanceof BaseVirtualThread vthread) {
                     vthread.unpark();
                 } else {
-                    throw new WrongThreadException();
+                    throw new IllegalArgumentException();
                 }
             }
 
             public Executor virtualThreadDefaultScheduler() {
                 return VirtualThread.defaultScheduler();
+            }
+
+            public Executor virtualThreadScheduler(Thread thread) {
+                if (thread instanceof VirtualThread vthread) {
+                    return vthread.scheduler();
+                } else {
+                    throw new IllegalArgumentException();
+                }
             }
 
             public StackWalker newStackWalkerInstance(Set<StackWalker.Option> options,
