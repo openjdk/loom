@@ -59,7 +59,7 @@ public class SctpServerChannelImpl extends SctpServerChannel
     private final int fdVal;
 
     /* IDs of native thread doing accept, for signalling */
-    private volatile long thread;
+    private volatile NativeThread thread;
 
     /* Lock held by thread currently blocked in this channel */
     private final Object lock = new Object();
@@ -200,7 +200,7 @@ public class SctpServerChannelImpl extends SctpServerChannel
 
     private void acceptCleanup() throws IOException {
         synchronized (stateLock) {
-            thread = 0;
+            thread = null;
             if (state == ChannelState.KILLPENDING)
                 kill();
         }
@@ -253,8 +253,8 @@ public class SctpServerChannelImpl extends SctpServerChannel
         synchronized (stateLock) {
             if (state != ChannelState.KILLED)
                 SctpNet.preClose(fdVal);
-            if (thread != 0)
-                NativeThread.signal(thread);
+            if (NativeThread.isNativeThread(thread))
+                thread.signal();
             if (!isRegistered())
                 kill();
         }
@@ -273,7 +273,7 @@ public class SctpServerChannelImpl extends SctpServerChannel
             assert !isOpen() && !isRegistered();
 
             // Postpone the kill if there is a thread in accept
-            if (thread == 0) {
+            if (thread == null) {
                 state = ChannelState.KILLED;
                 SctpNet.close(fdVal);
             } else {

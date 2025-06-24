@@ -60,6 +60,24 @@ public class VThreadRunner {
     public static <X extends Throwable> void run(String name,
                                                  int characteristics,
                                                  ThrowingRunnable<X> task) throws X {
+        Thread.Builder.OfVirtual builder = Thread.ofVirtual();
+        if (name != null)
+            builder.name(name);
+        if ((characteristics & NO_INHERIT_THREAD_LOCALS) != 0)
+            builder.inheritInheritableThreadLocals(false);
+        run(builder, task);
+    }
+
+    /**
+     * Run a task in a virtual thread and wait for it to terminate.
+     * If the task completes with an exception then it is thrown by this method.
+     *
+     * @param builder the builder to create the thread
+     * @param task the task to run
+     * @throws X the exception thrown by the task
+     */
+    public static <X extends Throwable> void run(Thread.Builder.OfVirtual builder,
+                                                 ThrowingRunnable<X> task) throws X {
         var throwableRef = new AtomicReference<Throwable>();
         Runnable target = () -> {
             try {
@@ -68,12 +86,6 @@ public class VThreadRunner {
                 throwableRef.set(ex);
             }
         };
-
-        Thread.Builder builder = Thread.ofVirtual();
-        if (name != null)
-            builder.name(name);
-        if ((characteristics & NO_INHERIT_THREAD_LOCALS) != 0)
-            builder.inheritInheritableThreadLocals(false);
         Thread thread = builder.start(target);
 
         // wait for thread to terminate

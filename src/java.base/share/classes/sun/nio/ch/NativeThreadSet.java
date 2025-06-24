@@ -31,9 +31,9 @@ class NativeThreadSet {
     private static final int OTHER_THREAD_INDEX = -99;
 
     private final int initialCapacity;
-    private long[] threads;             // array of thread handles, created lazily
-    private int used;                   // number of thread handles in threads array
-    private int otherThreads;           // count of threads without a native thread handle
+    private NativeThread[] threads;     // array of native threads, created lazily
+    private int used;                   // number of elements in threads array
+    private int otherThreads;           // count of threads without a native thread object
     private boolean waitingToEmpty;
 
     NativeThreadSet(int n) {
@@ -45,9 +45,9 @@ class NativeThreadSet {
      * it can efficiently be removed later.
      */
     int add() {
-        long th = NativeThread.current();
+        NativeThread nt = NativeThread.currentNativeThread();
         synchronized (this) {
-            if (!NativeThread.isNativeThread(th)) {
+            if (nt == null) {
                 otherThreads++;
                 return OTHER_THREAD_INDEX;
             }
@@ -55,18 +55,18 @@ class NativeThreadSet {
             // add native thread handle to array, creating or growing array if needed
             int start = 0;
             if (threads == null) {
-                threads = new long[initialCapacity];
+                threads = new NativeThread[initialCapacity];
             } else if (used >= threads.length) {
                 int on = threads.length;
                 int nn = on * 2;
-                long[] nthreads = new long[nn];
+                NativeThread[] nthreads = new NativeThread[nn];
                 System.arraycopy(threads, 0, nthreads, 0, on);
                 threads = nthreads;
                 start = on;
             }
             for (int i = start; i < threads.length; i++) {
-                if (threads[i] == 0) {
-                    threads[i] = th;
+                if (threads[i] == null) {
+                    threads[i] = nt;
                     used++;
                     return i;
                 }
@@ -81,8 +81,8 @@ class NativeThreadSet {
     void remove(int i) {
         synchronized (this) {
             if (i >= 0) {
-                assert threads[i] == NativeThread.current();
-                threads[i] = 0;
+                assert threads[i] == NativeThread.currentNativeThread();
+                threads[i] = null;
                 used--;
             } else if (i == OTHER_THREAD_INDEX) {
                 otherThreads--;
@@ -104,9 +104,9 @@ class NativeThreadSet {
         while (used > 0 || otherThreads > 0) {
             int u = used, i = 0;
             while (u > 0 && i < threads.length) {
-                long th = threads[i];
-                if (th != 0) {
-                    NativeThread.signal(th);
+                NativeThread nt = threads[i];
+                if (nt != null) {
+                    nt.signal();
                     u--;
                 }
                 i++;

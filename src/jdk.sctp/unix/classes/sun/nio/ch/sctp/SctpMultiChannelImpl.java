@@ -82,8 +82,8 @@ public class SctpMultiChannelImpl extends SctpMultiChannel
     private final int fdVal;
 
     /* IDs of native threads doing send and receives, for signalling */
-    private volatile long receiverThread;
-    private volatile long senderThread;
+    private volatile NativeThread receiverThread;
+    private volatile NativeThread senderThread;
 
     /* Lock held by current receiving thread */
     private final Object receiveLock = new Object();
@@ -265,7 +265,7 @@ public class SctpMultiChannelImpl extends SctpMultiChannel
 
     private void receiverCleanup() throws IOException {
         synchronized (stateLock) {
-            receiverThread = 0;
+            receiverThread = null;
             if (state == ChannelState.KILLPENDING)
                 kill();
         }
@@ -273,7 +273,7 @@ public class SctpMultiChannelImpl extends SctpMultiChannel
 
     private void senderCleanup() throws IOException {
         synchronized (stateLock) {
-            senderThread = 0;
+            senderThread = null;
             if (state == ChannelState.KILLPENDING)
                 kill();
         }
@@ -290,11 +290,11 @@ public class SctpMultiChannelImpl extends SctpMultiChannel
             if (state != ChannelState.KILLED)
                 SctpNet.preClose(fdVal);
 
-            if (receiverThread != 0)
-                NativeThread.signal(receiverThread);
+            if (NativeThread.isNativeThread(receiverThread))
+                receiverThread.signal();
 
-            if (senderThread != 0)
-                NativeThread.signal(senderThread);
+            if (NativeThread.isNativeThread(senderThread))
+                senderThread.signal();
 
             if (!isRegistered())
                 kill();
@@ -378,7 +378,7 @@ public class SctpMultiChannelImpl extends SctpMultiChannel
             assert !isOpen() && !isRegistered();
 
             /* Postpone the kill if there is a thread sending or receiving. */
-            if (receiverThread == 0 && senderThread == 0) {
+            if (receiverThread == null && senderThread == null) {
                 state = ChannelState.KILLED;
                 SctpNet.close(fdVal);
             } else {

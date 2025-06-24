@@ -212,7 +212,7 @@ class BlockingSocketOps {
      */
     @Test
     void testSocketReadAsyncClose2() throws Exception {
-        testSocketReadAsyncClose(0);
+        testSocketReadAsyncClose(60_000);
     }
 
     void testSocketReadAsyncClose(int timeout) throws Exception {
@@ -231,6 +231,47 @@ class BlockingSocketOps {
                     int n = s.getInputStream().read();
                     fail("read " + n);
                 } catch (SocketException expected) { }
+            }
+        });
+    }
+
+    /**
+     * Socket shutdownInput while virtual thread blocked in read.
+     */
+    @Test
+    void testSocketReadAsyncShutdownInput1() throws Exception {
+        testSocketReadAsyncShutdownInput(0);
+    }
+
+    /**
+     * Socket shutdownInput while virtual thread blocked in timed read.
+     */
+    @Test
+    void testSocketReadAsyncShutdownInput2() throws Exception {
+        testSocketReadAsyncShutdownInput(60_000);
+    }
+
+    void testSocketReadAsyncShutdownInput(int timeout) throws Exception {
+        VThreadRunner.run(() -> {
+            try (var connection = new Connection()) {
+                Socket s = connection.socket1();
+
+                // delayed shutdown of s
+                runAfterParkedAsync(s::shutdownInput);
+
+                // read from s should block, then throw
+                if (timeout > 0) {
+                    s.setSoTimeout(timeout);
+                }
+
+                // -1 or SocketException
+                try {
+                    int n = s.getInputStream().read();
+                    assertEquals(-1, n);
+                } catch (SocketException e) { }
+
+                assertTrue(s.isInputShutdown());
+                assertFalse(s.isClosed());
             }
         });
     }
@@ -285,7 +326,7 @@ class BlockingSocketOps {
             try (var connection = new Connection()) {
                 Socket s = connection.socket1();
 
-                // delayedclose of s
+                // delayed close of s
                 runAfterParkedAsync(s::close);
 
                 // write to s should block, then throw
@@ -296,6 +337,33 @@ class BlockingSocketOps {
                         out.write(ba);
                     }
                 } catch (SocketException expected) { }
+            }
+        });
+    }
+
+    /**
+     * Socket shutdownOutput while virtual thread blocked in write.
+     */
+    @Test
+    void testSocketWriteAsyncShutdownOutput() throws Exception {
+        VThreadRunner.run(() -> {
+            try (var connection = new Connection()) {
+                Socket s = connection.socket1();
+
+                // delayed shutdown of s
+                runAfterParkedAsync(s::shutdownOutput);
+
+                // write to s should block, then throw
+                try {
+                    byte[] ba = new byte[100*1024];
+                    OutputStream out = s.getOutputStream();
+                    for (;;) {
+                        out.write(ba);
+                    }
+                } catch (SocketException expected) { }
+
+                assertTrue(s.isOutputShutdown());
+                assertFalse(s.isClosed());
             }
         });
     }

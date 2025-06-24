@@ -135,8 +135,8 @@ class DatagramChannelImpl
     private int state;
 
     // IDs of native threads doing reads and writes, for signalling
-    private long readerThread;
-    private long writerThread;
+    private NativeThread readerThread;
+    private NativeThread writerThread;
 
     // Local and remote (connected) address
     private InetSocketAddress localAddress;
@@ -538,7 +538,7 @@ class DatagramChannelImpl
     {
         if (blocking) {
             synchronized (stateLock) {
-                readerThread = 0;
+                readerThread = null;
                 if (state == ST_CLOSING) {
                     tryFinishClose();
                 }
@@ -1045,7 +1045,7 @@ class DatagramChannelImpl
     {
         if (blocking) {
             synchronized (stateLock) {
-                writerThread = 0;
+                writerThread = null;
                 if (state == ST_CLOSING) {
                     tryFinishClose();
                 }
@@ -1714,7 +1714,7 @@ class DatagramChannelImpl
      */
     private boolean tryClose() throws IOException {
         assert Thread.holdsLock(stateLock) && state == ST_CLOSING;
-        if ((readerThread == 0) && (writerThread == 0) && !isRegistered()) {
+        if ((readerThread == null) && (writerThread == null) && !isRegistered()) {
             state = ST_CLOSED;
             try {
                 // close socket
