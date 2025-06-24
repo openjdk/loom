@@ -50,6 +50,8 @@ import jdk.internal.vm.annotation.Hidden;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 import jdk.internal.vm.annotation.Stable;
 import sun.nio.ch.Interruptible;
+import sun.nio.ch.NativeThread;
+
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
@@ -247,6 +249,9 @@ public class Thread implements Runnable {
         volatile boolean daemon;
         volatile int threadStatus;
 
+        // Native thread used for signalling, set lazily, read from any thread
+        volatile NativeThread nativeThread;
+
         // This map is maintained by the ThreadLocal class
         ThreadLocal.ThreadLocalMap terminatingThreadLocals;
 
@@ -271,6 +276,14 @@ public class Thread implements Runnable {
 
     void setTerminatingThreadLocals(ThreadLocal.ThreadLocalMap map) {
         holder.terminatingThreadLocals = map;
+    }
+
+    NativeThread nativeThread() {
+        return holder.nativeThread;
+    }
+
+    void setNativeThread(NativeThread nt) {
+        holder.nativeThread = nt;
     }
 
     /*

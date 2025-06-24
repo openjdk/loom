@@ -115,8 +115,8 @@ class SocketChannelImpl
     private volatile int state;  // need stateLock to change
 
     // IDs of native threads doing reads and writes, for signalling
-    private long readerThread;
-    private long writerThread;
+    private NativeThread readerThread;
+    private NativeThread writerThread;
 
     // Binding
     private SocketAddress localAddress;
@@ -385,7 +385,7 @@ class SocketChannelImpl
     {
         if (blocking) {
             synchronized (stateLock) {
-                readerThread = 0;
+                readerThread = null;
                 if (state == ST_CLOSING) {
                     tryFinishClose();
                 }
@@ -539,7 +539,7 @@ class SocketChannelImpl
     {
         if (blocking) {
             synchronized (stateLock) {
-                writerThread = 0;
+                writerThread = null;
                 if (state == ST_CLOSING) {
                     tryFinishClose();
                 }
@@ -690,7 +690,7 @@ class SocketChannelImpl
      */
     void afterTransferTo(boolean completed) throws AsynchronousCloseException {
         synchronized (stateLock) {
-            writerThread = 0;
+            writerThread = null;
             if (state == ST_CLOSING) {
                 tryFinishClose();
             }
@@ -1075,7 +1075,7 @@ class SocketChannelImpl
      */
     private boolean tryClose() throws IOException {
         assert Thread.holdsLock(stateLock) && state == ST_CLOSING;
-        if ((readerThread == 0) && (writerThread == 0) && !isRegistered()) {
+        if ((readerThread == null) && (writerThread == null) && !isRegistered()) {
             state = ST_CLOSED;
             nd.close(fd);
             return true;
@@ -1218,11 +1218,8 @@ class SocketChannelImpl
                 throw new NotYetConnectedException();
             if (!isInputClosed) {
                 Net.shutdown(fd, Net.SHUT_RD);
-                long reader = readerThread;
-                if (NativeThread.isVirtualThread(reader)) {
-                    Poller.stopPoll(fdVal, Net.POLLIN);
-                } else if (NativeThread.isNativeThread(reader)) {
-                    NativeThread.signal(reader);
+                if (NativeThread.isVirtualThread(readerThread)) {
+                    Poller.stopPoll(readerThread.thread());
                 }
                 isInputClosed = true;
             }
@@ -1238,11 +1235,8 @@ class SocketChannelImpl
                 throw new NotYetConnectedException();
             if (!isOutputClosed) {
                 Net.shutdown(fd, Net.SHUT_WR);
-                long writer = writerThread;
-                if (NativeThread.isVirtualThread(writer)) {
-                    Poller.stopPoll(fdVal, Net.POLLOUT);
-                } else if (NativeThread.isNativeThread(writer)) {
-                    NativeThread.signal(writer);
+                if (NativeThread.isVirtualThread(writerThread)) {
+                    Poller.stopPoll(writerThread.thread());
                 }
                 isOutputClosed = true;
             }

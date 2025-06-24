@@ -25,6 +25,9 @@
 
 package sun.nio.ch;
 
+import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.SharedSecrets;
+
 
 // Signalling operations on native threads
 //
@@ -37,45 +40,79 @@ package sun.nio.ch;
 // always returns -1 and the signal(long) method has no effect.
 
 public class NativeThread {
+    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     private static final long VIRTUAL_THREAD_ID = -1L;
 
+    private final Thread thread;
+    private final long tid;
+
+    private NativeThread(Thread thread, long tid) {
+        this.thread = thread;
+        this.tid = tid;
+    }
+
+    Thread thread() {
+        return thread;
+    }
+
     /**
-     * Returns the id of the current native thread if the platform can signal
-     * native threads, 0 if the platform can not signal native threads, or
-     * -1L if the current thread is a virtual thread.
+     * Return a NativeThread for the current thread.
      */
-    public static long current() {
-        if (Thread.currentThread().isVirtual()) {
-            return VIRTUAL_THREAD_ID;
+    public static NativeThread current() {
+        Thread t = Thread.currentThread();
+        if (t.isVirtual()) {
+            // return new object for now
+            return new NativeThread(t, VIRTUAL_THREAD_ID);
         } else {
-            return current0();
+            NativeThread nt = JLA.nativeThread(t);
+            if (nt == null) {
+                nt = new NativeThread(t, current0());
+                JLA.setNativeThread(nt);
+            }
+            return nt;
         }
     }
 
     /**
-     * Signals the given native thread.
-     *
-     * @throws IllegalArgumentException if tid is not a token to a native thread
+     * Return a NativeThread for the current platform thread. Returns null if called
+     * from a virtual thread.
      */
-    public static void signal(long tid) {
-        if (tid == 0 || tid == VIRTUAL_THREAD_ID)
-            throw new IllegalArgumentException();
+    public static NativeThread currentNativeThread() {
+        Thread t = Thread.currentThread();
+        if (t.isVirtual()) {
+            return null;
+        } else {
+            NativeThread nt = JLA.nativeThread(t);
+            if (nt == null) {
+                nt = new NativeThread(t, current0());
+                JLA.setNativeThread(nt);
+            }
+            return nt;
+        }
+    }
+
+    /**
+     * Return true if the given NativeThread is a platform thread.
+     */
+    public static boolean isNativeThread(NativeThread nt) {
+        return nt != null && nt.tid != VIRTUAL_THREAD_ID;
+    }
+
+    /**
+     * Return true if the given NativeThread is a virtual thread.
+     */
+    public static boolean isVirtualThread(NativeThread nt) {
+        return nt != null && nt.tid == VIRTUAL_THREAD_ID;
+    }
+
+    /**
+     * Signals this native thread.
+     * @throws UnsupportedOperationException if virtual thread
+     */
+    public void signal() {
+        if (tid == VIRTUAL_THREAD_ID)
+            throw new UnsupportedOperationException();
         signal0(tid);
-    }
-
-    /**
-     * Returns true the tid is the id of a native thread.
-     */
-    static boolean isNativeThread(long tid) {
-        return (tid != 0 && tid != VIRTUAL_THREAD_ID);
-    }
-
-    /**
-     * Returns true if tid is -1L.
-     * @see #current()
-     */
-    static boolean isVirtualThread(long tid) {
-        return (tid == VIRTUAL_THREAD_ID);
     }
 
     /**

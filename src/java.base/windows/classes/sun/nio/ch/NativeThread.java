@@ -25,47 +25,39 @@
 
 package sun.nio.ch;
 
-
-// Signalling operations on native threads
-
 public class NativeThread {
-    private static final long VIRTUAL_THREAD_ID = -1L;
+    private final Thread thread;
 
-    /**
-     * Returns the id of the current native thread if the platform can signal
-     * native threads, 0 if the platform can not signal native threads, or
-     * -1L if the current thread is a virtual thread.
-     */
-    public static long current() {
-        if (Thread.currentThread().isVirtual()) {
-            return VIRTUAL_THREAD_ID;
+    private NativeThread(Thread thread) {
+        this.thread = thread;
+    }
+
+    Thread thread() {
+        return thread;
+    }
+
+    static NativeThread current() {
+        Thread t = Thread.currentThread();
+        if (t.isVirtual()) {
+            return new NativeThread(t);
         } else {
-            // no support for signalling threads on Windows
-            return 0;
+            return null;
         }
     }
 
-    /**
-     * Signals the given native thread.
-     *
-     * @throws IllegalArgumentException if tid is not a token to a native thread
-     */
-    static void signal(long tid) {
+    static NativeThread currentNativeThread() {
+        return null;
+    }
+
+    void signal() {
         throw new UnsupportedOperationException();
     }
 
-    /**
-     * Returns true the tid is the id of a native thread.
-     */
-    static boolean isNativeThread(long tid) {
-        return false;
+    static boolean isVirtualThread(NativeThread nt) {
+        return nt != null;
     }
 
-    /**
-     * Returns true if tid is -1L.
-     * @see #current()
-     */
-    static boolean isVirtualThread(long tid) {
-        return (tid == VIRTUAL_THREAD_ID);
+    static boolean isNativeThread(NativeThread nt) {
+        return false;
     }
 }

@@ -36,15 +36,15 @@ abstract class UnixDispatcher extends NativeDispatcher {
         close0(fd);
     }
 
-    private void signalThreads(long reader, long writer) {
+    private void signalThreads(NativeThread reader, NativeThread writer) {
         if (NativeThread.isNativeThread(reader))
-            NativeThread.signal(reader);
+            reader.signal();
         if (NativeThread.isNativeThread(writer))
-            NativeThread.signal(writer);
+            writer.signal();
     }
 
     @Override
-    void implPreClose(FileDescriptor fd, long reader, long writer) throws IOException {
+    void implPreClose(FileDescriptor fd, NativeThread reader, NativeThread writer) throws IOException {
         if (SUPPORTS_PENDING_SIGNALS) {
             signalThreads(reader, writer);
         }

@@ -55,6 +55,7 @@ import jdk.internal.vm.Continuation;
 import jdk.internal.vm.ContinuationScope;
 import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.ThreadContainer;
+import sun.nio.ch.NativeThread;
 import sun.reflect.annotation.AnnotationType;
 import sun.nio.ch.Interruptible;
 
@@ -562,6 +563,16 @@ public interface JavaLangAccess {
     Object scopedValueBindings();
 
     /**
+     * Returns the NativeThread for signalling, null if not set.
+     */
+    NativeThread nativeThread(Thread thread);
+
+    /**
+     * Sets the NativeThread for the current platform thread.
+     */
+    void setNativeThread(NativeThread nt);
+
+    /**
      * Returns the innermost mounted continuation
      */
     Continuation getContinuation(Thread thread);
@@ -602,6 +613,11 @@ public interface JavaLangAccess {
      * Returns the virtual thread default scheduler.
      */
     Executor virtualThreadDefaultScheduler();
+
+    /**
+     * Returns the scheduler for the given virtual thread.
+     */
+    Executor virtualThreadScheduler(Thread thread);
 
     /**
      * Creates a new StackWalker
