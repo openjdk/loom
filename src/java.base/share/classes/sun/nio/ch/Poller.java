@@ -144,7 +144,7 @@ public abstract class Poller {
         throws IOException
     {
         assert nanos >= 0L;
-        PollerGroup pollerGroup = PollerGroup.groupFor(Thread.currentThread());
+        PollerGroup pollerGroup = pollerGroup(Thread.currentThread());
         if (event == Net.POLLIN) {
             pollerGroup.readPoller(fdVal).poll(fdVal, nanos, supplier);
         } else if (event == Net.POLLOUT) {
@@ -161,7 +161,7 @@ public abstract class Poller {
      */
     static void pollSelector(int fdVal, long nanos) throws IOException {
         assert nanos >= 0L;
-        PollerGroup pollerGroup = PollerGroup.groupFor(Thread.currentThread());
+        PollerGroup pollerGroup = pollerGroup(Thread.currentThread());
         Poller poller = pollerGroup.masterPoller();
         if (poller == null) {
             poller = pollerGroup.readPoller(fdVal);
@@ -254,12 +254,12 @@ public abstract class Poller {
      * again when there are no more events. The sub-poller yields after each poll to help
      * with fairness and to avoid re-registering with the master poller where possible.
      */
-    private void subPollerLoop(Poller masterPoller) {
+    private void subPollerLoop(PollerGroup pollerGroup, Poller masterPoller) {
         assert Thread.currentThread().isVirtual();
         owner = Thread.currentThread();
         try {
             int polled = 0;
-            for (;;) {
+            while (!pollerGroup.isShutdown()) {
                 if (polled == 0) {
                     masterPoller.poll(fdVal(), 0, () -> true);  // park
                 } else {
@@ -287,6 +287,7 @@ public abstract class Poller {
         private final Poller[] writePollers;
         private final Poller masterPoller;
         private final Executor executor;
+        private volatile boolean shutdown;
 
         PollerGroup(Executor scheduler) throws IOException {
             Mode mode = Poller.POLLER_MODE.get();
@@ -366,10 +367,10 @@ public abstract class Poller {
                     startPlatformThread("Master-Poller", masterPoller::pollerLoop);
                 }
                 Arrays.stream(readPollers).forEach(p -> {
-                    executor.execute(() -> p.subPollerLoop(masterPoller));
+                    executor.execute(() -> p.subPollerLoop(this, masterPoller));
                 });
                 Arrays.stream(writePollers).forEach(p -> {
-                    executor.execute(() -> p.subPollerLoop(masterPoller));
+                    executor.execute(() -> p.subPollerLoop(this, masterPoller));
                 });
             } else {
                 // Mode.SYSTEM_THREADS
@@ -381,6 +382,46 @@ public abstract class Poller {
                 });
             }
             return this;
+        }
+
+        /**
+         * Invoked during shutdown to unpark all subpoller threads and wait for
+         * them to terminate.
+         */
+        private void wakeupPollers(Poller[] pollers) {
+            boolean interrupted = false;
+            for (Poller poller : pollers) {
+                if (poller.owner instanceof Thread owner) {
+                    LockSupport.unpark(owner);
+                    while (owner.isAlive()) {
+                        try {
+                            owner.join();
+                        } catch (InterruptedException e) {
+                            interrupted = true;
+                        }
+                    }
+                }
+            }
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        void shutdown() {
+            if (scheduler == DEFAULT_SCHEDULER || POLLER_MODE.get() == Mode.SYSTEM_THREADS) {
+                throw new UnsupportedOperationException();
+            }
+            shutdown = true;
+            wakeupPollers(readPollers);
+            wakeupPollers(writePollers);
+        }
+
+        /**
+         *
+         * @return
+         */
+        boolean isShutdown() {
+            return shutdown;
         }
 
         Poller masterPoller() {
@@ -443,22 +484,6 @@ public abstract class Poller {
                 throw new InternalError(e);
             }
         }
-
-        /**
-         * Returns the PollerGroup that the given thread uses to poll file descriptors.
-         */
-        static PollerGroup groupFor(Thread thread) {
-            if (POLLER_MODE.get() == Mode.SYSTEM_THREADS) {
-                return DEFAULT_POLLER_GROUP.get();
-            }
-            Executor scheduler;
-            if (thread.isVirtual()) {
-                scheduler = JLA.virtualThreadScheduler(thread);
-            } else {
-                scheduler = DEFAULT_SCHEDULER;
-            }
-            return POLLER_GROUPS.computeIfAbsent(scheduler, _ -> PollerGroup.create(scheduler));
-        }
     }
 
     /**
@@ -476,6 +501,36 @@ public abstract class Poller {
             }
         } else {
             return PROVIDER.defaultPollerMode();
+        }
+    }
+
+    /**
+     * Returns the PollerGroup that the given thread uses to poll file descriptors.
+     */
+    private static PollerGroup pollerGroup(Thread thread) {
+        if (POLLER_MODE.get() == Mode.SYSTEM_THREADS) {
+            return DEFAULT_POLLER_GROUP.get();
+        }
+        Executor scheduler;
+        if (thread.isVirtual()) {
+            scheduler = JLA.virtualThreadScheduler(thread);
+        } else {
+            scheduler = DEFAULT_SCHEDULER;
+        }
+        return POLLER_GROUPS.computeIfAbsent(scheduler, _ -> PollerGroup.create(scheduler));
+    }
+
+    /**
+     * Invoked before the given scheduler is shutdown. In VTHREAD_POLLERS mode, this
+     * method will arrange for the sub poller threads to terminate. Does nothing in
+     * SYSTEM_THREADS mode.
+     */
+    public static void beforeShutdown(Executor executor) {
+        if (POLLER_MODE.get() == Mode.VTHREAD_POLLERS) {
+            PollerGroup group = POLLER_GROUPS.remove(executor);
+            if (group != null) {
+                group.shutdown();
+            }
         }
     }
 
@@ -499,4 +554,5 @@ public abstract class Poller {
     public static List<Poller> writePollers() {
         return DEFAULT_POLLER_GROUP.get().writePollers();
     }
+
 }

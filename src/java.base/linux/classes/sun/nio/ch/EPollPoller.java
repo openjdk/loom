@@ -25,6 +25,9 @@
 package sun.nio.ch;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.lang.ref.Cleaner.Cleanable;
+import jdk.internal.ref.CleanerFactory;
 import static sun.nio.ch.EPoll.*;
 
 /**
@@ -44,6 +47,27 @@ class EPollPoller extends Poller {
         this.event = (read) ? EPOLLIN : EPOLLOUT;
         this.maxEvents = (subPoller) ? 64 : 512;
         this.address = EPoll.allocatePollArray(maxEvents);
+        if (subPoller) {
+            this.cleaner = CleanerFactory.cleaner().register(this, release(epfd, address));
+        } else {
+            this.cleaner = null;
+        }
+    }
+
+    /**
+     * Closes epoll instance and release poll array.
+     */
+    private static Runnable release(int epfd, long address) {
+        return () -> {
+            try {
+                FileDispatcherImpl.closeIntFD(kqfd);
+            } catch (IOException ioe) {
+                throw new UncheckedIOException(ioe);
+            } finally {
+                // release memory
+                EPoll.freePollArray(address);
+            }
+        };
     }
 
     @Override
