@@ -41,6 +41,7 @@ class EPollPoller extends Poller {
     private final int event;
     private final int maxEvents;
     private final long address;
+    private final Cleanable cleaner;
 
     EPollPoller(boolean subPoller, boolean read) throws IOException {
         this.epfd = EPoll.create();
@@ -60,7 +61,7 @@ class EPollPoller extends Poller {
     private static Runnable release(int epfd, long address) {
         return () -> {
             try {
-                FileDispatcherImpl.closeIntFD(kqfd);
+                FileDispatcherImpl.closeIntFD(epfd);
             } catch (IOException ioe) {
                 throw new UncheckedIOException(ioe);
             } finally {
