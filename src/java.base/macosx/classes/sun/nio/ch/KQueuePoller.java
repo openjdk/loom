@@ -25,6 +25,9 @@
 package sun.nio.ch;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.lang.ref.Cleaner.Cleanable;
+import jdk.internal.ref.CleanerFactory;
 import static sun.nio.ch.KQueue.*;
 
 /**
@@ -35,12 +38,34 @@ class KQueuePoller extends Poller {
     private final int filter;
     private final int maxEvents;
     private final long address;
+    private final Cleanable cleaner;
 
     KQueuePoller(boolean subPoller, boolean read) throws IOException {
         this.kqfd = KQueue.create();
         this.filter = (read) ? EVFILT_READ : EVFILT_WRITE;
         this.maxEvents = (subPoller) ? 64 : 512;
         this.address = KQueue.allocatePollArray(maxEvents);
+        if (subPoller) {
+            this.cleaner = CleanerFactory.cleaner().register(this, release(kqfd, address));
+        } else {
+            this.cleaner = null;
+        }
+    }
+
+    /**
+     * Closes kernel event queue and release poll array.
+     */
+    private static Runnable release(int kqfd, long address) {
+        return () -> {
+            try {
+                FileDispatcherImpl.closeIntFD(kqfd);
+            } catch (IOException ioe) {
+                throw new UncheckedIOException(ioe);
+            } finally {
+                // release memory
+                KQueue.freePollArray(address);
+            }
+        };
     }
 
     @Override
