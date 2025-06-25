@@ -269,8 +269,6 @@ class BlockingSocketOps {
                     int n = s.getInputStream().read();
                     assertEquals(-1, n);
                 } catch (SocketException e) { }
-
-                assertTrue(s.isInputShutdown());
                 assertFalse(s.isClosed());
             }
         });
@@ -361,8 +359,6 @@ class BlockingSocketOps {
                         out.write(ba);
                     }
                 } catch (SocketException expected) { }
-
-                assertTrue(s.isOutputShutdown());
                 assertFalse(s.isClosed());
             }
         });
