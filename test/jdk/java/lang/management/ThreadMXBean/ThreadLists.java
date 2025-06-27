@@ -57,6 +57,9 @@ public class ThreadLists {
         Runnable printLambda = () -> {System.out.println("Starting Test");};
         printLambda.run();
 
+        // start a virutal thread to cause supporting threads to start
+        Thread.startVirtualThread(() -> { });
+
         // get top-level thread group
         ThreadGroup top = Thread.currentThread().getThreadGroup();
         ThreadGroup parent;
