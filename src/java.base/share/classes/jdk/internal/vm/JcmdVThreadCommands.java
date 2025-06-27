@@ -47,7 +47,7 @@ public class JcmdVThreadCommands {
         StringBuilder sb = new StringBuilder();
 
         // virtual thread scheduler
-        sb.append(JLA.virtualThreadDefaultScheduler())
+        sb.append(JLA.defaultVirtualThreadScheduler())
           .append(System.lineSeparator());
 
         return sb.toString().getBytes(StandardCharsets.UTF_8);

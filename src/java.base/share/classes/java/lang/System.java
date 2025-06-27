@@ -2313,8 +2313,12 @@ public final class System {
                 }
             }
 
-            public Executor virtualThreadDefaultScheduler() {
+            public Executor defaultVirtualThreadScheduler() {
                 return VirtualThread.defaultScheduler();
+            }
+
+            public boolean isCustomDefaultVirtualThreadScheduler() {
+                return VirtualThread.isCustomDefaultScheduler();
             }
 
             public Executor virtualThreadScheduler(Thread thread) {
