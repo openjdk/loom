@@ -45,6 +45,12 @@ class WEPollPoller extends Poller {
     }
 
     @Override
+    void close() {
+        WEPoll.close(handle);
+        WEPoll.freePollArray(address);
+    }
+
+    @Override
     void implRegister(int fdVal) throws IOException {
         int err = WEPoll.ctl(handle, EPOLL_CTL_ADD, fdVal, (event | EPOLLONESHOT));
         if (err != 0)

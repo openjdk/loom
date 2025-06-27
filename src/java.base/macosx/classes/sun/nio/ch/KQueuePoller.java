@@ -52,6 +52,11 @@ class KQueuePoller extends Poller {
         }
     }
 
+    @Override
+    void close() {
+        cleaner.clean();
+    }
+
     /**
      * Closes kernel event queue and release poll array.
      */

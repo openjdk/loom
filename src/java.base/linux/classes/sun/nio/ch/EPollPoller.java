@@ -55,6 +55,11 @@ class EPollPoller extends Poller {
         }
     }
 
+    @Override
+    void close() {
+        cleaner.clean();
+    }
+
     /**
      * Closes epoll instance and release poll array.
      */

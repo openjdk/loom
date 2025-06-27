@@ -51,11 +51,12 @@ public abstract class Poller {
 
     private static final PollerProvider PROVIDER = PollerProvider.provider();
 
-    private static final Executor DEFAULT_SCHEDULER = JLA.virtualThreadDefaultScheduler();
+    private static final Mode POLLER_MODE = pollerMode();
 
-    private static Supplier<Mode> POLLER_MODE = StableValue.supplier(Poller::pollerMode);
+    private static final Executor DEFAULT_SCHEDULER = JLA.defaultVirtualThreadScheduler();
 
-    private static Supplier<PollerGroup> DEFAULT_POLLER_GROUP = StableValue.supplier(PollerGroup::create);
+    // poller group for default scheduler
+    private static final Supplier<PollerGroup> DEFAULT_POLLER_GROUP = StableValue.supplier(PollerGroup::create);
 
     // maps scheduler to PollerGroup, custom schedulers can't be GC'ed at this time
     private static final Map<Executor, PollerGroup> POLLER_GROUPS = new ConcurrentHashMap<>();
@@ -93,6 +94,12 @@ public abstract class Poller {
      */
     protected Poller() {
     }
+
+    /**
+     * Closes the poller and release resources. This method can only be used to cleanup
+     * when creating a poller group fails.
+     */
+    abstract void close();
 
     /**
      * Returns the poller's file descriptor, used when the read and write poller threads
@@ -279,7 +286,7 @@ public abstract class Poller {
     }
 
     /**
-     * The read/write pollers.
+     * The read/write pollers for a virtual thread scheduler.
      */
     private static class PollerGroup {
         private final Executor scheduler;
@@ -289,28 +296,13 @@ public abstract class Poller {
         private final Executor executor;
         private volatile boolean shutdown;
 
-        PollerGroup(Executor scheduler) throws IOException {
-            Mode mode = Poller.POLLER_MODE.get();
-            int readPollerCount, writePollerCount;
-            Poller masterPoller;
-            if (scheduler == DEFAULT_SCHEDULER) {
-                readPollerCount = pollerCount("jdk.readPollers", PROVIDER.defaultReadPollers(mode));
-                writePollerCount = pollerCount("jdk.writePollers", PROVIDER.defaultWritePollers(mode));
-                masterPoller = (mode == Mode.VTHREAD_POLLERS)
-                        ? PROVIDER.readPoller(false)
-                        : null;
-            } else {
-                readPollerCount = 1;
-                writePollerCount = 1;
-                if (mode == Mode.VTHREAD_POLLERS) {
-                    masterPoller = DEFAULT_POLLER_GROUP.get().masterPoller();
-                } else {
-                    masterPoller = null;
-                }
-            }
-
+        PollerGroup(Executor scheduler,
+                    Poller masterPoller,
+                    int readPollerCount,
+                    int writePollerCount) throws IOException {
+            boolean subPoller = (POLLER_MODE == Mode.VTHREAD_POLLERS);
             Executor executor = null;
-            if (mode == Mode.VTHREAD_POLLERS) {
+            if (subPoller) {
                 String namePrefix;
                 if (scheduler == DEFAULT_SCHEDULER) {
                     namePrefix = "SubPoller-";
@@ -327,16 +319,20 @@ public abstract class Poller {
                 executor = Executors.newThreadPerTaskExecutor(factory);
             }
 
-            // read pollers (or sub-pollers)
+            // read and write pollers (or sub-pollers)
             Poller[] readPollers = new Poller[readPollerCount];
-            for (int i = 0; i < readPollerCount; i++) {
-                readPollers[i] = PROVIDER.readPoller(mode == Mode.VTHREAD_POLLERS);
-            }
-
-            // write pollers (or sub-pollers)
             Poller[] writePollers = new Poller[writePollerCount];
-            for (int i = 0; i < writePollerCount; i++) {
-                writePollers[i] = PROVIDER.writePoller(mode == Mode.VTHREAD_POLLERS);
+            try {
+                for (int i = 0; i < readPollerCount; i++) {
+                    readPollers[i] = PROVIDER.readPoller(subPoller);
+                }
+                for (int i = 0; i < writePollerCount; i++) {
+                    writePollers[i] = PROVIDER.writePoller(subPoller);
+                }
+            } catch (Exception e) {
+                closeAll(readPollers);
+                closeAll(writePollers);
+                throw e;
             }
 
             this.scheduler = scheduler;
@@ -346,23 +342,49 @@ public abstract class Poller {
             this.executor = executor;
         }
 
-        static PollerGroup create(Executor scheduler) {
+        /**
+         * Create and starts the poller group for the default scheduler.
+         */
+        static PollerGroup create() {
             try {
-                return new PollerGroup(scheduler).start();
+                Poller masterPoller = (POLLER_MODE == Mode.VTHREAD_POLLERS)
+                        ? PROVIDER.readPoller(false)
+                        : null;
+                PollerGroup pollerGroup;
+                try {
+                    int rc = pollerCount("jdk.readPollers", PROVIDER.defaultReadPollers(POLLER_MODE));
+                    int wc = pollerCount("jdk.writePollers", PROVIDER.defaultWritePollers(POLLER_MODE));
+                    pollerGroup = new PollerGroup(DEFAULT_SCHEDULER, masterPoller, rc, wc);
+                } catch (Exception e) {
+                    masterPoller.close();
+                    throw e;
+                }
+                pollerGroup.start();
+                return pollerGroup;
             } catch (IOException ioe) {
                 throw new UncheckedIOException(ioe);
             }
         }
 
-        static PollerGroup create() {
-            return create(DEFAULT_SCHEDULER);
+        /**
+         * Create and starts the poller group for a custom scheduler.
+         */
+        static PollerGroup create(Executor scheduler) {
+            try {
+                Poller masterPoller = DEFAULT_POLLER_GROUP.get().masterPoller();
+                var pollerGroup = new PollerGroup(scheduler, masterPoller, 1, 1);
+                pollerGroup.start();
+                return pollerGroup;
+            } catch (IOException ioe) {
+                throw new UncheckedIOException(ioe);
+            }
         }
 
         /**
          * Start poller threads.
          */
-        private PollerGroup start() {
-            if (POLLER_MODE.get() == Mode.VTHREAD_POLLERS) {
+        private void start() {
+            if (POLLER_MODE == Mode.VTHREAD_POLLERS) {
                 if (scheduler == DEFAULT_SCHEDULER) {
                     startPlatformThread("Master-Poller", masterPoller::pollerLoop);
                 }
@@ -381,14 +403,24 @@ public abstract class Poller {
                     startPlatformThread("Write-Poller", p::pollerLoop);
                 });
             }
-            return this;
+        }
+
+        /**
+         * Close the given pollers.
+         */
+        private void closeAll(Poller... pollers) {
+            for (Poller poller : pollers) {
+                if (poller != null) {
+                    poller.close();
+                }
+            }
         }
 
         /**
          * Invoked during shutdown to unpark all subpoller threads and wait for
          * them to terminate.
          */
-        private void wakeupPollers(Poller[] pollers) {
+        private void shutdownPollers(Poller... pollers) {
             boolean interrupted = false;
             for (Poller poller : pollers) {
                 if (poller.owner instanceof Thread owner) {
@@ -408,12 +440,12 @@ public abstract class Poller {
         }
 
         void shutdown() {
-            if (scheduler == DEFAULT_SCHEDULER || POLLER_MODE.get() == Mode.SYSTEM_THREADS) {
+            if (scheduler == DEFAULT_SCHEDULER || POLLER_MODE == Mode.SYSTEM_THREADS) {
                 throw new UnsupportedOperationException();
             }
             shutdown = true;
-            wakeupPollers(readPollers);
-            wakeupPollers(writePollers);
+            shutdownPollers(readPollers);
+            shutdownPollers(writePollers);
         }
 
         /**
@@ -508,7 +540,7 @@ public abstract class Poller {
      * Returns the PollerGroup that the given thread uses to poll file descriptors.
      */
     private static PollerGroup pollerGroup(Thread thread) {
-        if (POLLER_MODE.get() == Mode.SYSTEM_THREADS) {
+        if (POLLER_MODE == Mode.SYSTEM_THREADS) {
             return DEFAULT_POLLER_GROUP.get();
         }
         Executor scheduler;
@@ -526,7 +558,7 @@ public abstract class Poller {
      * SYSTEM_THREADS mode.
      */
     public static void beforeShutdown(Executor executor) {
-        if (POLLER_MODE.get() == Mode.VTHREAD_POLLERS) {
+        if (POLLER_MODE == Mode.VTHREAD_POLLERS) {
             PollerGroup group = POLLER_GROUPS.remove(executor);
             if (group != null) {
                 group.shutdown();

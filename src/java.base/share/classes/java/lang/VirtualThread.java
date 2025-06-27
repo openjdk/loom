@@ -211,6 +211,13 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
+     * Returns true if using a custom default scheduler.
+     */
+    static boolean isCustomDefaultScheduler() {
+        return USE_CUSTOM_RUNNER;
+    }
+
+    /**
      * Returns the continuation scope used for virtual threads.
      */
     static ContinuationScope continuationScope() {
