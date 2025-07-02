@@ -4,7 +4,9 @@ The following is a summary of the experimental support for custom virtual thread
 in the loom repo.
 
 The purpose of the experimental support is to allow exploration and provide feedback to help
-inform the project on whether to expose anything.
+inform this project on whether to expose anything.
+
+The experimental support may change or be removed at any time.
 
 
 
@@ -52,8 +54,10 @@ n a platform thread.
 
 A custom scheduler can cast the `Runnable` task to `Thread.VirtualThreadTask`.  This allows
 the scheduler to know which virtual thread needs to execute. It also allows the scheduler
-to attach arbitrary context. The following is an example uses an attached object to give
-the mounted virtual thread a reference to is carrier thread, and to the scheduler.
+to attach arbitrary context. The following is an example uses an attached object to
+reference the carrier thread and the scheduler.
+
+The scheduler attaches an object with the references like this:
 
 ```
 record Context(Executor scheduler, Thread carrier) { }
@@ -70,23 +74,9 @@ public void execute(Runnable task) {
         }
     });
 }
-
-Thread.ofVirtual()
-      .scheduler(customScheduler)
-      .start(() -> {
-
-          if (Thread.VirtualThreadTask.currentVirtualThreadTaskAttachment()
-                  instanceof Context ctxt) {
-              Executor scheduler = ctxt.scheduler();
-              Thread carrier = ctxt.carrier();
-          }
-
-      });
 ```
 
-
-
-
-
-
-
+If code executing in the virtual thread calls back into the scheduler, maybe
+framework code that controls the scheduler, then the
+`Thread.VirtualThreadTask.currentVirtualThreadTaskAttachment()` method can be
+used to get the attached context object.
