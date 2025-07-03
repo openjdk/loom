@@ -72,12 +72,13 @@ final class VirtualThread extends BaseVirtualThread {
     private static final boolean USE_CUSTOM_RUNNER;
     static {
         // experimental
+        Executor builtinScheduler = createDefaultForkJoinPoolScheduler();
         String propValue = System.getProperty("jdk.virtualThreadScheduler.implClass");
         if (propValue != null) {
-            DEFAULT_SCHEDULER = createCustomDefaultScheduler(propValue);
+            DEFAULT_SCHEDULER = createCustomDefaultScheduler(builtinScheduler, propValue);
             USE_CUSTOM_RUNNER = true;
         } else {
-            DEFAULT_SCHEDULER = createDefaultForkJoinPoolScheduler();
+            DEFAULT_SCHEDULER = builtinScheduler;
             USE_CUSTOM_RUNNER = false;
         }
     }
@@ -1506,11 +1507,18 @@ final class VirtualThread extends BaseVirtualThread {
      * default scheduler. The class is public in an exported package, has a public
      * no-arg constructor, and is visible to the system class loader.
      */
-    private static Executor createCustomDefaultScheduler(String cn) {
+    private static Executor createCustomDefaultScheduler(Executor builtinScheduler, String cn) {
         try {
             Class<?> clazz = Class.forName(cn, true, ClassLoader.getSystemClassLoader());
-            Constructor<?> ctor = clazz.getConstructor();
-            var scheduler = (Executor) ctor.newInstance();
+            Executor scheduler;
+            try {
+                Constructor<?> ctor = clazz.getConstructor(Executor.class);
+                Executor executor = builtinScheduler::execute;
+                scheduler = (Executor) ctor.newInstance(executor);
+            } catch (NoSuchMethodException e) {
+                Constructor<?> ctor = clazz.getConstructor();
+                scheduler = (Executor) ctor.newInstance();
+            }
             System.err.println("""
                 WARNING: Using custom default scheduler, this is an experimental feature!""");
             return scheduler;
