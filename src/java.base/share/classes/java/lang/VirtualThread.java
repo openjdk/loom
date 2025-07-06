@@ -1504,13 +1504,21 @@ final class VirtualThread extends BaseVirtualThread {
     /**
      * Loads a java.util.concurrent.Executor with the given class name to use at the
      * default scheduler. The class is public in an exported package, has a public
-     * no-arg constructor, and is visible to the system class loader.
+     * one-arg or no-arg constructor, and is visible to the system class loader.
      */
     private static Executor createCustomDefaultScheduler(String cn) {
         try {
             Class<?> clazz = Class.forName(cn, true, ClassLoader.getSystemClassLoader());
-            Constructor<?> ctor = clazz.getConstructor();
-            var scheduler = (Executor) ctor.newInstance();
+            Executor scheduler;
+            try {
+                Constructor<?> ctor = clazz.getConstructor(Executor.class);
+                Executor builtinDefaultScheduler = createDefaultForkJoinPoolScheduler();
+                Executor executor = builtinDefaultScheduler::execute;
+                scheduler = (Executor) ctor.newInstance(executor);
+            } catch (NoSuchMethodException e) {
+                Constructor<?> ctor = clazz.getConstructor();
+                scheduler = (Executor) ctor.newInstance();
+            }
             System.err.println("""
                 WARNING: Using custom default scheduler, this is an experimental feature!""");
             return scheduler;

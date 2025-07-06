@@ -24,8 +24,11 @@ property on the command line.
 
 where $EXECUTOR is fully qualified name of a class that implements `java.util.concurrent.Executor`.
 
-The class must be public, with a public no-arg constructor, and deployed on the class path
-or in an exported package of a module on the module path.
+The class must be public, with a public no-arg or one-arg constructor, and deployed on the
+class path or in an exported package of a module on the module path. If the class has a
+one-arg constructor then the parameter is an `Executor` that is a reference to the built-in
+default scheduler. This allows a custom scheduler to wrap or delegate the built-in default
+scheduler.
 
 The scheduler's `execute` method will be invoked with tasks of type `Thread.VirtualThreadTask`.
 The scheduler must arrange to execute the tasks on a platform thread,.

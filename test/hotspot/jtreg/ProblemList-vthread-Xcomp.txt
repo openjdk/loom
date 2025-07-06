@@ -27,8 +27,3 @@
 #
 #############################################################################
 
-####
-## Unexpected results
-compiler/uncommontrap/TestUnstableIfTrap.java
-gc/g1/plab/TestPLABPromotion.java
-gc/whitebox/TestWBGC.java

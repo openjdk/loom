@@ -27,7 +27,3 @@
 #
 #############################################################################
 
-####
-## Timeouts
-
-tools/javac/failover/CheckAttributedTree.java
