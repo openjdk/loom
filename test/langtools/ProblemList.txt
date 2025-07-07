@@ -62,7 +62,7 @@ tools/javac/annotations/typeAnnotations/referenceinfos/NestedTypes.java         
 tools/javac/warnings/suppress/TypeAnnotations.java                              8057683    generic-all    improve ordering of errors with type annotations
 tools/javac/modules/SourceInSymlinkTest.java                                    8180263    windows-all    fails when run on a subst drive
 
-tools/javac/lambda/T8031967.java                                                8323041    linux-aarch64  fails with -XX:TieredStopAtLevel=n (n=1,2,3)
+tools/javac/lambda/T8031967.java                                                8323041    generic-all  fails with -XX:TieredStopAtLevel=n (n=1,2,3)
 
 ###########################################################################
 #
