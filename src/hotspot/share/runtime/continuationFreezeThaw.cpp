@@ -1762,8 +1762,8 @@ static void verify_frame_kind(const frame& top, Continuation::preempt_kind preem
       at_sync_method = bci == SynchronizationEntryBCI;
       assert(!at_sync_method || m->is_synchronized(), "bci is %d but method %s is not synchronized", bci, m->external_name());
       bool is_c1_monitorenter = false, is_c2_monitorenter = false;
-      COMPILER1_PRESENT(is_c1_monitorenter = cb == Runtime1::blob_for(C1StubId::monitorenter_id) ||
-                                             cb == Runtime1::blob_for(C1StubId::monitorenter_nofpu_id);)
+      COMPILER1_PRESENT(is_c1_monitorenter = cb == Runtime1::blob_for(StubId::c1_monitorenter_id) ||
+                                             cb == Runtime1::blob_for(StubId::c1_monitorenter_nofpu_id);)
       COMPILER2_PRESENT(is_c2_monitorenter = cb == CodeCache::find_blob(OptoRuntime::complete_monitor_locking_Java());)
       assert(is_c1_monitorenter || is_c2_monitorenter, "wrong runtime stub frame");
     }
