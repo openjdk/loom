@@ -22,64 +22,25 @@ property on the command line.
 -Djdk.virtualThreadScheduler.implClass=$EXECUTOR
 ```
 
-where $EXECUTOR is fully qualified name of a class that implements `java.util.concurrent.Executor`.
+where $EXECUTOR is fully qualified name of a class that implements `Thread.VirtualThreadScheduler`.
 
 The class must be public, with a public no-arg or one-arg constructor, and deployed on the
 class path or in an exported package of a module on the module path. If the class has a
-one-arg constructor then the parameter is an `Executor` that is a reference to the built-in
-default scheduler. This allows a custom scheduler to wrap or delegate the built-in default
-scheduler.
-
-The scheduler's `execute` method will be invoked with tasks of type `Thread.VirtualThreadTask`.
-The scheduler must arrange to execute the tasks on a platform thread,.
-
+one-arg constructor then the parameter is a `Thread.VirtualThreadScheduler` that is a
+reference to the built-in default scheduler. This allows a custom scheduler to wrap or
+delegate the built-in default scheduler.
 
 
 ## Selecting a custom scheduler when creating a virtual thread
 
-`Thread.Builder.OfVirtual.scheduler(Executor)` can be used to set the scheduler when creating
-a virtual thread. The following uses a thread pool with 8 threads as the scheduler.
+`Thread.Builder.OfVirtual.scheduler(Thread.VirtualThreadScheduler)` can be used to set the
+scheduler when creating a virtual thread. The following uses a thread pool with 8 threads
+as the scheduler.
 
 ```
 ExecuorService pool = Executors.newFixedThreadPool(8);
+var scheduler = Thread.VirtualThreadScheduler.adapt(pool);
 
-Thread thread = Thread.ofVirtual().scheduler(pool).start(() -> { });
+Thread thread = Thread.ofVirtual().scheduler(scheduler).start(() -> { });
 thread.join();
 ```
-
-As with a custom default scheduler, the scheduler's `execute` method will be invoked with
-tasks of type `Thread.VirtualThreadTask`. The scheduler must arrange to execute the tasks o
-n a platform thread.
-
-
-
-## Thread.VirtualThreadTask
-
-A custom scheduler can cast the `Runnable` task to `Thread.VirtualThreadTask`.  This allows
-the scheduler to know which virtual thread needs to execute. It also allows the scheduler
-to attach arbitrary context. The following is an example uses an attached object to
-reference the carrier thread and the scheduler.
-
-The scheduler attaches an object with the references like this:
-
-```
-record Context(Executor scheduler, Thread carrier) { }
-
-@Override
-public void execute(Runnable task) {
-    pool.submit(() -> {
-        var vthreadTask = (Thread.VirtualThreadTask) task;
-        vthreadTask.attach(new Context(this, Thread.currentThread()));
-        try {
-            vthreadTask.run();
-        } finally {
-            vthreadTask.attach(null);
-        }
-    });
-}
-```
-
-If code executing in the virtual thread calls back into the scheduler, maybe
-framework code that controls the scheduler, then the
-`Thread.VirtualThreadTask.currentVirtualThreadTaskAttachment()` method can be
-used to get the attached context object.

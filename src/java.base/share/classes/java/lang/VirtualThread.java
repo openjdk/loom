@@ -24,16 +24,12 @@
  */
 package java.lang;
 
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
 import java.lang.reflect.Constructor;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ForkJoinPool.ForkJoinWorkerThreadFactory;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
@@ -43,7 +39,6 @@ import java.util.concurrent.TimeUnit;
 import jdk.internal.event.VirtualThreadEndEvent;
 import jdk.internal.event.VirtualThreadStartEvent;
 import jdk.internal.event.VirtualThreadSubmitFailedEvent;
-import jdk.internal.invoke.MhUtil;
 import jdk.internal.misc.CarrierThread;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
@@ -68,17 +63,17 @@ final class VirtualThread extends BaseVirtualThread {
     private static final Unsafe U = Unsafe.getUnsafe();
     private static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
 
-    private static final Executor DEFAULT_SCHEDULER;
-    private static final boolean USE_CUSTOM_RUNNER;
+    private static final VirtualThreadScheduler DEFAULT_SCHEDULER;
+    private static final boolean IS_CUSTOM_DEFAULT_SCHEDULER;
     static {
         // experimental
         String propValue = System.getProperty("jdk.virtualThreadScheduler.implClass");
         if (propValue != null) {
             DEFAULT_SCHEDULER = createCustomDefaultScheduler(propValue);
-            USE_CUSTOM_RUNNER = true;
+            IS_CUSTOM_DEFAULT_SCHEDULER = true;
         } else {
             DEFAULT_SCHEDULER = createDefaultForkJoinPoolScheduler();
-            USE_CUSTOM_RUNNER = false;
+            IS_CUSTOM_DEFAULT_SCHEDULER = false;
         }
     }
 
@@ -89,7 +84,7 @@ final class VirtualThread extends BaseVirtualThread {
     private static final long ON_WAITING_LIST = U.objectFieldOffset(VirtualThread.class, "onWaitingList");
 
     // scheduler and continuation
-    private final Executor scheduler;
+    private final VirtualThreadScheduler scheduler;
     private final Continuation cont;
     private final Runnable runContinuation;
 
@@ -206,7 +201,7 @@ final class VirtualThread extends BaseVirtualThread {
     /**
      * Returns the default scheduler.
      */
-    static Executor defaultScheduler() {
+    static VirtualThreadScheduler defaultScheduler() {
         return DEFAULT_SCHEDULER;
     }
 
@@ -214,7 +209,7 @@ final class VirtualThread extends BaseVirtualThread {
      * Returns true if using a custom default scheduler.
      */
     static boolean isCustomDefaultScheduler() {
-        return USE_CUSTOM_RUNNER;
+        return IS_CUSTOM_DEFAULT_SCHEDULER;
     }
 
     /**
@@ -226,9 +221,14 @@ final class VirtualThread extends BaseVirtualThread {
 
     /**
      * Return the scheduler for this thread.
+     * @param revealBuiltin true to reveal the built-in default scheduler, false to hide
      */
-    Executor scheduler() {
-        return scheduler;
+    VirtualThreadScheduler scheduler(boolean revealBuiltin) {
+        if (scheduler instanceof BuiltinDefaultScheduler builtin && !revealBuiltin) {
+            return builtin.externalView();
+        } else {
+            return scheduler;
+        }
     }
 
     /**
@@ -239,7 +239,10 @@ final class VirtualThread extends BaseVirtualThread {
      * @param characteristics characteristics
      * @param task the task to execute
      */
-    VirtualThread(Executor scheduler, String name, int characteristics, Runnable task) {
+    VirtualThread(VirtualThreadScheduler scheduler,
+                  String name,
+                  int characteristics,
+                  Runnable task) {
         super(name, characteristics, /*bound*/ false);
         Objects.requireNonNull(task);
 
@@ -250,11 +253,7 @@ final class VirtualThread extends BaseVirtualThread {
 
         this.scheduler = scheduler;
         this.cont = new VThreadContinuation(this, task);
-        if (USE_CUSTOM_RUNNER || (scheduler != DEFAULT_SCHEDULER)) {
-            this.runContinuation = new CustomRunner(this);
-        } else {
-            this.runContinuation = this::runContinuation;
-        }
+        this.runContinuation = this::runContinuation;
     }
 
     /**
@@ -280,51 +279,6 @@ final class VirtualThread extends BaseVirtualThread {
                     }
                 }
             };
-        }
-    }
-
-    /**
-     * The task to execute when using a custom scheduler.
-     */
-    private static class CustomRunner implements VirtualThreadTask {
-        private static final VarHandle ATTACHMENT =
-                MhUtil.findVarHandle(MethodHandles.lookup(), "attachment", Object.class);
-        private final VirtualThread vthread;
-        private volatile Object attachment;
-        CustomRunner(VirtualThread vthread) {
-            this.vthread = vthread;
-        }
-        @Override
-        public void run() {
-            vthread.runContinuation();
-        }
-        @Override
-        public Thread thread() {
-            return vthread;
-        }
-        @Override
-        public Object attach(Object ob) {
-            return ATTACHMENT.getAndSet(this, ob);
-        }
-        @Override
-        public Object attachment() {
-            return attachment;
-        }
-        @Override
-        public String toString() {
-            return vthread.toString();
-        }
-    }
-
-    /**
-     * Returns the object attached to the virtual thread's task.
-     */
-    Object currentTaskAttachment() {
-        assert Thread.currentThread() == this;
-        if (runContinuation instanceof CustomRunner runner) {
-            return runner.attachment();
-        } else {
-            return null;
         }
     }
 
@@ -387,26 +341,13 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Submits the given task to the given executor. If the scheduler is a
-     * ForkJoinPool then the task is first adapted to a ForkJoinTask.
-     */
-    private void submit(Executor executor, Runnable task) {
-        if (executor instanceof ForkJoinPool pool) {
-            pool.submit(ForkJoinTask.adapt(task));
-        } else {
-            executor.execute(task);
-        }
-    }
-
-    /**
      * Submits the runContinuation task to the scheduler. For the default scheduler,
      * and calling it on a worker thread, the task will be pushed to the local queue,
      * otherwise it will be pushed to an external submission queue.
-     * @param scheduler the scheduler
      * @param retryOnOOME true to retry indefinitely if OutOfMemoryError is thrown
      * @throws RejectedExecutionException
      */
-    private void submitRunContinuation(Executor scheduler, boolean retryOnOOME) {
+    private void submitRunContinuation(boolean retryOnOOME) {
         boolean done = false;
         while (!done) {
             try {
@@ -418,12 +359,12 @@ final class VirtualThread extends BaseVirtualThread {
                 if (currentThread().isVirtual()) {
                     Continuation.pin();
                     try {
-                        submit(scheduler, runContinuation);
+                        scheduler.execute(this, runContinuation);
                     } finally {
                         Continuation.unpin();
                     }
                 } else {
-                    submit(scheduler, runContinuation);
+                    scheduler.execute(this, runContinuation);
                 }
                 done = true;
             } catch (RejectedExecutionException ree) {
@@ -440,24 +381,6 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Submits the runContinuation task to the given scheduler as an external submit.
-     * If OutOfMemoryError is thrown then the submit will be retried until it succeeds.
-     * @throws RejectedExecutionException
-     * @see ForkJoinPool#externalSubmit(ForkJoinTask)
-     */
-    private void externalSubmitRunContinuation(ForkJoinPool pool) {
-        assert Thread.currentThread() instanceof CarrierThread;
-        try {
-            pool.externalSubmit(ForkJoinTask.adapt(runContinuation));
-        } catch (RejectedExecutionException ree) {
-            submitFailed(ree);
-            throw ree;
-        } catch (OutOfMemoryError e) {
-            submitRunContinuation(pool, true);
-        }
-    }
-
-    /**
      * Submits the runContinuation task to the scheduler. For the default scheduler,
      * and calling it on a worker thread, the task will be pushed to the local queue,
      * otherwise it will be pushed to an external submission queue.
@@ -465,7 +388,7 @@ final class VirtualThread extends BaseVirtualThread {
      * @throws RejectedExecutionException
      */
     private void submitRunContinuation() {
-        submitRunContinuation(scheduler, true);
+        submitRunContinuation(true);
     }
 
     /**
@@ -477,10 +400,32 @@ final class VirtualThread extends BaseVirtualThread {
      * @see ForkJoinPool#lazySubmit(ForkJoinTask)
      */
     private void lazySubmitRunContinuation() {
-        if (currentThread() instanceof CarrierThread ct && ct.getQueuedTaskCount() == 0) {
-            ForkJoinPool pool = ct.getPool();
+        if (scheduler == DEFAULT_SCHEDULER
+                && currentCarrierThread() instanceof CarrierThread ct
+                && ct.getQueuedTaskCount() == 0) {
             try {
-                pool.lazySubmit(ForkJoinTask.adapt(runContinuation));
+                ct.getPool().lazySubmit(ForkJoinTask.adapt(runContinuation));
+            } catch (RejectedExecutionException ree) {
+                submitFailed(ree);
+                throw ree;
+            } catch (OutOfMemoryError e) {
+                submitRunContinuation();
+            }
+        } else {
+            submitRunContinuation();
+        }
+    }
+
+    /**
+     * Submits the runContinuation task to the scheduler. For the default scheduler, and
+     * calling it a virtual thread that uses the default scheduler, the task will be
+     * pushed to an external submission queue.
+     * @throws RejectedExecutionException
+     */
+    private void externalSubmitRunContinuation() {
+        if (scheduler == DEFAULT_SCHEDULER && currentCarrierThread() instanceof CarrierThread ct) {
+            try {
+                ct.getPool().externalSubmit(ForkJoinTask.adapt(runContinuation));
             } catch (RejectedExecutionException ree) {
                 submitFailed(ree);
                 throw ree;
@@ -508,7 +453,7 @@ final class VirtualThread extends BaseVirtualThread {
                 throw ree;
             }
         } else {
-            submitRunContinuation(scheduler, false);
+            submitRunContinuation(false);
         }
     }
 
@@ -663,7 +608,7 @@ final class VirtualThread extends BaseVirtualThread {
 
             // external submit if there are no tasks in the local task queue
             if (currentThread() instanceof CarrierThread ct && ct.getQueuedTaskCount() == 0) {
-                externalSubmitRunContinuation(ct.getPool());
+                externalSubmitRunContinuation();
             } else {
                 submitRunContinuation();
             }
@@ -1502,22 +1447,23 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Loads a java.util.concurrent.Executor with the given class name to use at the
+     * Loads a VirtualThreadScheduler with the given class name to use at the
      * default scheduler. The class is public in an exported package, has a public
      * one-arg or no-arg constructor, and is visible to the system class loader.
      */
-    private static Executor createCustomDefaultScheduler(String cn) {
+    private static VirtualThreadScheduler createCustomDefaultScheduler(String cn) {
         try {
             Class<?> clazz = Class.forName(cn, true, ClassLoader.getSystemClassLoader());
-            Executor scheduler;
+            VirtualThreadScheduler scheduler;
             try {
-                Constructor<?> ctor = clazz.getConstructor(Executor.class);
-                Executor builtinDefaultScheduler = createDefaultForkJoinPoolScheduler();
-                Executor executor = builtinDefaultScheduler::execute;
-                scheduler = (Executor) ctor.newInstance(executor);
+                // 1-arg constructor
+                Constructor<?> ctor = clazz.getConstructor(VirtualThreadScheduler.class);
+                var builtin = createDefaultForkJoinPoolScheduler();
+                scheduler = (VirtualThreadScheduler) ctor.newInstance(builtin.externalView());
             } catch (NoSuchMethodException e) {
+                // 0-arg constructor
                 Constructor<?> ctor = clazz.getConstructor();
-                scheduler = (Executor) ctor.newInstance();
+                scheduler = (VirtualThreadScheduler) ctor.newInstance();
             }
             System.err.println("""
                 WARNING: Using custom default scheduler, this is an experimental feature!""");
@@ -1528,10 +1474,9 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Creates the default ForkJoinPool scheduler.
+     * Creates the built-in default ForkJoinPool scheduler.
      */
-    private static ForkJoinPool createDefaultForkJoinPoolScheduler() {
-        ForkJoinWorkerThreadFactory factory = pool -> new CarrierThread(pool);
+    private static BuiltinDefaultScheduler createDefaultForkJoinPoolScheduler() {
         int parallelism, maxPoolSize, minRunnable;
         String parallelismValue = System.getProperty("jdk.virtualThreadScheduler.parallelism");
         String maxPoolSizeValue = System.getProperty("jdk.virtualThreadScheduler.maxPoolSize");
@@ -1552,10 +1497,54 @@ final class VirtualThread extends BaseVirtualThread {
         } else {
             minRunnable = Integer.max(parallelism / 2, 1);
         }
-        Thread.UncaughtExceptionHandler handler = (t, e) -> { };
-        boolean asyncMode = true; // FIFO
-        return new ForkJoinPool(parallelism, factory, handler, asyncMode,
-                     0, maxPoolSize, minRunnable, pool -> true, 30, SECONDS);
+        return new BuiltinDefaultScheduler(parallelism, maxPoolSize, minRunnable);
+    }
+
+    /**
+     * The built-in default ForkJoinPool scheduler.
+     */
+    private static class BuiltinDefaultScheduler
+            extends ForkJoinPool implements VirtualThreadScheduler {
+
+        private static final StableValue<VirtualThreadScheduler> VIEW = StableValue.of();
+
+        BuiltinDefaultScheduler(int parallelism, int maxPoolSize, int minRunnable) {
+            ForkJoinWorkerThreadFactory factory = pool -> new CarrierThread(pool);
+            Thread.UncaughtExceptionHandler handler = (t, e) -> { };
+            boolean asyncMode = true; // FIFO
+            super(parallelism, factory, handler, asyncMode,
+                    0, maxPoolSize, minRunnable, pool -> true, 30, SECONDS);
+        }
+
+        @Override
+        public void execute(Thread vthread, Runnable task) {
+            execute(ForkJoinTask.adapt(task));
+        }
+
+        /**
+         * Wraps the scheduler to avoid leaking a direct reference.
+         */
+        VirtualThreadScheduler externalView() {
+            VirtualThreadScheduler builtin = this;
+            return VIEW.orElseSet(() -> {
+                return new VirtualThreadScheduler() {
+                    @Override
+                    public void execute(Thread thread, Runnable task) {
+                        Objects.requireNonNull(thread);
+                        if (thread instanceof VirtualThread vthread) {
+                            VirtualThreadScheduler scheduler = vthread.scheduler;
+                            if (scheduler == builtin || scheduler == DEFAULT_SCHEDULER) {
+                                builtin.execute(thread, task);
+                            } else {
+                                throw new IllegalArgumentException();
+                            }
+                        } else {
+                            throw new UnsupportedOperationException();
+                        }
+                    }
+                };
+            });
+        }
     }
 
     /**

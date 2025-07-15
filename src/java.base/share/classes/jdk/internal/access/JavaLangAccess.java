@@ -43,7 +43,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.stream.Stream;
 
@@ -612,7 +611,7 @@ public interface JavaLangAccess {
     /**
      * Returns the default virtual thread scheduler.
      */
-    Executor defaultVirtualThreadScheduler();
+    Thread.VirtualThreadScheduler defaultVirtualThreadScheduler();
 
     /**
      * Returns true if using a custom default virtual thread scheduler.
@@ -622,7 +621,7 @@ public interface JavaLangAccess {
     /**
      * Returns the scheduler for the given virtual thread.
      */
-    Executor virtualThreadScheduler(Thread thread);
+    Thread.VirtualThreadScheduler virtualThreadScheduler(Thread thread);
 
     /**
      * Creates a new StackWalker

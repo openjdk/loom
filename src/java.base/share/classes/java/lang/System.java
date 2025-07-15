@@ -2313,7 +2313,7 @@ public final class System {
                 }
             }
 
-            public Executor defaultVirtualThreadScheduler() {
+            public Thread.VirtualThreadScheduler defaultVirtualThreadScheduler() {
                 return VirtualThread.defaultScheduler();
             }
 
@@ -2321,9 +2321,9 @@ public final class System {
                 return VirtualThread.isCustomDefaultScheduler();
             }
 
-            public Executor virtualThreadScheduler(Thread thread) {
+            public Thread.VirtualThreadScheduler virtualThreadScheduler(Thread thread) {
                 if (thread instanceof VirtualThread vthread) {
-                    return vthread.scheduler();
+                    return vthread.scheduler(true);
                 } else {
                     throw new IllegalArgumentException();
                 }

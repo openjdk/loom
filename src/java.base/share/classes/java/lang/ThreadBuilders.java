@@ -212,7 +212,7 @@ class ThreadBuilders {
      */
     static final class VirtualThreadBuilder
             extends BaseThreadBuilder implements OfVirtual {
-        private Executor scheduler;
+        private Thread.VirtualThreadScheduler scheduler;
 
         VirtualThreadBuilder() {
         }
@@ -266,7 +266,7 @@ class ThreadBuilders {
 
         @CallerSensitive
         @Override
-        public OfVirtual scheduler(Executor scheduler) {
+        public OfVirtual scheduler(Thread.VirtualThreadScheduler scheduler) {
             Class<?> caller = Reflection.getCallerClass();
             caller.getModule().ensureNativeAccess(OfVirtual.class, "scheduler", caller, false);
             if (!ContinuationSupport.isSupported()) {
@@ -376,9 +376,9 @@ class ThreadBuilders {
      * ThreadFactory for virtual threads.
      */
     private static class VirtualThreadFactory extends BaseThreadFactory {
-        private final Executor scheduler;
+        private final Thread.VirtualThreadScheduler scheduler;
 
-        VirtualThreadFactory(Executor scheduler,
+        VirtualThreadFactory(Thread.VirtualThreadScheduler scheduler,
                              String name,
                              long start,
                              int characteristics,
@@ -402,7 +402,7 @@ class ThreadBuilders {
     /**
      * Creates a new virtual thread to run the given task.
      */
-    static Thread newVirtualThread(Executor scheduler,
+    static Thread newVirtualThread(Thread.VirtualThreadScheduler scheduler,
                                    String name,
                                    int characteristics,
                                    Runnable task) {

@@ -41,12 +41,12 @@ public class VThreadScheduler {
     /**
      * Returns the default virtual thread scheduler.
      */
-    public static Executor defaultScheduler() {
+    public static Thread.VirtualThreadScheduler defaultScheduler() {
         try {
             Method m = Class.forName("java.lang.VirtualThread")
                     .getDeclaredMethod("defaultScheduler");
             m.setAccessible(true);
-            return (Executor) m.invoke(null);
+            return (Thread.VirtualThreadScheduler ) m.invoke(null);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
             if (cause instanceof RuntimeException re) {
@@ -61,14 +61,14 @@ public class VThreadScheduler {
     /**
      * Returns the scheduler for the given virtual thread.
      */
-    public static Executor scheduler(Thread thread) {
+    public static Thread.VirtualThreadScheduler scheduler(Thread thread) {
         if (!thread.isVirtual())
             throw new IllegalArgumentException("Not a virtual thread");
         try {
             Field scheduler = Class.forName("java.lang.VirtualThread")
                     .getDeclaredField("scheduler");
             scheduler.setAccessible(true);
-            return (Executor) scheduler.get(thread);
+            return (Thread.VirtualThreadScheduler) scheduler.get(thread);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -93,30 +93,24 @@ public class VThreadScheduler {
      * @throws UnsupportedOperationException if custom schedulers are not supported
      */
     @SuppressWarnings("restricted")
-    public static Thread.Builder.OfVirtual virtualThreadBuilder(Executor scheduler) {
+    public static Thread.Builder.OfVirtual virtualThreadBuilder(Thread.VirtualThreadScheduler scheduler) {
         return Thread.ofVirtual().scheduler(scheduler);
-//        var builder = Thread.ofVirtual();
-//        try {
-//            Method m = Thread.Builder.OfVirtual.class.getMethod("scheduler", Executor.class);
-//            m.setAccessible(true);
-//            m.invoke(builder, scheduler);
-//        } catch (InvocationTargetException e) {
-//            Throwable cause = e.getCause();
-//            if (cause instanceof RuntimeException re) {
-//                throw re;
-//            }
-//            throw new RuntimeException(e);
-//        } catch (Exception e) {
-//            throw new RuntimeException(e);
-//        }
-//        return builder;
+    }
+
+    public static Thread.Builder.OfVirtual virtualThreadBuilder(Executor executor) {
+        Thread.VirtualThreadScheduler scheduler = (_, task) -> executor.execute(task);
+        return virtualThreadBuilder(scheduler);
     }
 
     /**
      * Returns a ThreadFactory to create virtual threads that use the given scheduler.
      * @throws UnsupportedOperationException if custom schedulers are not supported
      */
-    public static ThreadFactory virtualThreadFactory(Executor scheduler) {
+    public static ThreadFactory virtualThreadFactory(Thread.VirtualThreadScheduler scheduler) {
         return virtualThreadBuilder(scheduler).factory();
+    }
+
+    public static ThreadFactory virtualThreadFactory(Executor executor) {
+        return virtualThreadBuilder(executor).factory();
     }
 }
