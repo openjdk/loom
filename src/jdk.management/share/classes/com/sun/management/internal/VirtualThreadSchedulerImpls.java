@@ -24,7 +24,6 @@
  */
 package com.sun.management.internal;
 
-import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 import javax.management.ObjectName;
 import jdk.management.VirtualThreadSchedulerMXBean;
@@ -89,9 +88,9 @@ public class VirtualThreadSchedulerImpls {
          * Holder class for scheduler.
          */
         private static class Scheduler {
-            private static final Executor SCHEDULER =
+            private static final Thread.VirtualThreadScheduler SCHEDULER =
                 SharedSecrets.getJavaLangAccess().defaultVirtualThreadScheduler();
-            static Executor instance() {
+            static Thread.VirtualThreadScheduler instance() {
                 return SCHEDULER;
             }
         }

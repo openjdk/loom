@@ -76,17 +76,18 @@ import org.junit.jupiter.params.provider.MethodSource;
 import static org.junit.jupiter.api.Assertions.*;
 
 class BlockingChannelOps {
-
-    private static ExecutorService customScheduler;
+    private static ExecutorService threadPool;
+    private static Thread.VirtualThreadScheduler customScheduler;
 
     @BeforeAll
     static void setup() {
-        customScheduler = Executors.newCachedThreadPool();
+        threadPool = Executors.newCachedThreadPool();
+        customScheduler = (_, task) -> threadPool.execute(task);
     }
 
     @AfterAll
     static void finish() {
-        customScheduler.shutdown();
+        threadPool.shutdown();
     }
 
     /**

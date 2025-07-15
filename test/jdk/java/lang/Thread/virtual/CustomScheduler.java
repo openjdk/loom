@@ -49,19 +49,21 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.*;
 
 class CustomScheduler {
-    private static ExecutorService scheduler1;
-    private static ExecutorService scheduler2;
+    private static ExecutorService threadPool1, threadPool2;
+    private static Thread.VirtualThreadScheduler scheduler1, scheduler2;
 
     @BeforeAll
     static void setup() {
-        scheduler1 = Executors.newFixedThreadPool(1);
-        scheduler2 = Executors.newFixedThreadPool(1);
+        threadPool1 = Executors.newFixedThreadPool(1);
+        threadPool2 = Executors.newFixedThreadPool(1);
+        scheduler1 = (_, task) -> threadPool1.execute(task);
+        scheduler2 = (_, task) -> threadPool2.execute(task);
     }
 
     @AfterAll
     static void shutdown() {
-        scheduler1.shutdown();
-        scheduler2.shutdown();
+        threadPool1.shutdown();
+        threadPool2.shutdown();
     }
 
     /**
@@ -69,7 +71,7 @@ class CustomScheduler {
      */
     @Test
     void testCustomScheduler1() throws Exception {
-        var ref = new AtomicReference<Executor>();
+        var ref = new AtomicReference<Thread.VirtualThreadScheduler>();
         ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler1);
         Thread thread = factory.newThread(() -> {
             ref.set(VThreadScheduler.scheduler(Thread.currentThread()));
@@ -93,7 +95,7 @@ class CustomScheduler {
      */
     @Test
     void testCustomScheduler3() throws Exception {
-        var ref = new AtomicReference<Executor>();
+        var ref = new AtomicReference<Thread.VirtualThreadScheduler>();
         ThreadFactory factory = VThreadScheduler.virtualThreadFactory(scheduler1);
         Thread thread = factory.newThread(() -> {
             try {
@@ -115,7 +117,7 @@ class CustomScheduler {
      */
     @Test
     void testCustomScheduler4() throws Exception {
-        var ref = new AtomicReference<Executor>();
+        var ref = new AtomicReference<Thread.VirtualThreadScheduler>();
         ThreadFactory factory1 = VThreadScheduler.virtualThreadFactory(scheduler1);
         ThreadFactory factory2 = VThreadScheduler.virtualThreadFactory(scheduler2);
         Thread thread1 = factory1.newThread(() -> {

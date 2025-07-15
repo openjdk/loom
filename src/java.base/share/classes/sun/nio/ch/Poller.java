@@ -53,13 +53,13 @@ public abstract class Poller {
 
     private static final Mode POLLER_MODE = pollerMode();
 
-    private static final Executor DEFAULT_SCHEDULER = JLA.defaultVirtualThreadScheduler();
+    private static final Thread.VirtualThreadScheduler DEFAULT_SCHEDULER = JLA.defaultVirtualThreadScheduler();
 
     // poller group for default scheduler
     private static final Supplier<PollerGroup> DEFAULT_POLLER_GROUP = StableValue.supplier(PollerGroup::create);
 
     // maps scheduler to PollerGroup, custom schedulers can't be GC'ed at this time
-    private static final Map<Executor, PollerGroup> POLLER_GROUPS = new ConcurrentHashMap<>();
+    private static final Map<Thread.VirtualThreadScheduler, PollerGroup> POLLER_GROUPS = new ConcurrentHashMap<>();
 
     // the poller or sub-poller thread
     private @Stable Thread owner;
@@ -289,14 +289,14 @@ public abstract class Poller {
      * The read/write pollers for a virtual thread scheduler.
      */
     private static class PollerGroup {
-        private final Executor scheduler;
+        private final Thread.VirtualThreadScheduler scheduler;
         private final Poller[] readPollers;
         private final Poller[] writePollers;
         private final Poller masterPoller;
         private final Executor executor;
         private volatile boolean shutdown;
 
-        PollerGroup(Executor scheduler,
+        PollerGroup(Thread.VirtualThreadScheduler scheduler,
                     Poller masterPoller,
                     int readPollerCount,
                     int writePollerCount) throws IOException {
@@ -369,7 +369,7 @@ public abstract class Poller {
         /**
          * Create and starts the poller group for a custom scheduler.
          */
-        static PollerGroup create(Executor scheduler) {
+        static PollerGroup create(Thread.VirtualThreadScheduler scheduler) {
             try {
                 Poller masterPoller = DEFAULT_POLLER_GROUP.get().masterPoller();
                 var pollerGroup = new PollerGroup(scheduler, masterPoller, 1, 1);
@@ -543,7 +543,7 @@ public abstract class Poller {
         if (POLLER_MODE == Mode.SYSTEM_THREADS) {
             return DEFAULT_POLLER_GROUP.get();
         }
-        Executor scheduler;
+        Thread.VirtualThreadScheduler scheduler;
         if (thread.isVirtual()) {
             scheduler = JLA.virtualThreadScheduler(thread);
         } else {
