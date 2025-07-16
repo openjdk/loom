@@ -1533,7 +1533,7 @@ final class VirtualThread extends BaseVirtualThread {
                         Objects.requireNonNull(thread);
                         if (thread instanceof VirtualThread vthread) {
                             VirtualThreadScheduler scheduler = vthread.scheduler;
-                            if (scheduler == builtin || scheduler == DEFAULT_SCHEDULER) {
+                            if (scheduler == this || scheduler == DEFAULT_SCHEDULER) {
                                 builtin.execute(thread, task);
                             } else {
                                 throw new IllegalArgumentException();
