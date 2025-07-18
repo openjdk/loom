@@ -10,23 +10,22 @@ The experimental support may change or be removed at any time.
 
 ## Using a custom scheduler as the default scheduler
 
-The default virtual thread scheduler is selected when starting a new virtual thread with
-`Thread.startVirtualThread`, or creating a virtual thread with the `Thread.Builder` API and
-not specifying a scheduler The default scheduler is a `ForkJoinPool` instance that is
-configured in FIFO mode.  A different default scheduler can be used by setting a system
+The JDK's built-in virtual thread scheduler is a `ForkJoinPool` instance that is
+configured in FIFO mode.
+
+A default scheduler can be used by setting a system
 property on the command line.
 
 ```
--Djdk.virtualThreadScheduler.implClass=$EXECUTOR
+-Djdk.virtualThreadScheduler.implClass=<scheduler-class>
 ```
 
-where $EXECUTOR is fully qualified name of a class that implements
+where `<scheduler-class>` is fully qualified name of a class that implements
 `java.lang.Thread.VirtualThreadScheduler`. The scheduler's `execute` method is invoked
 to continue execution of a virtual thread.
 
-A custom scheduler may use its own pool of platform threads, may assign virtual threads
-to specific be carried by specific platform threads, or may delegate to the built-in.
-default scheduler.
+A custom scheduler may use its own pool of platform threads, may assign virtual threads to
+be carried by specific platform threads, or may delegate to the built-in default scheduler.
 
 The implementation class must be public, with a public no-arg or one-arg constructor, and
 deployed on the class path or in an exported package of a module on the module path. If the
@@ -40,7 +39,7 @@ that is a reference to the built-in default scheduler.
 scheduler when creating a virtual thread. The experimental supports allows several
 schedulers to be in use at the same time.
 
-The following examples uses a thread pool with 8 threads as the scheduler.
+The following example uses a thread pool with 8 threads as the scheduler.
 
 ```
 ExecuorService pool = Executors.newFixedThreadPool(8);

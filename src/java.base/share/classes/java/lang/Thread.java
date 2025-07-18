@@ -792,12 +792,14 @@ public class Thread implements Runnable {
      * {@snippet lang=java :
      *     ExecutorService pool = Executors.newFixedThreadPool(4);
      *     VirtualThreadScheduler scheduler = (vthread, task) -> {
-     *         Thread carrier = Thread.currentThread();
+     *          pool.submit(() -> {
+     *              Thread carrier = Thread.currentThread();
      *
-     *         // runs the virtual thread task
-     *         task.run();
+     *              // runs the virtual thread task
+     *              task.run();
      *
-     *         assert Thread.currentThread() == carrier;
+     *              assert Thread.currentThread() == carrier;
+     *         });
      *     };
      * }
      *
