@@ -2329,6 +2329,14 @@ public final class System {
                 }
             }
 
+            public <T> T supplyIfUnmounted(Thread thread, Supplier<T> supplier1, Supplier<T> supplier2) {
+                if (thread instanceof VirtualThread vthread) {
+                    return vthread.supplyIfUnmounted(supplier1, supplier2);
+                } else {
+                    throw new IllegalArgumentException();
+                }
+            }
+
             public StackWalker newStackWalkerInstance(Set<StackWalker.Option> options,
                                                       ContinuationScope contScope,
                                                       Continuation continuation) {
