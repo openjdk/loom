@@ -44,6 +44,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 import jdk.internal.loader.NativeLibraries;
@@ -622,6 +623,14 @@ public interface JavaLangAccess {
      * Returns the scheduler for the given virtual thread.
      */
     Thread.VirtualThreadScheduler virtualThreadScheduler(Thread thread);
+
+    /**
+     * Invokes a supplier to produce a non-null result if this virtual thread is not mounted.
+     * @param supplier1 invoked if this virtual thread is alive and unmounted
+     * @param supplier2 invoked if this virtual thread is not alive
+     * @return the result; {@code null} if this virtual thread is mounted or in transition
+     */
+    <T> T supplyIfUnmounted(Thread thread, Supplier<T> supplier1, Supplier<T> supplier2);
 
     /**
      * Creates a new StackWalker
