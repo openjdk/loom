@@ -31,6 +31,17 @@
  * @run junit/othervm VThreadCommandsTest
  */
 
+/*
+ * @test id=poller-modes
+ * @requires (os.family == "linux") | (os.family == "mac")
+ * @requires vm.continuations
+ * @modules jdk.jcmd
+ * @library /test/lib
+ * @run junit/othervm -Djdk.pollerMode=1 VThreadCommandsTest
+ * @run junit/othervm -Djdk.pollerMode=2 VThreadCommandsTest
+ * @run junit/othervm -Djdk.pollerMode=3 VThreadCommandsTest
+ */
+
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;

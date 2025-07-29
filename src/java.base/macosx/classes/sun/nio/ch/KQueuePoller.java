@@ -25,7 +25,6 @@
 package sun.nio.ch;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.lang.ref.Cleaner.Cleanable;
 import jdk.internal.ref.CleanerFactory;
 import static sun.nio.ch.KQueue.*;
@@ -40,16 +39,23 @@ class KQueuePoller extends Poller {
     private final long address;
     private final Cleanable cleaner;
 
+    // file descriptors used for wakeup
+    private final int fd0;
+    private final int fd1;
+
     KQueuePoller(boolean subPoller, boolean read) throws IOException {
         this.kqfd = KQueue.create();
         this.filter = (read) ? EVFILT_READ : EVFILT_WRITE;
         this.maxEvents = (subPoller) ? 64 : 512;
         this.address = KQueue.allocatePollArray(maxEvents);
-        if (subPoller) {
-            this.cleaner = CleanerFactory.cleaner().register(this, release(kqfd, address));
-        } else {
-            this.cleaner = null;
-        }
+
+        long fds =  IOUtil.makePipe(false);
+        this.fd0 = (int) (fds >>> 32);
+        this.fd1 = (int) fds;
+        KQueue.register(kqfd, fd0, EVFILT_READ, EV_ADD);
+
+        this.cleaner = CleanerFactory.cleaner()
+                .register(this, releaser(kqfd, address, fd0, fd1));
     }
 
     @Override
@@ -58,18 +64,16 @@ class KQueuePoller extends Poller {
     }
 
     /**
-     * Closes kernel event queue and release poll array.
+     * Releases the kqueue instance and other resources.
      */
-    private static Runnable release(int kqfd, long address) {
+    private static Runnable releaser(int kqfd, long address, int fd0, int fd1) {
         return () -> {
             try {
                 FileDispatcherImpl.closeIntFD(kqfd);
-            } catch (IOException ioe) {
-                throw new UncheckedIOException(ioe);
-            } finally {
-                // release memory
                 KQueue.freePollArray(address);
-            }
+                FileDispatcherImpl.closeIntFD(fd0);
+                FileDispatcherImpl.closeIntFD(fd1);
+            } catch (IOException _) { }
         };
     }
 
@@ -94,13 +98,20 @@ class KQueuePoller extends Poller {
     }
 
     @Override
+    void wakeupPoller() throws IOException {
+        IOUtil.write1(fd1, (byte)0);
+    }
+
+    @Override
     int poll(int timeout) throws IOException {
         int n = KQueue.poll(kqfd, address, maxEvents, timeout);
         int i = 0;
         while (i < n) {
             long keventAddress = KQueue.getEvent(address, i);
             int fdVal = KQueue.getDescriptor(keventAddress);
-            polled(fdVal);
+            if (fdVal != fd0) {
+                polled(fdVal);
+            }
             i++;
         }
         return n;
