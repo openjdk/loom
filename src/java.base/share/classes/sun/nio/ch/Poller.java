@@ -39,7 +39,6 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
-import jdk.internal.misc.CarrierThread;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.TerminatingThreadLocal;
 import jdk.internal.vm.Continuation;
@@ -224,7 +223,13 @@ public abstract class Poller {
     private void poll(int fdVal, long nanos, BooleanSupplier isOpen) throws IOException {
         register(fdVal);
         try {
-            parkIfOpen(nanos, isOpen);
+            if (isOpen.getAsBoolean()) {
+                if (nanos > 0) {
+                    LockSupport.parkNanos(nanos);
+                } else {
+                    LockSupport.park();
+                }
+            }
         } finally {
             deregister(fdVal);
         }
@@ -244,19 +249,6 @@ public abstract class Poller {
             throw t;
         } finally {
             Reference.reachabilityFence(this);
-        }
-    }
-
-    /**
-     * Parks the current thread for the given number of nanos.
-     */
-    private void parkIfOpen(long nanos, BooleanSupplier isOpen) {
-        if (isOpen.getAsBoolean()) {
-            if (nanos > 0) {
-                LockSupport.parkNanos(nanos);
-            } else {
-                LockSupport.park();
-            }
         }
     }
 
@@ -501,7 +493,7 @@ public abstract class Poller {
 
         // maps scheduler to a set of read and write pollers
         private record Pollers(ExecutorService executor, Poller[] readPollers, Poller[] writePollers) { }
-        private Map<Thread.VirtualThreadScheduler, Pollers> POLLERS = new ConcurrentHashMap<>();
+        private final Map<Thread.VirtualThreadScheduler, Pollers> POLLERS = new ConcurrentHashMap<>();
 
         VirtualThreadsPollerGroup(PollerProvider provider) throws IOException {
             super(provider);
@@ -651,7 +643,7 @@ public abstract class Poller {
         private static final Thread THREAD_HOLDER = new Thread();
 
         // maps carrier thread to its read poller
-        private Map<Thread, Poller> READ_POLLERS = new ConcurrentHashMap<>();
+        private final Map<Thread, Poller> READ_POLLERS = new ConcurrentHashMap<>();
         private final Poller writePoller;
 
         PerCarrierPollerGroup(PollerProvider provider) throws IOException {
@@ -690,10 +682,9 @@ public abstract class Poller {
             }
 
             assert event == Net.POLLIN;
+            Poller readPoller;
             if (Thread.currentThread().isVirtual() && ContinuationSupport.isSupported()) {
-                Poller readPoller;
-
-                // register with the read poller for this carrier
+                // get read poller for this carrier
                 Continuation.pin();
                 try {
                     Thread carrier = JLA.currentCarrierThread();
@@ -702,21 +693,14 @@ public abstract class Poller {
                     } catch (UncheckedIOException uioe) {
                         throw uioe.getCause();
                     }
-                    readPoller.register(fdVal);
+
                 } finally {
                     Continuation.unpin();
                 }
-
-                // park, may continue on a different carrier
-                try {
-                    readPoller.parkIfOpen(nanos, isOpen);
-                } finally {
-                    readPoller.deregister(fdVal);
-                }
             } else {
-                READ_POLLERS.computeIfAbsent(THREAD_HOLDER, _ -> createReadPoller(THREAD_HOLDER))
-                        .poll(fdVal, nanos, isOpen);
+                readPoller = READ_POLLERS.computeIfAbsent(THREAD_HOLDER, _ -> createReadPoller(THREAD_HOLDER));
             }
+            readPoller.poll(fdVal, nanos, isOpen);
         }
 
         @Override
