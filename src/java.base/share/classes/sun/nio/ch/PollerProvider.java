@@ -75,13 +75,15 @@ abstract class PollerProvider {
 
     /**
      * Creates a Poller for read ops.
+     * @param mode the poller mode
      * @param subPoller true to create a sub-poller
      */
-    abstract Poller readPoller(boolean subPoller) throws IOException;
+    abstract Poller readPoller(Poller.Mode mode, boolean subPoller) throws IOException;
 
     /**
      * Creates a Poller for write ops.
+     * @param mode the poller mode
      * @param subPoller true to create a sub-poller
      */
-    abstract Poller writePoller(boolean subPoller) throws IOException;
+    abstract Poller writePoller(Poller.Mode mode, boolean subPoller) throws IOException;
 }

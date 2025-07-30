@@ -39,7 +39,6 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
-import jdk.internal.misc.CarrierThread;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.TerminatingThreadLocal;
 import jdk.internal.vm.Continuation;
@@ -224,7 +223,13 @@ public abstract class Poller {
     private void poll(int fdVal, long nanos, BooleanSupplier isOpen) throws IOException {
         register(fdVal);
         try {
-            parkIfOpen(nanos, isOpen);
+            if (isOpen.getAsBoolean()) {
+                if (nanos > 0) {
+                    LockSupport.parkNanos(nanos);
+                } else {
+                    LockSupport.park();
+                }
+            }
         } finally {
             deregister(fdVal);
         }
@@ -244,19 +249,6 @@ public abstract class Poller {
             throw t;
         } finally {
             Reference.reachabilityFence(this);
-        }
-    }
-
-    /**
-     * Parks the current thread for the given number of nanos.
-     */
-    private void parkIfOpen(long nanos, BooleanSupplier isOpen) {
-        if (isOpen.getAsBoolean()) {
-            if (nanos > 0) {
-                LockSupport.parkNanos(nanos);
-            } else {
-                LockSupport.park();
-            }
         }
     }
 
@@ -364,14 +356,10 @@ public abstract class Poller {
          * Starts a platform thread to run the given task.
          */
         protected final void startPlatformThread(String name, Runnable task) {
-            try {
-                Thread thread = InnocuousThread.newSystemThread(name, task);
-                thread.setDaemon(true);
-                thread.setUncaughtExceptionHandler((t, e) -> e.printStackTrace());
-                thread.start();
-            } catch (Exception e) {
-                throw new InternalError(e);
-            }
+            Thread thread = InnocuousThread.newSystemThread(name, task);
+            thread.setDaemon(true);
+            thread.setUncaughtExceptionHandler((t, e) -> e.printStackTrace());
+            thread.start();
         }
 
         /**
@@ -411,10 +399,10 @@ public abstract class Poller {
             Poller[] writePollers = new Poller[writePollerCount];
             try {
                 for (int i = 0; i < readPollerCount; i++) {
-                    readPollers[i] = provider.readPoller(false);
+                    readPollers[i] = provider.readPoller(Mode.SYSTEM_THREADS, false);
                 }
                 for (int i = 0; i < writePollerCount; i++) {
-                    writePollers[i] = provider.writePoller(false);
+                    writePollers[i] = provider.writePoller(Mode.SYSTEM_THREADS, false);
                 }
             } catch (Throwable e) {
                 closeAll(readPollers);
@@ -505,16 +493,17 @@ public abstract class Poller {
 
         // maps scheduler to a set of read and write pollers
         private record Pollers(ExecutorService executor, Poller[] readPollers, Poller[] writePollers) { }
-        private Map<Thread.VirtualThreadScheduler, Pollers> POLLERS = new ConcurrentHashMap<>();
+        private final Map<Thread.VirtualThreadScheduler, Pollers> POLLERS = new ConcurrentHashMap<>();
 
         VirtualThreadsPollerGroup(PollerProvider provider) throws IOException {
             super(provider);
 
+            var mode = Mode.VTHREAD_POLLERS;
             this.defaultReadPollerCount = pollerCount("jdk.readPollers",
-                    provider.defaultReadPollers(Mode.VTHREAD_POLLERS));
+                    provider.defaultReadPollers(mode));
             this.defaultWritePollerCount = pollerCount("jdk.writePollers",
-                    provider.defaultWritePollers(Mode.VTHREAD_POLLERS));
-            this.masterPoller = provider.readPoller(false);
+                    provider.defaultWritePollers(mode));
+            this.masterPoller = provider.readPoller(mode, false);
         }
 
         @Override
@@ -539,11 +528,12 @@ public abstract class Poller {
             Poller[] readPollers = new Poller[readPollerCount];
             Poller[] writePollers = new Poller[writePollerCount];
             try {
+                var mode = Mode.VTHREAD_POLLERS;
                 for (int i = 0; i < readPollerCount; i++) {
-                    readPollers[i] = provider().readPoller(true);
+                    readPollers[i] = provider().readPoller(mode, true);
                 }
                 for (int i = 0; i < writePollerCount; i++) {
-                    writePollers[i] = provider().writePoller(true);
+                    writePollers[i] = provider().writePoller(mode, true);
                 }
             } catch (IOException ioe) {
                 closeAll(readPollers);
@@ -653,12 +643,12 @@ public abstract class Poller {
         private static final Thread THREAD_HOLDER = new Thread();
 
         // maps carrier thread to its read poller
-        private Map<Thread, Poller> READ_POLLERS = new ConcurrentHashMap<>();
+        private final Map<Thread, Poller> READ_POLLERS = new ConcurrentHashMap<>();
         private final Poller writePoller;
 
         PerCarrierPollerGroup(PollerProvider provider) throws IOException {
             super(provider);
-            this.writePoller = provider.writePoller(false);
+            this.writePoller = provider.writePoller(Mode.PER_CARRIER, false);
         }
 
         @Override
@@ -668,7 +658,7 @@ public abstract class Poller {
 
         private Poller createReadPoller(Thread carrier) {
             try {
-                Poller readPoller = provider().readPoller(false);
+                Poller readPoller = provider().readPoller(Mode.PER_CARRIER, false);
                 String name;
                 if (carrier == THREAD_HOLDER) {
                     name = "Read-Poller";
@@ -692,10 +682,9 @@ public abstract class Poller {
             }
 
             assert event == Net.POLLIN;
+            Poller readPoller;
             if (Thread.currentThread().isVirtual() && ContinuationSupport.isSupported()) {
-                Poller readPoller;
-
-                // register with the read poller for this carrier
+                // get read poller for this carrier
                 Continuation.pin();
                 try {
                     Thread carrier = JLA.currentCarrierThread();
@@ -704,21 +693,14 @@ public abstract class Poller {
                     } catch (UncheckedIOException uioe) {
                         throw uioe.getCause();
                     }
-                    readPoller.register(fdVal);
+
                 } finally {
                     Continuation.unpin();
                 }
-
-                // park, may continue on a different carrier
-                try {
-                    readPoller.parkIfOpen(nanos, isOpen);
-                } finally {
-                    readPoller.deregister(fdVal);
-                }
             } else {
-                READ_POLLERS.computeIfAbsent(THREAD_HOLDER, _ -> createReadPoller(THREAD_HOLDER))
-                        .poll(fdVal, nanos, isOpen);
+                readPoller = READ_POLLERS.computeIfAbsent(THREAD_HOLDER, _ -> createReadPoller(THREAD_HOLDER));
             }
+            readPoller.poll(fdVal, nanos, isOpen);
         }
 
         @Override
@@ -766,11 +748,9 @@ public abstract class Poller {
 
         @Override
         List<Poller> defaultReadPollers() {
-            // default built-in scheduler for now
-            return READ_POLLERS.entrySet()
+            // the read pollers for all schedulers for now
+            return READ_POLLERS.values()
                     .stream()
-                    .filter(e -> e.getKey() instanceof CarrierThread)
-                    .map(Map.Entry::getValue)
                     .toList();
         }
 

@@ -25,14 +25,19 @@
 package jdk.internal.vm;
 
 import java.util.Arrays;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
+import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.SharedSecrets;
 
 /**
  * Represents a snapshot of information about a Thread.
  */
 class ThreadSnapshot {
+    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     private static final StackTraceElement[] EMPTY_STACK = new StackTraceElement[0];
     private static final ThreadLock[] EMPTY_LOCKS = new ThreadLock[0];
+    private static final ThreadSnapshot NOT_ALIVE = new ThreadSnapshot();
 
     // filled by VM
     private String name;
@@ -59,7 +64,25 @@ class ThreadSnapshot {
     static ThreadSnapshot of(Thread thread) {
         ThreadSnapshot snapshot = create(thread);
         if (snapshot == null) {
-            return null; // thread terminated
+            if (thread.isVirtual()) {
+                while (snapshot == null) {
+                    // may be unmounted
+                    snapshot = JLA.supplyIfUnmounted(thread,
+                            () -> create(thread),    // alive
+                            () -> NOT_ALIVE);        // not alive (terminated or not started)
+                    if (snapshot == null) {
+                        // may be mounted
+                        snapshot = create(thread);
+                        if (snapshot == null) {
+                            Thread.yield();
+                        }
+                    } else if (snapshot == NOT_ALIVE) {
+                        return null; // virtual thread not alive
+                    }
+                }
+            } else {
+                return null; // platform thread not alive
+            }
         }
         if (snapshot.stackTrace == null) {
             snapshot.stackTrace = EMPTY_STACK;
