@@ -45,13 +45,13 @@ class DefaultPollerProvider extends PollerProvider {
     }
 
     @Override
-    Poller readPoller(boolean subPoller) throws IOException {
+    Poller readPoller(Poller.Mode mode, boolean subPoller) throws IOException {
         assert !subPoller;
         return new WEPollPoller(true);
     }
 
     @Override
-    Poller writePoller(boolean subPoller) throws IOException {
+    Poller writePoller(Poller.Mode mode, boolean subPoller) throws IOException {
         assert !subPoller;
         return new WEPollPoller(false);
     }
