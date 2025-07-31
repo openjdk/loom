@@ -1179,13 +1179,15 @@ public:
   OopHandle _thread_name;
   GrowableArray<OwnedLock>* _locks;
   Blocker _blocker;
+  bool _completed;
 
   GetThreadSnapshotHandshakeClosure(Handle thread_h, JavaThread* java_thread):
     HandshakeClosure("GetThreadSnapshotHandshakeClosure"),
     _thread_h(thread_h), _java_thread(java_thread),
     _frame_count(0), _methods(nullptr), _bcis(nullptr),
     _thread_status(), _thread_name(nullptr),
-    _locks(nullptr), _blocker() {
+    _locks(nullptr), _blocker(),
+    _completed(false) {
   }
   virtual ~GetThreadSnapshotHandshakeClosure() {
     delete _methods;
@@ -1276,15 +1278,25 @@ public:
     bool is_virtual = java_lang_VirtualThread::is_instance(_thread_h());
     if (_java_thread != nullptr) {
       if (is_virtual) {
-        // mounted vthread, use carrier thread state
         oop carrier_thread = java_lang_VirtualThread::carrier_thread(_thread_h());
-        _thread_status = java_lang_Thread::get_thread_status(carrier_thread);
+        if (carrier_thread != nullptr) {
+          if (java_lang_Thread::thread(carrier_thread) != _java_thread) {
+            // mounted on a different carrier to expected
+            return;
+          }
+          // mounted on expected carrier, use carrier thread state
+          _thread_status = java_lang_Thread::get_thread_status(carrier_thread);
+        } else {
+          // expected to be mounted but is now unmounted, let caller retry
+          return;
+        }
       } else {
         _thread_status = java_lang_Thread::get_thread_status(_thread_h());
       }
     } else {
-      // unmounted vthread
+      // suspended (and unmounted) virtual thread
       int vt_state = java_lang_VirtualThread::state(_thread_h());
+      assert((vt_state & java_lang_VirtualThread::SUSPENDED) != 0, "unmounted for but suspended");
       _thread_status = java_lang_VirtualThread::map_state_to_thread_status(vt_state);
     }
     _thread_name = OopHandle(oop_storage(), java_lang_Thread::name(_thread_h()));
@@ -1334,6 +1346,12 @@ public:
     }
 
     _frame_count = total_count;
+
+    _completed = true;
+  }
+
+  bool is_completed() {
+    return _completed;
   }
 };
 
@@ -1451,33 +1469,18 @@ oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, TRAPS) {
     return nullptr; // thread terminated so not of interest
   }
 
-  // wrapper to auto delete JvmtiVTMSTransitionDisabler
-  class TransitionDisabler {
-    JvmtiVTMSTransitionDisabler* _transition_disabler;
-  public:
-    TransitionDisabler(): _transition_disabler(nullptr) {}
-    ~TransitionDisabler() {
-      reset();
-    }
-    void init(jobject jthread) {
-      _transition_disabler = new (mtInternal) JvmtiVTMSTransitionDisabler(jthread);
-    }
-    void reset() {
-      if (_transition_disabler != nullptr) {
-        delete _transition_disabler;
-        _transition_disabler = nullptr;
-      }
-    }
-  } transition_disabler;
-
   Handle carrier_thread;
   if (is_virtual) {
-    // 1st need to disable mount/unmount transitions
-    transition_disabler.init(jthread);
-
     carrier_thread = Handle(THREAD, java_lang_VirtualThread::carrier_thread(thread_h()));
     if (carrier_thread != nullptr) {
+      // mounted
       java_thread = java_lang_Thread::thread(carrier_thread());
+    } else {
+      // needs to be suspended if unmounted
+      int vt_state = java_lang_VirtualThread::state(thread_h());
+      if ((vt_state & java_lang_VirtualThread::SUSPENDED) == 0) {
+        return nullptr;
+      }
     }
   } else {
     java_thread = java_lang_Thread::thread(thread_h());
@@ -1491,9 +1494,9 @@ oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, TRAPS) {
   } else {
     Handshake::execute(&cl, &tlh, java_thread);
   }
-
-  // all info is collected, can enable transitions.
-  transition_disabler.reset();
+  if (!cl.is_completed()) {
+    return nullptr;
+  }
 
   // StackTrace
   InstanceKlass* ste_klass = vmClasses::StackTraceElement_klass();

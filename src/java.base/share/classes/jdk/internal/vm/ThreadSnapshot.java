@@ -57,8 +57,7 @@ class ThreadSnapshot {
 
     /**
      * Take a snapshot of a Thread to get all information about the thread.
-     * Return null if a ThreadSnapshot is not created, for example if the
-     * thread has terminated.
+     * Return null if the thread is not alive.
      * @throws UnsupportedOperationException if not supported by VM
      */
     static ThreadSnapshot of(Thread thread) {
@@ -242,5 +241,10 @@ class ThreadSnapshot {
         }
     }
 
+    /**
+     * Return the snapshot of the given thread if alive. If the thread is a virtual
+     * thread then this method returns null if unmounted but not suspended, or mounted
+     * and the carrier thread changes during the operation.
+     */
     private static native ThreadSnapshot create(Thread thread);
 }
