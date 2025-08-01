@@ -119,10 +119,17 @@ public abstract class Poller {
     abstract void close() throws IOException;
 
     /**
+     * Returns the poller's thread owner.
+     */
+    private Thread owner() {
+        return owner;
+    }
+
+    /**
      * Sets the poller's thread owner.
      */
     private void setOwner() {
-        this.owner = Thread.currentThread();
+        owner = Thread.currentThread();
     }
 
     /**
@@ -295,7 +302,7 @@ public abstract class Poller {
         setOwner();
         try {
             int polled = 0;
-            for (;;) {
+            while (!isShutdown()) {
                 if (polled == 0) {
                     masterPoller.poll(fdVal(), 0, () -> true);  // park
                 } else {
@@ -639,35 +646,40 @@ public abstract class Poller {
                 }
             };
 
-        // for use when polling from platform thread or -XX:-VMContinuations
-        private static final Thread THREAD_HOLDER = new Thread();
-
         // maps carrier thread to its read poller
         private final Map<Thread, Poller> READ_POLLERS = new ConcurrentHashMap<>();
+
+        private final Poller masterPoller;
         private final Poller writePoller;
 
         PerCarrierPollerGroup(PollerProvider provider) throws IOException {
             super(provider);
+            this.masterPoller = provider.readPoller(Mode.PER_CARRIER, false);
             this.writePoller = provider.writePoller(Mode.PER_CARRIER, false);
         }
 
         @Override
         void start() {
+            startPlatformThread("Master-Poller", masterPoller::pollerLoop);
             startPlatformThread("Write-Poller", writePoller::pollerLoop);
         }
 
-        private Poller createReadPoller(Thread carrier) {
+        /**
+         * Creates a read poller for the current virtual thread's carrier.
+         */
+        private Poller createReadPoller() {
+            Thread carrier = JLA.currentCarrierThread();
+            var scheduler = JLA.virtualThreadScheduler(Thread.currentThread());
             try {
-                Poller readPoller = provider().readPoller(Mode.PER_CARRIER, false);
-                String name;
-                if (carrier == THREAD_HOLDER) {
-                    name = "Read-Poller";
-                } else {
-                    assert JLA.currentCarrierThread() == carrier;
-                    POLLER_GROUP.set(this);
-                    name = "#" + carrier.threadId() + "-Read-Poller";
-                }
-                startPlatformThread(name, () -> pollerLoop(readPoller));
+                Poller readPoller = provider().readPoller(Mode.PER_CARRIER, true);
+                POLLER_GROUP.set(this);
+
+                @SuppressWarnings("restricted")
+                var _ = Thread.ofVirtual()
+                        .name(carrier.getName() + "-Read-Poller")
+                        .scheduler(scheduler)
+                        .start(() -> subPollerLoop(readPoller, masterPoller));
+
                 return readPoller;
             } catch (IOException ioe) {
                 throw new UncheckedIOException(ioe);
@@ -689,16 +701,16 @@ public abstract class Poller {
                 try {
                     Thread carrier = JLA.currentCarrierThread();
                     try {
-                        readPoller = READ_POLLERS.computeIfAbsent(carrier, _ -> createReadPoller(carrier));
+                        readPoller = READ_POLLERS.computeIfAbsent(carrier, _ -> createReadPoller());
                     } catch (UncheckedIOException uioe) {
                         throw uioe.getCause();
                     }
-
                 } finally {
                     Continuation.unpin();
                 }
             } else {
-                readPoller = READ_POLLERS.computeIfAbsent(THREAD_HOLDER, _ -> createReadPoller(THREAD_HOLDER));
+                // use master poller if -XX:-VMContinuations or called from platform thread
+                readPoller = masterPoller;
             }
             readPoller.poll(fdVal, nanos, isOpen);
         }
@@ -709,20 +721,15 @@ public abstract class Poller {
         }
 
         /**
-         * The poll loop for the read poller.
+         * Read-poller polling loop.
          */
-        private void pollerLoop(Poller readPoller) {
-            readPoller.setOwner();
+        private void subPollerLoop(Poller readPoller, Poller masterPoller) {
             try {
-                while (!readPoller.isShutdown()) {
-                    readPoller.poll(-1);
-                }
-
+                readPoller.subPollerLoop(masterPoller);
+            } finally {
                 // wakeup all threads waiting on file descriptors registered with the
                 // read poller, these I/O operation will migrate to another carrier.
                 readPoller.wakeupAll();
-            } catch (Throwable e) {
-                e.printStackTrace();
             }
         }
 
@@ -743,15 +750,25 @@ public abstract class Poller {
 
         @Override
         Poller defaultMasterPoller() {
-            return null;
+            if (ContinuationSupport.isSupported()) {
+                return masterPoller;
+            } else {
+                return null;
+            }
         }
 
         @Override
         List<Poller> defaultReadPollers() {
-            // the read pollers for all schedulers for now
-            return READ_POLLERS.values()
-                    .stream()
-                    .toList();
+            if (ContinuationSupport.isSupported()) {
+                var defaultScheduler = JLA.defaultVirtualThreadScheduler();
+                return READ_POLLERS.values()
+                        .stream()
+                        .filter(p -> (p.owner() instanceof Thread t)
+                                && JLA.virtualThreadScheduler(t) == defaultScheduler)
+                        .toList();
+            } else {
+                return List.of(masterPoller);
+            }
         }
 
         @Override
