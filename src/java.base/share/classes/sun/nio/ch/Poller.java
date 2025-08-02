@@ -230,7 +230,7 @@ public abstract class Poller {
     private void poll(int fdVal, long nanos, BooleanSupplier isOpen) throws IOException {
         register(fdVal);
         try {
-            if (isOpen.getAsBoolean()) {
+            if (isOpen.getAsBoolean() && !isShutdown()) {
                 if (nanos > 0) {
                     LockSupport.parkNanos(nanos);
                 } else {
@@ -633,9 +633,11 @@ public abstract class Poller {
 
     /**
      * The poller group for the PER_CARRIER polling mode. A dedicated read poller is
-     * created for each carrier thread. The read poller is a platform thread. The read
-     * poller terminates if the carrier thread terminates.
-     * There is one system-wide (carrier agnostic) platform thread for the write poller.
+     * created for each carrier thread. The read poller is a virtual thread. When a
+     * virtual thread polls a file descriptor for POLLIN, then it will use (almost
+     * always, not guaranteed) to see the read poller for its carrier. The read poller
+     * terminates if carrier thread terminates. There is one system-wide (carrier
+     * agnostic) platform thread for the write poller.
      */
     private static class PerCarrierPollerGroup extends PollerGroup {
         private static final TerminatingThreadLocal<PerCarrierPollerGroup> POLLER_GROUP =
@@ -676,7 +678,7 @@ public abstract class Poller {
 
                 @SuppressWarnings("restricted")
                 var _ = Thread.ofVirtual()
-                        .name(carrier.getName() + "-Read-Poller")
+                        .name(carrier.getName() + "-subPoller")
                         .scheduler(scheduler)
                         .start(() -> subPollerLoop(readPoller, masterPoller));
 
@@ -712,6 +714,8 @@ public abstract class Poller {
                 // use master poller if -XX:-VMContinuations or called from platform thread
                 readPoller = masterPoller;
             }
+
+            // may be on a different carrier
             readPoller.poll(fdVal, nanos, isOpen);
         }
 
