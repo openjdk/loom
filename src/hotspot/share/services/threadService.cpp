@@ -1460,7 +1460,7 @@ int jdk_internal_vm_ThreadSnapshot::_locks_offset;
 int jdk_internal_vm_ThreadSnapshot::_blockerTypeOrdinal_offset;
 int jdk_internal_vm_ThreadSnapshot::_blockerObject_offset;
 
-oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, TRAPS) {
+oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, jboolean suspended_by_caller, TRAPS) {
   ThreadsListHandle tlh(THREAD);
 
   ResourceMark rm(THREAD);
@@ -1476,11 +1476,14 @@ oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, TRAPS) {
     return nullptr; // thread terminated so not of interest
   }
 
-  if (is_virtual && java_thread == nullptr) {
-    // unmounted virtual thread must be suspended
-    int vt_state = java_lang_VirtualThread::state(thread_h());
-    if ((vt_state & java_lang_VirtualThread::SUSPENDED) == 0) {
-      return nullptr;  // not suspended, let caller retry
+  if (is_virtual) {
+    if (suspended_by_caller == JNI_TRUE) {
+      assert(java_thread == nullptr, "Should be unmounted");
+      assert((java_lang_VirtualThread::state(thread_h()) & java_lang_VirtualThread::SUSPENDED) != 0, "Should be suspended");
+    } else {
+      if (java_thread == nullptr) {
+        return nullptr;  // unmounted but not suspended, caller must retry
+      }
     }
   }
 
