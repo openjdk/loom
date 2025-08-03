@@ -630,10 +630,11 @@ public interface JavaLangAccess {
     Thread.VirtualThreadScheduler virtualThreadScheduler(Thread thread);
 
     /**
-     * Invokes a supplier to produce a non-null result if this virtual thread is not mounted.
-     * @param supplier1 invoked if this virtual thread is alive and unmounted
+     * Invokes a supplier to produce a non-null result if this virtual thread is unmounted.
+     * @param supplier1 invoked if this virtual thread is unmounted and alive. The virtual
+     *     thread is suspended while this supplier executes
      * @param supplier2 invoked if this virtual thread is not alive
-     * @return the result; {@code null} if this virtual thread is mounted or in transition
+     * @return the result; {@code null} if mounted, suspended or in transition
      */
     <T> T supplyIfUnmounted(Thread thread, Supplier<T> supplier1, Supplier<T> supplier2);
 
