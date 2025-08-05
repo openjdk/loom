@@ -1197,8 +1197,8 @@ final class VirtualThread extends BaseVirtualThread {
         StackTraceElement[] stackTrace;
         do {
             stackTrace = (carrierThread != null)
-                ? super.asyncGetStackTrace()                          // mounted
-                : supplyIfUnmounted(cont::getStackTrace,              // unmounted
+                ? super.asyncGetStackTrace()              // mounted
+                : supplyIfUnmounted(cont::getStackTrace,  // unmounted
                                     () -> new StackTraceElement[0]);
             if (stackTrace == null) {
                 Thread.yield();
@@ -1271,7 +1271,6 @@ final class VirtualThread extends BaseVirtualThread {
                 submitRunContinuation();
             }
         }
-
     }
 
     @Override

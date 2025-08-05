@@ -88,7 +88,7 @@ class EPollPoller extends Poller {
 
     @Override
     void implRegister(int fdVal) throws IOException {
-        // re-arm
+        // re-enable if already added but disabled (previously polled)
         int err = EPoll.ctl(epfd, EPOLL_CTL_MOD, fdVal, (event | EPOLLONESHOT));
         if (err == ENOENT)
             err = EPoll.ctl(epfd, EPOLL_CTL_ADD, fdVal, (event | EPOLLONESHOT));
