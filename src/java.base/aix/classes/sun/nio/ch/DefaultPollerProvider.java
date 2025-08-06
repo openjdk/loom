@@ -34,11 +34,15 @@ class DefaultPollerProvider extends PollerProvider {
 
     @Override
     Poller readPoller(boolean subPoller) throws IOException {
+        if (subPoller)
+            throw new UnsupportedOperationException();
         return new PollsetPoller(true);
     }
 
     @Override
     Poller writePoller(boolean subPoller) throws IOException {
+        if (subPoller)
+            throw new UnsupportedOperationException();
         return new PollsetPoller(false);
     }
 }

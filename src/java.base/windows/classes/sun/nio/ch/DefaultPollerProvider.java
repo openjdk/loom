@@ -34,7 +34,9 @@ class DefaultPollerProvider extends PollerProvider {
 
     @Override
     int defaultReadPollers(Poller.Mode mode) {
-        assert mode == Poller.Mode.SYSTEM_THREADS;
+        if (mode != Poller.Mode.SYSTEM_THREADS) {
+            throw new UnsupportedOperationException();
+        }
         int ncpus = Runtime.getRuntime().availableProcessors();
         return Math.max(Integer.highestOneBit(ncpus / 8), 1);
     }
@@ -45,14 +47,16 @@ class DefaultPollerProvider extends PollerProvider {
     }
 
     @Override
-    Poller readPoller(Poller.Mode mode, boolean subPoller) throws IOException {
-        assert !subPoller;
+    Poller readPoller(boolean subPoller) throws IOException {
+        if (subPoller)
+            throw new UnsupportedOperationException();
         return new WEPollPoller(true);
     }
 
     @Override
-    Poller writePoller(Poller.Mode mode, boolean subPoller) throws IOException {
-        assert !subPoller;
+    Poller writePoller(boolean subPoller) throws IOException {
+        if (subPoller)
+            throw new UnsupportedOperationException();
         return new WEPollPoller(false);
     }
 }

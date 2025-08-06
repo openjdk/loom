@@ -58,11 +58,6 @@ class KQueuePoller extends Poller {
                 .register(this, releaser(kqfd, address, fd0, fd1));
     }
 
-    @Override
-    void close() {
-        cleaner.clean();
-    }
-
     /**
      * Releases the kqueue instance and other resources.
      */
@@ -75,6 +70,11 @@ class KQueuePoller extends Poller {
                 FileDispatcherImpl.closeIntFD(fd1);
             } catch (IOException _) { }
         };
+    }
+
+    @Override
+    void close() {
+        cleaner.clean();
     }
 
     @Override

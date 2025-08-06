@@ -33,12 +33,12 @@ class DefaultPollerProvider extends PollerProvider {
     DefaultPollerProvider() { }
 
     @Override
-    Poller readPoller(Poller.Mode mode, boolean subPoller) throws IOException {
+    Poller readPoller(boolean subPoller) throws IOException {
         return new KQueuePoller(subPoller, true);
     }
 
     @Override
-    Poller writePoller(Poller.Mode mode, boolean subPoller) throws IOException {
+    Poller writePoller(boolean subPoller) throws IOException {
         return new KQueuePoller(subPoller, false);
     }
 }
