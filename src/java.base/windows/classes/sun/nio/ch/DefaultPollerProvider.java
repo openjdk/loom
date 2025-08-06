@@ -47,18 +47,16 @@ class DefaultPollerProvider extends PollerProvider {
     }
 
     @Override
-    Poller readPoller(Poller.Mode mode, boolean subPoller) throws IOException {
-        if (mode != Poller.Mode.SYSTEM_THREADS || subPoller) {
+    Poller readPoller(boolean subPoller) throws IOException {
+        if (subPoller)
             throw new UnsupportedOperationException();
-        }
         return new WEPollPoller(true);
     }
 
     @Override
-    Poller writePoller(Poller.Mode mode, boolean subPoller) throws IOException {
-        if (mode != Poller.Mode.SYSTEM_THREADS || subPoller) {
+    Poller writePoller(boolean subPoller) throws IOException {
+        if (subPoller)
             throw new UnsupportedOperationException();
-        }
         return new WEPollPoller(false);
     }
 }

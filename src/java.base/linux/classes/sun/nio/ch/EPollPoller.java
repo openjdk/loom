@@ -61,11 +61,6 @@ class EPollPoller extends Poller {
                 .register(this, releaser(epfd, address, fd0, fd1));
     }
 
-    @Override
-    void close() {
-        cleaner.clean();
-    }
-
     /**
      * Releases the epoll instance and other resources.
      */
@@ -74,11 +69,15 @@ class EPollPoller extends Poller {
             try {
                 FileDispatcherImpl.closeIntFD(epfd);
                 EPoll.freePollArray(address);
-
                 FileDispatcherImpl.closeIntFD(fd0);
                 FileDispatcherImpl.closeIntFD(fd1);
             } catch (IOException _) { }
         };
+    }
+
+    @Override
+    void close() {
+        cleaner.clean();
     }
 
     @Override
@@ -88,7 +87,7 @@ class EPollPoller extends Poller {
 
     @Override
     void implRegister(int fdVal) throws IOException {
-        // re-enable if already added but disabled (previously polled)
+        // re-enable if already registered but disabled (previously polled)
         int err = EPoll.ctl(epfd, EPOLL_CTL_MOD, fdVal, (event | EPOLLONESHOT));
         if (err == ENOENT)
             err = EPoll.ctl(epfd, EPOLL_CTL_ADD, fdVal, (event | EPOLLONESHOT));
@@ -115,8 +114,10 @@ class EPollPoller extends Poller {
         int i = 0;
         while (i < n) {
             long eventAddress = EPoll.getEvent(address, i);
-            int fdVal = EPoll.getDescriptor(eventAddress);
-            polled(fdVal);
+            int fd = EPoll.getDescriptor(eventAddress);
+            if (fd != fd0) {
+                polled(fd);
+            }
             i++;
         }
         return n;
