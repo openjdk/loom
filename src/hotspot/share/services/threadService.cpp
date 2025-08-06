@@ -1558,4 +1558,3 @@ oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, jboolean suspend
 }
 
 #endif // INCLUDE_JVMTI
-
