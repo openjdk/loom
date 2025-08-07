@@ -106,16 +106,18 @@ class EPollPoller extends Poller {
     @Override
     int poll(int timeout) throws IOException {
         int n = EPoll.wait(epfd, address, maxEvents, timeout);
+        int polled = 0;
         int i = 0;
         while (i < n) {
             long eventAddress = EPoll.getEvent(address, i);
             int fd = EPoll.getDescriptor(eventAddress);
             if (fd != eventfd.efd()) {
                 polled(fd);
+                polled++;
             }
             i++;
         }
-        return n;
+        return polled;
     }
 }
 

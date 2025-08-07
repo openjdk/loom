@@ -147,7 +147,7 @@ public abstract class Poller {
     }
 
     /**
-     * Returns the poller's file descriptor to use when polling it with the master poller.
+     * Returns the poller's file descriptor to use when polling with the master poller.
      * @throws UnsupportedOperationException if not supported
      */
     int fdVal() {
@@ -178,7 +178,7 @@ public abstract class Poller {
      *
      * @param timeout if positive then block for up to {@code timeout} milliseconds,
      *     if zero then don't block, if -1 then block indefinitely
-     * @return the number of file descriptors polled
+     * @return >0 if file descriptors are polled, 0 if no file descriptor polled
      */
     abstract int poll(int timeout) throws IOException;
 
