@@ -147,13 +147,17 @@ public abstract class Poller {
     }
 
     /**
-     * Returns the poller's file descriptor, used when the read and write poller threads
-     * are virtual threads.
-     *
+     * Returns the poller's file descriptor to use when polling it with the master poller.
      * @throws UnsupportedOperationException if not supported
      */
     int fdVal() {
         throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Invoked if when this poller's file descriptor is polled by the master poller.
+     */
+    void pollerPolled() throws IOException {
     }
 
     /**
@@ -305,6 +309,7 @@ public abstract class Poller {
             while (!isShutdown()) {
                 if (polled == 0) {
                     masterPoller.poll(fdVal(), 0, () -> true);  // park
+                    pollerPolled();
                 } else {
                     Thread.yield();
                 }
@@ -638,6 +643,12 @@ public abstract class Poller {
      * There is one system-wide (carrier agnostic) write poller.
      */
     private static class PerCarrierPollerGroup extends PollerGroup {
+        private static final boolean USE_SUBPOLLER;
+        static {
+            String s = System.getProperty("jdk.useSubPoller");
+            USE_SUBPOLLER = (s == null) || s.isEmpty() || Boolean.parseBoolean(s);
+        }
+
         private static final TerminatingThreadLocal<PerCarrierPollerGroup> POLLER_GROUP =
             new TerminatingThreadLocal<>() {
                 @Override
@@ -653,25 +664,45 @@ public abstract class Poller {
         private final Map<Thread, Poller> READ_POLLERS = new ConcurrentHashMap<>();
 
         private final Poller writePoller;
+        private final Poller masterPoller;
 
         PerCarrierPollerGroup(PollerProvider provider) throws IOException {
             super(provider);
+
             this.writePoller = provider.writePoller(false);
+            if (USE_SUBPOLLER) {
+                this.masterPoller = provider.readPoller(false);
+            } else {
+                this.masterPoller = null;
+            }
         }
 
         @Override
         void start() {
             startPlatformThread("Write-Poller", writePoller::pollerLoop);
+            if (masterPoller != null) {
+                startPlatformThread("Master-Poller", masterPoller::pollerLoop);
+            }
         }
 
         /**
-         * Starts a read poller with the given name
+         * Starts a read poller with the given name.
          * @throws UncheckedIOException if an I/O error occurs
          */
         private Poller startReadPoller(String name) {
             try {
-                Poller readPoller = provider().readPoller(false);
-                startPlatformThread(name, () -> pollLoop(readPoller));
+                Poller readPoller = provider().readPoller(USE_SUBPOLLER);
+                if (USE_SUBPOLLER) {
+                    var scheduler = JLA.virtualThreadScheduler(Thread.currentThread());
+                    @SuppressWarnings("restricted")
+                    var _ = Thread.ofVirtual().scheduler(scheduler)
+                            .inheritInheritableThreadLocals(false)
+                            .name(name)
+                            .uncaughtExceptionHandler((_, e) -> e.printStackTrace())
+                            .start(() -> subPollerLoop(readPoller));
+                } else {
+                    startPlatformThread(name, () -> pollLoop(readPoller));
+                }
                 return readPoller;
             } catch (IOException ioe) {
                 throw new UncheckedIOException(ioe);
@@ -686,8 +717,8 @@ public abstract class Poller {
             }
 
             assert event == Net.POLLIN;
-            Poller readPoller;
             if (Thread.currentThread().isVirtual() && ContinuationSupport.isSupported()) {
+                Poller readPoller;
                 // get read poller for this carrier
                 Continuation.pin();
                 try {
@@ -704,18 +735,24 @@ public abstract class Poller {
                 } finally {
                     Continuation.unpin();
                 }
+                // may execute on a different carrier
+                readPoller.poll(fdVal, nanos, isOpen);
+                return;
+            }
+
+            // -XX:-VMContinuations or called from platform thread
+            if (masterPoller != null) {
+                masterPoller.poll(fdVal, nanos, isOpen);
             } else {
-                // System-wide read poller if -XX:-VMContinuations or called from platform thread
+                Poller readPoller;
                 try {
                     readPoller = READ_POLLERS.computeIfAbsent(PLACEHOLDER,
                             _ -> startReadPoller("Read-Poller"));
                 } catch (UncheckedIOException uioe) {
                     throw uioe.getCause();
                 }
+                readPoller.poll(fdVal, nanos, isOpen);
             }
-
-            // may be on a different carrier
-            readPoller.poll(fdVal, nanos, isOpen);
         }
 
         @Override
@@ -729,6 +766,19 @@ public abstract class Poller {
         private void pollLoop(Poller readPoller) {
             try {
                 readPoller.pollerLoop();
+            } finally {
+                // wakeup all threads waiting on file descriptors registered with the
+                // read poller, these I/O operation will migrate to another carrier.
+                readPoller.wakeupAll();
+            }
+        }
+
+        /**
+         * Read-poll sub-poller polling loop.
+         */
+        private void subPollerLoop(Poller readPoller) {
+            try {
+                readPoller.subPollerLoop(masterPoller);
             } finally {
                 // wakeup all threads waiting on file descriptors registered with the
                 // read poller, these I/O operation will migrate to another carrier.
@@ -753,7 +803,7 @@ public abstract class Poller {
 
         @Override
         Poller defaultMasterPoller() {
-            return null;
+            return masterPoller;
         }
 
         @Override
