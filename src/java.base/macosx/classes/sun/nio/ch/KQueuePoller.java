@@ -105,15 +105,17 @@ class KQueuePoller extends Poller {
     @Override
     int poll(int timeout) throws IOException {
         int n = KQueue.poll(kqfd, address, maxEvents, timeout);
+        int polled = 0;
         int i = 0;
         while (i < n) {
             long keventAddress = KQueue.getEvent(address, i);
             int fdVal = KQueue.getDescriptor(keventAddress);
             if (fdVal != fd0) {
                 polled(fdVal);
+                polled++;
             }
             i++;
         }
-        return n;
+        return polled;
     }
 }
