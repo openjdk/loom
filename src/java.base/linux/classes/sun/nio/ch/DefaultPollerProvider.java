@@ -31,12 +31,18 @@ import jdk.internal.vm.ContinuationSupport;
  * Default PollerProvider for Linux.
  */
 class DefaultPollerProvider extends PollerProvider {
+    private static final boolean USE_IOURING;
+    static {
+        String s = System.getProperty("jdk.io_uring");
+        USE_IOURING = "".equals(s) || Boolean.parseBoolean(s);
+    }
+
     DefaultPollerProvider() { }
 
     @Override
     Poller.Mode defaultPollerMode() {
         if (ContinuationSupport.isSupported()) {
-            return Poller.Mode.VTHREAD_POLLERS;
+            return USE_IOURING ? Poller.Mode.PER_CARRIER : Poller.Mode.VTHREAD_POLLERS;
         } else {
             return Poller.Mode.SYSTEM_THREADS;
         }
@@ -54,11 +60,19 @@ class DefaultPollerProvider extends PollerProvider {
 
     @Override
     Poller readPoller(boolean subPoller) throws IOException {
-        return new EPollPoller(subPoller, true);
+        if (USE_IOURING) {
+            return new IoUringPoller(subPoller, true);
+        } else {
+            return new EPollPoller(subPoller, true);
+        }
     }
 
     @Override
     Poller writePoller(boolean subPoller) throws IOException {
-        return new EPollPoller(subPoller, false);
+        if (USE_IOURING) {
+            return new IoUringPoller(subPoller, false);
+        } else {
+            return new EPollPoller(subPoller, false);
+        }
     }
 }
