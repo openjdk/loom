@@ -39,6 +39,15 @@
  */
 
 /**
+ * @test id=io_uring
+ * @requires os.family == "linux"
+ * @library /test/lib
+ * @run junit/othervm -Djdk.pollerMode=1 -Djdk.io_uring=true BlockingChannelOps
+ * @run junit/othervm -Djdk.pollerMode=2 -Djdk.io_uring=true BlockingChannelOps
+ * @run junit/othervm -Djdk.pollerMode=3 -Djdk.io_uring=true BlockingChannelOps
+ */
+
+/**
  * @test id=no-vmcontinuations
  * @requires vm.continuations
  * @library /test/lib
