@@ -102,10 +102,8 @@ public class IoUring implements Closeable {
      * @param entries the size of the submission queue
      */
     public static IoUring create(int entries) throws IOException {
-        return new IoUring(entries );
+        return new IoUring(entries);
     }
-
-
 
     /**
      * For testing register_eventfd()
@@ -170,66 +168,58 @@ public class IoUring implements Closeable {
     }
 
     /**
-     * Blocks until some file descriptor is ready or an error
-     * has occurred.
+     * Poll and consume up to {@code max} completion events. If {@code block} is
+     * true then wait for completion events.
      *
-     * @param polled callback informed with the user data
-     *               and the error (if any) relating to it.
-     *               If the ring is closed while blocked
-     *               in this method, the callback will be
-     *               invoked with a data value of {@code -1}
-     *
-     * @return the number of events signalled. Will be {@code 1}
-     *         on success.
-     *
-     * @throws IOException Non fd specific errors are signaled
-     *         via exception
-     */
-    public int poll(BiConsumer<Long, Integer> polled) throws IOException {
-        return poll(polled, true);
-    }
-
-    /**
-     * Blocks until some file descriptor is ready or an error
-     * has occurred
-     *
-     * @param polled callback informed with the user data
+     * @param consumer callback informed with the user data
      *               and the error if one occurred.
      *               If the ring is closed while blocked
      *               in this method, the callback will be
      *               invoked with a data value of {@code -1}
      *
+     * @param max the maximum number of completion events to consume
+     *
      * @param block true if call should block waiting for event
      *              {@code false} if call should not block
      *
-     * @return the number of events signalled. Will be either
-     *         {@code 1} or {@code 0} if block is {@code false}.
+     * @return the number of events consumed, maybe be 0
      *
      * @throws IOException Non fd specific errors are signaled
      *         via exception
      */
-    public int poll(BiConsumer<Long, Integer> polled, boolean block)
-            throws IOException {
-        if (pollCompletionQueue(polled) == 1)
-            return 1;
-        if (!block)
-            return 0;
+    public int poll(BiConsumer<Long, Integer> consumer, int max, boolean block) throws IOException {
+        int polled = pollCompletionQueue(consumer, max);
+        if (polled > 0 || !block) {
+            return polled;
+        }
         impl.enter(0, 1, 0);
-        return pollCompletionQueue(polled); // should return 1
+        return pollCompletionQueue(consumer, max);
     }
 
     /**
-     * Poll the Completion Queue and returning 0 or 1
-     * if an event found and the completion consumer was called
+     * Poll and consume up to max completion events without waiting.
+     * @return the number of completion events consumed
      */
-    private int pollCompletionQueue(BiConsumer<Long, Integer> polled) {
+    private int pollCompletionQueue(BiConsumer<Long, Integer> consumer, int max) {
+        int polled = 0;
+        while (polled < max && pollCompletionQueue(consumer) > 0) {
+            polled++;
+        }
+        return polled;
+    }
+
+    /**
+     * Poll and consume a completion event without waiting.
+     * @return 1 if a completion event was consume, 0 if no completion event was consumed
+     */
+    private int pollCompletionQueue(BiConsumer<Long, Integer> consumer) {
         Cqe cqe = impl.pollCompletion();
         if (cqe == null) {
             return 0;
         }
         int res = cqe.res();
         long data = cqe.user_data();
-        polled.accept(data, res);
+        consumer.accept(data, res);
         return 1;
     }
 }

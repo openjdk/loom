@@ -40,8 +40,8 @@ import sun.nio.ch.iouring.IoUring;
 public class IoUringPoller extends Poller implements BiConsumer<Long, Integer> {
     private final int event;
     private final IoUring ring;
-    private final EventFD readyEvent;   // completions posted to CQ ring
-    private final EventFD wakeupEvent;
+    private final EventFD readyEvent;   // completion events posted to CQ ring
+    private final EventFD wakeupEvent;  // wakeup event, used for shutdown
     private final Cleanable cleaner;
 
     // used to coordinate access to submission queue
@@ -51,22 +51,34 @@ public class IoUringPoller extends Poller implements BiConsumer<Long, Integer> {
     private final Map<Integer, Thread> cancels = new ConcurrentHashMap<>();
 
     IoUringPoller(boolean subPoller, boolean read) throws IOException {
-        IoUring ring = IoUring.create();
+        IoUring ring = null;
+        EventFD wakeupEvent = null;
+        EventFD readyEvent = null;
+        try {
+            ring = IoUring.create();
 
-        if (subPoller) {
-            this.readyEvent = new EventFD();
-            ring.register_eventfd(readyEvent.efd());
-        } else {
-            this.readyEvent = null;
+            // need event to register with master poller
+            if (subPoller) {
+                readyEvent = new EventFD();
+                ring.register_eventfd(readyEvent.efd());
+            }
+
+            // register event with epoll to allow for wakeup
+            wakeupEvent = new EventFD();
+            int efd = wakeupEvent.efd();
+            IOUtil.configureBlocking(efd, false);
+            ring.poll_add(efd, Net.POLLIN, efd);
+        } catch (Throwable e) {
+            if (ring != null) ring.close();
+            if (readyEvent != null) readyEvent.close();
+            if (wakeupEvent != null) wakeupEvent.close();
+            throw e;
         }
-
-        this.wakeupEvent = new EventFD();
-        IOUtil.configureBlocking(wakeupEvent.efd(), false);
-        int efd = wakeupEvent.efd();
-        ring.poll_add(efd, Net.POLLIN, efd);
 
         this.event = (read) ? Net.POLLIN : Net.POLLOUT;
         this.ring = ring;
+        this.readyEvent = readyEvent;
+        this.wakeupEvent = wakeupEvent;
         this.cleaner = CleanerFactory.cleaner()
                 .register(this, releaser(ring, readyEvent, wakeupEvent));
     }
@@ -93,9 +105,8 @@ public class IoUringPoller extends Poller implements BiConsumer<Long, Integer> {
     int fdVal() {
         if (readyEvent == null) {
             throw new UnsupportedOperationException();
-        } else {
-            return readyEvent.efd();
         }
+        return readyEvent.efd();
     }
 
     @Override
@@ -138,7 +149,7 @@ public class IoUringPoller extends Poller implements BiConsumer<Long, Integer> {
             throw new UnsupportedOperationException();
         }
         boolean block = (timeout == -1);
-        return ring.poll(this, block);
+        return ring.poll(this, block ? 64 : 16, block);
     }
 
     @Override

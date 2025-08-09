@@ -40,18 +40,35 @@ class EPollPoller extends Poller {
     private final int event;
     private final int maxEvents;
     private final long address;
-    private final EventFD eventfd;  // wakeup
+    private final EventFD eventfd;  // wakeup event, used for shutdown
     private final Cleanable cleaner;
 
     EPollPoller(boolean subPoller, boolean read) throws IOException {
-        this.epfd = EPoll.create();
-        this.event = (read) ? EPOLLIN : EPOLLOUT;
-        this.maxEvents = (subPoller) ? 64 : 512;
-        this.address = EPoll.allocatePollArray(maxEvents);
+        int maxEvents = (subPoller) ? 16 : 64;
 
-        this.eventfd = new EventFD();
-        IOUtil.configureBlocking(eventfd.efd(), false);
-        EPoll.ctl(epfd, EPOLL_CTL_ADD, eventfd.efd(), EPOLLIN);
+        int epfd = -1;
+        long address = 0L;
+        EventFD eventfd = null;
+        try {
+            epfd = EPoll.create();
+            address = EPoll.allocatePollArray(maxEvents);
+
+            // register event with epoll to allow for wakeup
+            eventfd = new EventFD();
+            IOUtil.configureBlocking(eventfd.efd(), false);
+            EPoll.ctl(epfd, EPOLL_CTL_ADD, eventfd.efd(), EPOLLIN);
+        } catch (Throwable e) {
+            if (epfd >= 0) FileDispatcherImpl.closeIntFD(epfd);
+            if (address != 0L) EPoll.freePollArray(address);
+            if (eventfd != null) eventfd.close();
+            throw e;
+        }
+
+        this.epfd = epfd;
+        this.event = (read) ? EPOLLIN : EPOLLOUT;
+        this.maxEvents = maxEvents;
+        this.address = address;
+        this.eventfd = eventfd;
 
         this.cleaner = CleanerFactory.cleaner()
                 .register(this, releaser(epfd, address, eventfd));

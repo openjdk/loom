@@ -32,16 +32,24 @@ import static sun.nio.ch.WEPoll.*;
  */
 class WEPollPoller extends Poller {
     private static final int MAX_EVENTS_TO_POLL = 256;
-    private static final int ENOENT = 2;
 
     private final long handle;
     private final int event;
     private final long address;
 
     WEPollPoller(boolean read) throws IOException {
-        this.handle = WEPoll.create();
+        long handle =  WEPoll.create();
+        long address;
+        try {
+            address = WEPoll.allocatePollArray(MAX_EVENTS_TO_POLL);
+        } catch (Throwable e) {
+            WEPoll.close(handle);
+            throw e;
+        }
+
         this.event = (read) ? EPOLLIN : EPOLLOUT;
-        this.address = WEPoll.allocatePollArray(MAX_EVENTS_TO_POLL);
+        this.handle = handle;
+        this.address = address;
     }
 
     @Override
