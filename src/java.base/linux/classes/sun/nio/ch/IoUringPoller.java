@@ -107,8 +107,8 @@ public class IoUringPoller extends Poller implements BiConsumer<Long, Integer> {
     void implRegister(int fd) throws IOException {
         assert fd != 0;
         synchronized (submitLock) {
-            long data = fd;
-            ring.poll_add(fd, event, data);
+            // fd is the user data for IORING_OP_POLL_ADD requests
+            ring.poll_add(fd, event, fd);
         }
     }
 
@@ -117,8 +117,9 @@ public class IoUringPoller extends Poller implements BiConsumer<Long, Integer> {
         if (!polled && !isShutdown()) {
             cancels.put(fd, Thread.currentThread());
             synchronized (submitLock) {
-                long data = -fd;
-                ring.poll_remove(fd, data);
+                // fd is the user data for IORING_OP_POLL_ADD requests
+                // -fd is the user data for IORING_OP_POLL_REMOVE requests
+                ring.poll_remove(fd, -fd);
             }
             while (cancels.containsKey(fd) && !isShutdown()) {
                 LockSupport.park();
@@ -141,7 +142,8 @@ public class IoUringPoller extends Poller implements BiConsumer<Long, Integer> {
     }
 
     @Override
-    public void accept(Long data, Integer errno) {
+    public void accept(Long data, Integer res) {
+        // user data is fd or -fd
         int fd = data.intValue();
         if (fd > 0 && fd != wakeupEvent.efd()) {
             // poll done

@@ -25,6 +25,8 @@
 
 package sun.nio.ch.iouring;
 
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 import java.io.Closeable;
 import java.io.IOException;
 import java.time.Duration;
@@ -43,6 +45,8 @@ import static jdk.internal.ffi.generated.iouring.iouring_h_1.IORING_OP_POLL_REMO
  * the submitters.
  */
 public class IoUring implements Closeable {
+
+    private final long ADDRESS_SIZE = ValueLayout.ADDRESS.byteSize();
 
     private static final int SQ_ENTRIES = 5;
 
@@ -72,7 +76,7 @@ public class IoUring implements Closeable {
         // Seems safest to use the fd that we are about
         // to close anyway.
         try {
-            poll_remove(impl.ringFd(), -1);
+            //poll_remove(impl.ringFd(), -1);
             impl.close();
         } catch (IOException e) {}
     }
@@ -101,20 +105,7 @@ public class IoUring implements Closeable {
         return new IoUring(entries );
     }
 
-    /**
-     * Adds the given file descriptor to the iouring poller.
-     * Submission errors may be reported immediately.
-     */
-    public void poll_add(int sock, int events, long data) throws IOException {
-        Sqe sqe = new Sqe()
-                .opcode(IORING_OP_POLL_ADD())
-                .fd(sock)
-                .flags(IOSQE_IO_LINK())
-                .user_data(data)
-                .poll_events(events);
-        impl.submit(sqe);
-        enterNSubmissions(1);
-    }
+
 
     /**
      * For testing register_eventfd()
@@ -133,15 +124,33 @@ public class IoUring implements Closeable {
     }
 
     /**
-     * Removes the given file descriptor to the iouring poller.
+     * Submits a request to poll the given file descriptor. The request is tagged with
+     * the given user data.
      * Submission errors may be reported immediately.
      */
-    public void poll_remove(int sock, long data) throws IOException {
+    public void poll_add(int fd, int events, long udata) throws IOException {
+        Sqe sqe = new Sqe()
+                .opcode(IORING_OP_POLL_ADD())
+                .fd(fd)
+                .user_data(udata)
+                .poll_events(events);
+        impl.submit(sqe);
+        enterNSubmissions(1);
+    }
+
+    /**
+     * Submits a request to remove an existing poll request.
+     * Submission errors may be reported immediately.
+     * @param req_udata identifies the poll request
+     * @param udata the user data for the poll remove operation
+     */
+    public void poll_remove(long req_udata, long udata) throws IOException {
+        @SuppressWarnings("restricted")
+        MemorySegment address = MemorySegment.ofAddress(req_udata).reinterpret(ADDRESS_SIZE);
         Sqe sqe = new Sqe()
                 .opcode(IORING_OP_POLL_REMOVE())
-                .flags(IOSQE_IO_LINK())
-                .fd(sock)
-                .user_data(data);
+                .addr(address)
+                .user_data(udata);
         impl.submit(sqe);
         enterNSubmissions(1);
     }
