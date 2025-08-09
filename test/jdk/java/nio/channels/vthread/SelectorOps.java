@@ -34,6 +34,16 @@
  * @library /test/lib
  * @run junit/othervm/native -Djdk.pollerMode=1 --enable-native-access=ALL-UNNAMED SelectorOps
  * @run junit/othervm/native -Djdk.pollerMode=2 --enable-native-access=ALL-UNNAMED SelectorOps
+ * @run junit/othervm/native -Djdk.pollerMode=3 --enable-native-access=ALL-UNNAMED SelectorOps
+ */
+
+/*
+ * @test id=io_uring
+ * @requires os.family == "linux"
+ * @library /test/lib
+ * @run junit/othervm -Djdk.pollerMode=1 -Djdk.io_uring=true --enable-native-access=ALL-UNNAMED SelectorOps
+ * @run junit/othervm -Djdk.pollerMode=2 -Djdk.io_uring=true --enable-native-access=ALL-UNNAMED SelectorOps
+ * @run junit/othervm -Djdk.pollerMode=3 -Djdk.io_uring=true --enable-native-access=ALL-UNNAMED SelectorOps
  */
 
 /*
