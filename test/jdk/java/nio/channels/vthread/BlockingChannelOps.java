@@ -26,7 +26,7 @@
  * @bug 8284161
  * @summary Test virtual threads doing blocking I/O on NIO channels
  * @library /test/lib
- * @run junit BlockingChannelOps
+ * @run junit/othervm BlockingChannelOps
  */
 
 /**
@@ -74,13 +74,13 @@ import java.nio.channels.SocketChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 import java.util.stream.Stream;
 
 import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadScheduler;
 
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import static org.junit.jupiter.api.Assertions.*;
@@ -91,13 +91,9 @@ class BlockingChannelOps {
 
     @BeforeAll
     static void setup() {
-        threadPool = Executors.newCachedThreadPool();
+        ThreadFactory factory = Thread.ofPlatform().daemon().factory();
+        threadPool = Executors.newCachedThreadPool(factory);
         customScheduler = (_, task) -> threadPool.execute(task);
-    }
-
-    @AfterAll
-    static void finish() {
-        threadPool.shutdown();
     }
 
     /**
