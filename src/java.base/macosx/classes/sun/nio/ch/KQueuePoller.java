@@ -39,20 +39,40 @@ class KQueuePoller extends Poller {
     private final long address;
     private final Cleanable cleaner;
 
-    // file descriptors used for wakeup
+    // file descriptors used for wakeup during shutdown
     private final int fd0;
     private final int fd1;
 
     KQueuePoller(boolean subPoller, boolean read) throws IOException {
-        this.kqfd = KQueue.create();
-        this.filter = (read) ? EVFILT_READ : EVFILT_WRITE;
-        this.maxEvents = (subPoller) ? 64 : 512;
-        this.address = KQueue.allocatePollArray(maxEvents);
+        int maxEvents = (subPoller) ? 16 : 64;
 
-        long fds =  IOUtil.makePipe(false);
-        this.fd0 = (int) (fds >>> 32);
-        this.fd1 = (int) fds;
-        KQueue.register(kqfd, fd0, EVFILT_READ, EV_ADD);
+        int kqfd = -1;
+        long address = 0L;
+        int fd0 = -1;
+        int fd1 = -1;
+        try {
+            kqfd = KQueue.create();
+            address = KQueue.allocatePollArray(maxEvents);
+
+            // register one of the pipe with kqueue to allow for wakeup
+            long fds =  IOUtil.makePipe(false);
+            fd0 = (int) (fds >>> 32);
+            fd1 = (int) fds;
+            KQueue.register(kqfd, fd0, EVFILT_READ, EV_ADD);
+        } catch (Throwable e) {
+            if (kqfd >= 0) FileDispatcherImpl.closeIntFD(kqfd);
+            if (address != 0L) KQueue.freePollArray(address);
+            if (fd0 >= 0) FileDispatcherImpl.closeIntFD(fd0);
+            if (fd1 >= 0) FileDispatcherImpl.closeIntFD(fd1);
+            throw e;
+        }
+
+        this.kqfd = kqfd;
+        this.filter = (read) ? EVFILT_READ : EVFILT_WRITE;
+        this.maxEvents = maxEvents;
+        this.address = address;
+        this.fd0 = fd0;
+        this.fd1 = fd1;
 
         this.cleaner = CleanerFactory.cleaner()
                 .register(this, releaser(kqfd, address, fd0, fd1));

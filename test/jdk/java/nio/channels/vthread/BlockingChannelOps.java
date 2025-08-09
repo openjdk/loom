@@ -21,7 +21,7 @@
  * questions.
  */
 
-/**
+/*
  * @test id=default
  * @bug 8284161
  * @summary Test virtual threads doing blocking I/O on NIO channels
@@ -29,7 +29,7 @@
  * @run junit/othervm BlockingChannelOps
  */
 
-/**
+/*
  * @test id=poller-modes
  * @requires (os.family == "linux") | (os.family == "mac")
  * @library /test/lib
@@ -38,7 +38,7 @@
  * @run junit/othervm -Djdk.pollerMode=3 BlockingChannelOps
  */
 
-/**
+/*
  * @test id=io_uring
  * @requires os.family == "linux"
  * @library /test/lib
@@ -47,7 +47,7 @@
  * @run junit/othervm -Djdk.pollerMode=3 -Djdk.io_uring=true BlockingChannelOps
  */
 
-/**
+/*
  * @test id=no-vmcontinuations
  * @requires vm.continuations
  * @library /test/lib
