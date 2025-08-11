@@ -41,6 +41,9 @@ class EPollPoller extends Poller {
     private final int maxEvents;
     private final long address;
     private final EventFD eventfd;  // wakeup event, used for shutdown
+
+    // close action, and cleaner if this is subpoller
+    private final Runnable closer;
     private final Cleanable cleaner;
 
     EPollPoller(boolean subPoller, boolean read) throws IOException {
@@ -70,14 +73,19 @@ class EPollPoller extends Poller {
         this.address = address;
         this.eventfd = eventfd;
 
-        this.cleaner = CleanerFactory.cleaner()
-                .register(this, releaser(epfd, address, eventfd));
+        // create action to close epoll instance, register cleaner if this is a subpoller
+        this.closer = closer(epfd, address, eventfd);
+        if (subPoller) {
+            this.cleaner = CleanerFactory.cleaner().register(this, closer);
+        } else {
+            this.cleaner = null;
+        }
     }
 
     /**
-     * Releases the epoll instance and other resources.
+     * Returns an action to close the epoll instance and release other resources.
      */
-    private static Runnable releaser(int epfd, long address, EventFD eventfd) {
+    private static Runnable closer(int epfd, long address, EventFD eventfd) {
         return () -> {
             try {
                 FileDispatcherImpl.closeIntFD(epfd);
@@ -89,7 +97,11 @@ class EPollPoller extends Poller {
 
     @Override
     void close() {
-        cleaner.clean();
+        if (cleaner != null) {
+            cleaner.clean();
+        } else {
+            closer.run();
+        }
     }
 
     @Override

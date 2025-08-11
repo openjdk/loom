@@ -37,11 +37,14 @@ class KQueuePoller extends Poller {
     private final int filter;
     private final int maxEvents;
     private final long address;
-    private final Cleanable cleaner;
 
     // file descriptors used for wakeup during shutdown
     private final int fd0;
     private final int fd1;
+
+    // close action, and cleaner if this is subpoller
+    private final Runnable closer;
+    private final Cleanable cleaner;
 
     KQueuePoller(boolean subPoller, boolean read) throws IOException {
         int maxEvents = (subPoller) ? 16 : 64;
@@ -74,14 +77,19 @@ class KQueuePoller extends Poller {
         this.fd0 = fd0;
         this.fd1 = fd1;
 
-        this.cleaner = CleanerFactory.cleaner()
-                .register(this, releaser(kqfd, address, fd0, fd1));
+        // create action to close kqueue, register cleaner if this is a subpoller
+        this.closer = closer(kqfd, address, fd0, fd1);
+        if (subPoller) {
+            this.cleaner = CleanerFactory.cleaner().register(this, closer);
+        } else {
+            this.cleaner = null;
+        }
     }
 
     /**
-     * Releases the kqueue instance and other resources.
+     * Returns an action to close the kqueue and release other resources.
      */
-    private static Runnable releaser(int kqfd, long address, int fd0, int fd1) {
+    private static Runnable closer(int kqfd, long address, int fd0, int fd1) {
         return () -> {
             try {
                 FileDispatcherImpl.closeIntFD(kqfd);
@@ -94,7 +102,11 @@ class KQueuePoller extends Poller {
 
     @Override
     void close() {
-        cleaner.clean();
+        if (cleaner != null) {
+            cleaner.clean();
+        } else {
+            closer.run();
+        }
     }
 
     @Override
