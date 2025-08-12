@@ -81,7 +81,7 @@ public class IoUringPoller extends Poller {
                 ring.register_eventfd(readyEvent.efd());
             }
 
-            // register event with epoll to allow for wakeup
+            // register event with io_uring to allow for wakeup
             wakeupEvent = new EventFD();
             int efd = wakeupEvent.efd();
             IOUtil.configureBlocking(efd, false);
@@ -188,7 +188,7 @@ public class IoUringPoller extends Poller {
     }
 
     /**
-     * Poll up to max sockets without blocking. Also handles the the completion of any
+     * Poll up to max sockets without blocking. Also handles the completion of any
      * POLL_REMOVE operations.
      * @retutn the number of sockets polled
      */
