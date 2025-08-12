@@ -757,7 +757,7 @@ public abstract class Poller {
 
         @Override
         void pollSelector(int fdVal, long nanos) throws IOException {
-            poll(fdVal, Net.POLLIN, nanos, () -> true);
+            masterPoller.poll(fdVal, nanos, () -> true);
         }
 
         /**

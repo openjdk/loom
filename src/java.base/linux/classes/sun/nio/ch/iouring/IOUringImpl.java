@@ -79,12 +79,19 @@ public class IOUringImpl {
      * (or the next higher power of 2) is the size of the Submission Queue.
      * Currently, the completion queue returned will be double the size
      * of the Submission queue.
-     * <p>
-     * This constructor invokes {@code IOURing(entries, 0, -1)}
-     * </p>
      */
     public IOUringImpl(int entries) throws IOException {
-        this(entries, 0, -1);
+        this(entries, 0, 0, -1);
+    }
+
+    /**
+     * Creates an IOURing and initializes the ring structures.
+     * @param sq_entries the number of submission queue entries to allocate
+     * @param cq_entries the number of completion queue entries to allocate
+     * @throws IOException if an IOException occurs
+     */
+    public IOUringImpl(int sq_entries, int cq_entries) throws IOException {
+        this(sq_entries, cq_entries, 0, -1);
     }
 
     /**
@@ -92,19 +99,29 @@ public class IOUringImpl {
      * number of direct {@link ByteBuffer}s which are additionally mapped
      * into the kernel address space.
      *
-     * @param entries requested size of submission queue
+     * @param sq_entries the number of submission queue entries to allocate
+     * @param cq_entries the number of completion queue entries to allocate
      * @param nmappedBuffers number of mapped direct ByteBuffers to create
      * @param mappedBufsize size of each buffer in bytes
      * @throws IOException if an IOException occurs
      */
-    public IOUringImpl(int entries, int nmappedBuffers, int mappedBufsize)
-            throws IOException {
+    public IOUringImpl(int sq_entries,
+                       int cq_entries,
+                       int nmappedBuffers,
+                       int mappedBufsize) throws IOException {
         MemorySegment params_seg = getSegmentFor(io_uring_params.$LAYOUT());
+        if (cq_entries > 0) {
+            io_uring_params.cq_entries(params_seg, cq_entries);
+            int flags = io_uring_params.flags(params_seg) | IORING_SETUP_CQSIZE();
+            io_uring_params.flags(params_seg, flags);
+        }
+
         // call setup
-        fd = io_uring_setup(entries, params_seg);
+        fd = io_uring_setup(sq_entries, params_seg);
         if (fd < 0) {
             throw new IOException(errorString(fd));
         }
+
         mappedBuffers = new KMappedBuffers(nmappedBuffers, mappedBufsize);
         if (nmappedBuffers > 0) {
             mappedBuffers.register(fd);
@@ -117,9 +134,9 @@ public class IOUringImpl {
         int cq_off_cqes = io_cqring_offsets.cqes(cq_off_seg);
         int sq_off_array = io_sqring_offsets.array(sq_off_seg);
 
-        // Number of entries in each Q
-        int sq_entries = io_uring_params.sq_entries(params_seg);
-        int cq_entries = io_uring_params.cq_entries(params_seg);
+        // Acual number of entries in each Q
+        sq_entries = io_uring_params.sq_entries(params_seg);
+        cq_entries = io_uring_params.cq_entries(params_seg);
 
         int sq_size = sq_off_array + sq_entries * INT_SIZE;
         int cq_size = cq_off_cqes + cq_entries * (int)io_uring_cqe.sizeof();
