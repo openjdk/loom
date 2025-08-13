@@ -81,17 +81,18 @@ public class IOUringImpl {
      * of the Submission queue.
      */
     public IOUringImpl(int entries) throws IOException {
-        this(entries, 0, 0, -1);
+        this(entries, 0, 0);
     }
 
     /**
      * Creates an IOURing and initializes the ring structures.
      * @param sq_entries the number of submission queue entries to allocate
      * @param cq_entries the number of completion queue entries to allocate
+     * @param flags io_uring_params flags
      * @throws IOException if an IOException occurs
      */
-    public IOUringImpl(int sq_entries, int cq_entries) throws IOException {
-        this(sq_entries, cq_entries, 0, -1);
+    public IOUringImpl(int sq_entries, int cq_entries, int flags) throws IOException {
+        this(sq_entries, cq_entries, 0, 0, -1);
     }
 
     /**
@@ -101,18 +102,24 @@ public class IOUringImpl {
      *
      * @param sq_entries the number of submission queue entries to allocate
      * @param cq_entries the number of completion queue entries to allocate
+     * @param flags io_uring_params flags
      * @param nmappedBuffers number of mapped direct ByteBuffers to create
      * @param mappedBufsize size of each buffer in bytes
      * @throws IOException if an IOException occurs
      */
     public IOUringImpl(int sq_entries,
                        int cq_entries,
+                       int flags,
                        int nmappedBuffers,
                        int mappedBufsize) throws IOException {
         MemorySegment params_seg = getSegmentFor(io_uring_params.$LAYOUT());
+
         if (cq_entries > 0) {
             io_uring_params.cq_entries(params_seg, cq_entries);
-            int flags = io_uring_params.flags(params_seg) | IORING_SETUP_CQSIZE();
+            flags |= IORING_SETUP_CQSIZE();
+        }
+
+        if (flags != 0) {
             io_uring_params.flags(params_seg, flags);
         }
 

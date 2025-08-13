@@ -73,7 +73,7 @@ public class IoUringPoller extends Poller {
         EventFD wakeupEvent = null;
         EventFD readyEvent = null;
         try {
-            ring = new IOUringImpl(SQ_SIZE, CQ_SIZE);
+            ring = new IOUringImpl(SQ_SIZE, CQ_SIZE, 0);
 
             // need event to register with master poller
             if (subPoller) {
