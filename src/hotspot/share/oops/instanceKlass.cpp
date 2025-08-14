@@ -1117,7 +1117,7 @@ void InstanceKlass::initialize_super_interfaces(TRAPS) {
   }
 }
 
-using InitializationErrorTable = ResourceHashtable<const InstanceKlass*, OopHandle, 107, AnyObj::C_HEAP, mtClass>;
+using InitializationErrorTable = HashTable<const InstanceKlass*, OopHandle, 107, AnyObj::C_HEAP, mtClass>;
 static InitializationErrorTable* _initialization_error_table;
 
 void InstanceKlass::add_initialization_error(JavaThread* current, Handle exception) {
