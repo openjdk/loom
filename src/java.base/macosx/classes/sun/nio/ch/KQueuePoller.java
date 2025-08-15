@@ -49,21 +49,22 @@ class KQueuePoller extends Poller {
     KQueuePoller(boolean subPoller, boolean read) throws IOException {
         int maxEvents = (subPoller) ? 16 : 64;
 
-        int kqfd = -1;
+        int kqfd = KQueue.create();
         long address = 0L;
         int fd0 = -1;
         int fd1 = -1;
         try {
-            kqfd = KQueue.create();
             address = KQueue.allocatePollArray(maxEvents);
 
             // register one of the pipe with kqueue to allow for wakeup
-            long fds =  IOUtil.makePipe(false);
-            fd0 = (int) (fds >>> 32);
-            fd1 = (int) fds;
-            KQueue.register(kqfd, fd0, EVFILT_READ, EV_ADD);
+            if (subPoller) {
+                long fds = IOUtil.makePipe(false);
+                fd0 = (int) (fds >>> 32);
+                fd1 = (int) fds;
+                KQueue.register(kqfd, fd0, EVFILT_READ, EV_ADD);
+            }
         } catch (Throwable e) {
-            if (kqfd >= 0) FileDispatcherImpl.closeIntFD(kqfd);
+            FileDispatcherImpl.closeIntFD(kqfd);
             if (address != 0L) KQueue.freePollArray(address);
             if (fd0 >= 0) FileDispatcherImpl.closeIntFD(fd0);
             if (fd1 >= 0) FileDispatcherImpl.closeIntFD(fd1);
@@ -94,8 +95,8 @@ class KQueuePoller extends Poller {
             try {
                 FileDispatcherImpl.closeIntFD(kqfd);
                 KQueue.freePollArray(address);
-                FileDispatcherImpl.closeIntFD(fd0);
-                FileDispatcherImpl.closeIntFD(fd1);
+                if (fd0 >= 0) FileDispatcherImpl.closeIntFD(fd0);
+                if (fd1 >= 0) FileDispatcherImpl.closeIntFD(fd1);
             } catch (IOException _) { }
         };
     }
@@ -131,6 +132,9 @@ class KQueuePoller extends Poller {
 
     @Override
     void wakeupPoller() throws IOException {
+        if (fd1 < 0) {
+            throw new UnsupportedOperationException();
+        }
         IOUtil.write1(fd1, (byte)0);
     }
 
