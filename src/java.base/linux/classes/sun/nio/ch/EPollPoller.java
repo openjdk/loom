@@ -49,19 +49,20 @@ class EPollPoller extends Poller {
     EPollPoller(boolean subPoller, boolean read) throws IOException {
         int maxEvents = (subPoller) ? 16 : 64;
 
-        int epfd = -1;
+        int epfd = EPoll.create();
         long address = 0L;
         EventFD eventfd = null;
         try {
-            epfd = EPoll.create();
             address = EPoll.allocatePollArray(maxEvents);
 
             // register event with epoll to allow for wakeup
-            eventfd = new EventFD();
-            IOUtil.configureBlocking(eventfd.efd(), false);
-            EPoll.ctl(epfd, EPOLL_CTL_ADD, eventfd.efd(), EPOLLIN);
+            if (subPoller) {
+                eventfd = new EventFD();
+                IOUtil.configureBlocking(eventfd.efd(), false);
+                EPoll.ctl(epfd, EPOLL_CTL_ADD, eventfd.efd(), EPOLLIN);
+            }
         } catch (Throwable e) {
-            if (epfd >= 0) FileDispatcherImpl.closeIntFD(epfd);
+            FileDispatcherImpl.closeIntFD(epfd);
             if (address != 0L) EPoll.freePollArray(address);
             if (eventfd != null) eventfd.close();
             throw e;
@@ -90,7 +91,7 @@ class EPollPoller extends Poller {
             try {
                 FileDispatcherImpl.closeIntFD(epfd);
                 EPoll.freePollArray(address);
-                eventfd.close();
+                if (eventfd != null) eventfd.close();
             } catch (IOException _) { }
         };
     }
@@ -129,6 +130,9 @@ class EPollPoller extends Poller {
 
     @Override
     void wakeupPoller() throws IOException {
+        if (eventfd == null) {
+            throw new UnsupportedOperationException();
+        }
         eventfd.set();
     }
 
@@ -140,7 +144,7 @@ class EPollPoller extends Poller {
         while (i < n) {
             long eventAddress = EPoll.getEvent(address, i);
             int fd = EPoll.getDescriptor(eventAddress);
-            if (fd != eventfd.efd()) {
+            if (eventfd == null || fd != eventfd.efd()) {
                 polled(fd);
                 polled++;
             }

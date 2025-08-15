@@ -29,8 +29,10 @@ import java.lang.foreign.ValueLayout;
 import java.lang.ref.Cleaner.Cleanable;
 import java.io.IOException;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
 import java.util.concurrent.locks.LockSupport;
+import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.SharedSecrets;
 import jdk.internal.ref.CleanerFactory;
 import sun.nio.ch.iouring.IOUringImpl;
 import sun.nio.ch.iouring.Cqe;
@@ -43,10 +45,15 @@ import static jdk.internal.ffi.generated.iouring.iouring_h.IORING_OP_POLL_REMOVE
  */
 
 public class IoUringPoller extends Poller {
+    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
+
     private static final long ADDRESS_SIZE = ValueLayout.ADDRESS.byteSize();
 
+    // true to batch submits and reduce calls to io_using_enter
+    private static final boolean BATCH_SUBMITS = Boolean.getBoolean("jdk.io_uring.batchSubmits");
+
     // submition and completion queue sizes
-    private static final int SQ_SIZE = 8;
+    private static final int SQ_SIZE = 16;
     private static final int CQ_SIZE = Math.max(SQ_SIZE + 1, 1024);
 
     // max completion events to consume in a blocking poll and non-blocking subpoll
@@ -65,32 +72,36 @@ public class IoUringPoller extends Poller {
     // used to coordinate access to submission queue
     private final Object submitLock = new Object();
 
+    // queue of file descriptors that are pending a poll add to submit
+    private final BlockingQueue<Integer> pendingPollAdds;
+
     // maps file descriptor to Thread when cancelling poll
     private final Map<Integer, Thread> cancels = new ConcurrentHashMap<>();
 
+
     IoUringPoller(boolean subPoller, boolean read) throws IOException {
-        IOUringImpl ring = null;
+        IOUringImpl ring = new IOUringImpl(SQ_SIZE, CQ_SIZE, 0);
         EventFD wakeupEvent = null;
         EventFD readyEvent = null;
-        try {
-            ring = new IOUringImpl(SQ_SIZE, CQ_SIZE, 0);
 
-            // need event to register with master poller
-            if (subPoller) {
+        if (subPoller) {
+            try {
+                // event to allow registering with master poller
                 readyEvent = new EventFD();
                 ring.register_eventfd(readyEvent.efd());
-            }
 
-            // register event with io_uring to allow for wakeup
-            wakeupEvent = new EventFD();
-            int efd = wakeupEvent.efd();
-            IOUtil.configureBlocking(efd, false);
-            submitPollAdd(ring, efd, Net.POLLIN, efd);
-        } catch (Throwable e) {
-            if (ring != null) ring.close();
-            if (readyEvent != null) readyEvent.close();
-            if (wakeupEvent != null) wakeupEvent.close();
-            throw e;
+                // wakeup event to allow for shutdown
+                wakeupEvent = new EventFD();
+                int efd = wakeupEvent.efd();
+                IOUtil.configureBlocking(efd, false);
+                submitPollAdd(ring, efd, Net.POLLIN, efd);
+                enter(ring, 1);
+            } catch (Throwable e) {
+                ring.close();
+                if (readyEvent != null) readyEvent.close();
+                if (wakeupEvent != null) wakeupEvent.close();
+                throw e;
+            }
         }
 
         this.event = (read) ? Net.POLLIN : Net.POLLOUT;
@@ -105,6 +116,23 @@ public class IoUringPoller extends Poller {
         } else {
             this.cleaner = null;
         }
+
+        // optionally start the (per-carrier) submit thread to batch submits
+        if (subPoller && BATCH_SUBMITS) {
+            this.pendingPollAdds = new LinkedTransferQueue<>();
+
+            var scheduler = JLA.virtualThreadScheduler(Thread.currentThread());
+            Thread carrier = JLA.currentCarrierThread();
+            String name = carrier.getName() + "-Submitter";
+            @SuppressWarnings("restricted")
+            var _ = Thread.ofVirtual().scheduler(scheduler)
+                    .inheritInheritableThreadLocals(false)
+                    .name(name)
+                    .uncaughtExceptionHandler((_, e) -> e.printStackTrace())
+                    .start(this::submitLoop);
+        } else {
+            this.pendingPollAdds = null;
+        }
     }
 
     /**
@@ -115,7 +143,7 @@ public class IoUringPoller extends Poller {
             try {
                 ring.close();
                 if (readyEvent != null) readyEvent.close();
-                wakeupEvent.close();
+                if (wakeupEvent != null) wakeupEvent.close();
             } catch (IOException _) { }
         };
     }
@@ -145,9 +173,18 @@ public class IoUringPoller extends Poller {
     @Override
     void implRegister(int fd) throws IOException {
         assert fd != 0;
-        synchronized (submitLock) {
-            // fd is the user data for IORING_OP_POLL_ADD request
-            submitPollAdd(ring, fd, event, fd);
+
+        if (pendingPollAdds == null) {
+            // single submit
+            synchronized (submitLock) {
+                // fd is the user data for IORING_OP_POLL_ADD request
+                submitPollAdd(ring, fd, event, fd);
+                enter(ring, 1);
+            }
+        } else {
+            // queue request to submit in batch
+            boolean inserted = pendingPollAdds.offer(fd);
+            assert inserted;
         }
     }
 
@@ -155,11 +192,17 @@ public class IoUringPoller extends Poller {
     void implDeregister(int fd, boolean polled) throws IOException {
         if (!polled && !isShutdown()) {
             cancels.put(fd, Thread.currentThread());
+
             synchronized (submitLock) {
+                // submit pending requests to ensure OP_POLL_ADD consumed before OP_POLL_REMOVE
+                submitPendingPollAdds();
+
                 // fd was the user data for IORING_OP_POLL_ADD request
                 // -fd is the user data for IORING_OP_POLL_REMOVE request
                 submitPollRemove(ring, fd, -fd);
+                enter(ring, 1);
             }
+
             while (cancels.containsKey(fd) && !isShutdown()) {
                 LockSupport.park();
             }
@@ -168,7 +211,17 @@ public class IoUringPoller extends Poller {
 
     @Override
     void wakeupPoller() throws IOException {
+        if (wakeupEvent == null) {
+            throw new UnsupportedOperationException();
+        }
+
+        // causes subpoller to wakeup
         wakeupEvent.set();
+
+        // causes submit loop to wakeup
+        if (pendingPollAdds != null) {
+            pendingPollAdds.offer(0);
+        }
     }
 
     @Override
@@ -182,7 +235,10 @@ public class IoUringPoller extends Poller {
         if (polled > 0 || !block) {
             return polled;
         } else {
-            ring.enter(0, 1, 0);  // wait for at least one completion
+            int ret = ring.enter(0, 1, 0);  // wait for at least one completion
+            if (ret < 0) {
+                throw new IOException("io_uring_enter failed, ret=" + ret);
+            }
             return tryPoll(max);
         }
     }
@@ -198,7 +254,7 @@ public class IoUringPoller extends Poller {
         while (polled < max && ((cqe = ring.pollCompletion()) != null)) {
             // user data is fd or -fd
             int fd = (int) cqe.user_data();
-            if (fd > 0 && fd != wakeupEvent.efd()) {
+            if (fd > 0 && (wakeupEvent == null || fd != wakeupEvent.efd())) {
                 // poll done
                 polled(fd);
                 polled++;
@@ -214,6 +270,66 @@ public class IoUringPoller extends Poller {
     }
 
     /**
+     * Submits any pending requests.
+     */
+    private void submitPendingPollAdds() throws IOException {
+        assert Thread.holdsLock(submitLock);
+        if (pendingPollAdds != null) {
+            Integer next = pendingPollAdds.poll();
+            while (next != null) {
+                int fd = next.intValue();
+                if (fd != 0) {
+                    submitPollAdd(ring, fd, event, fd);
+                    enter(ring, 1);
+                }
+                next = pendingPollAdds.poll();
+            }
+        }
+    }
+
+    /**
+     * Submit loop to submit pending requests in batch, reducing calls to io_uring_enter.
+     */
+    private void submitLoop() {
+        try {
+            while (!isShutdown()) {
+                int fd = pendingPollAdds.take();
+                synchronized (submitLock) {
+                    int n = 0;
+                    if (fd != 0) {
+                        submitPollAdd(ring, fd, event, fd);
+                        n++;
+                    }
+                    Integer next;
+                    while (ring.sqfree() > 0 && ((next = pendingPollAdds.poll()) != null)) {
+                        fd = next.intValue();
+                        if (fd != 0) {
+                            submitPollAdd(ring, fd, event, fd);
+                            n++;
+                        }
+                    }
+                    if (n > 0) {
+                        enter(ring, n);
+                    }
+                }
+            }
+        } catch (Throwable e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Invoke io_uring_enter to submit the SQE entries
+     */
+    private static void enter(IOUringImpl ring, int n) throws IOException {
+        int ret = ring.enter(n, 0, 0);
+        if (ret < 0) {
+            throw new IOException("io_uring_enter failed, ret=" + ret);
+        }
+        assert ret == n;
+    }
+
+    /**
      * Submit IORING_OP_POLL_ADD operation.
      */
     private static void submitPollAdd(IOUringImpl ring,
@@ -226,10 +342,6 @@ public class IoUringPoller extends Poller {
                 .user_data(udata)
                 .poll_events(events);
         ring.submit(sqe);
-        int ret = ring.enter(1, 0, 0);  // submit 1
-        if (ret < 1) {
-            throw new IOException("io_uring_enter failed, ret=" + ret);
-        }
     }
 
     /**
@@ -247,9 +359,5 @@ public class IoUringPoller extends Poller {
                 .addr(address)
                 .user_data(udata);
         ring.submit(sqe);
-        int ret = ring.enter(1, 0, 0);  // submit 1
-        if (ret < 1) {
-            throw new IOException("io_uring_enter failed, ret=" + ret);
-        }
     }
 }

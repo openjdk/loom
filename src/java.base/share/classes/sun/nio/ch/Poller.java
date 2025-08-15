@@ -509,12 +509,10 @@ public abstract class Poller {
 
         VirtualThreadsPollerGroup(PollerProvider provider) throws IOException {
             super(provider);
-
-            var mode = Mode.VTHREAD_POLLERS;
             this.defaultReadPollerCount = pollerCount("jdk.readPollers",
-                    provider.defaultReadPollers(mode));
+                    provider.defaultReadPollers(Mode.VTHREAD_POLLERS));
             this.defaultWritePollerCount = pollerCount("jdk.writePollers",
-                    provider.defaultWritePollers(mode));
+                    provider.defaultWritePollers(Mode.VTHREAD_POLLERS));
             this.masterPoller = provider.readPoller(false);
         }
 
@@ -636,19 +634,13 @@ public abstract class Poller {
     }
 
     /**
-     * The poller group for the PER_CARRIER polling mode. A dedicated read poller is
-     * created for each carrier thread. When a virtual thread polls a file descriptor
-     * for POLLIN, then it will use (almost always, not guaranteed) to see the read
-     * poller for its carrier. The read poller terminates if carrier thread terminates.
-     * There is one system-wide (carrier agnostic) write poller.
+     * The poller group for the PER_CARRIER polling mode. A dedicated read poller
+     * (running in a virtual thread) is created for each carrier thread. When a virtual
+     * thread polls a file descriptor for POLLIN, then it will use (almost always, not
+     * guaranteed) the read poller for its carrier. The read poller terminates if carrier
+     * thread terminates. There is one system-wide (carrier agnostic) write poller.
      */
     private static class PerCarrierPollerGroup extends PollerGroup {
-        private static final boolean USE_SUBPOLLER;
-        static {
-            String s = System.getProperty("jdk.useSubPoller");
-            USE_SUBPOLLER = (s == null) || s.isEmpty() || Boolean.parseBoolean(s);
-        }
-
         private static final TerminatingThreadLocal<PerCarrierPollerGroup> POLLER_GROUP =
             new TerminatingThreadLocal<>() {
                 @Override
@@ -657,52 +649,40 @@ public abstract class Poller {
                 }
             };
 
-        // -XX:-VMContinuations or called from platform thread
-        private static final Thread PLACEHOLDER = new Thread();
+        private final Poller writePoller;
+        private final Poller masterPoller;
 
         // maps carrier thread to its read poller
         private final Map<Thread, Poller> READ_POLLERS = new ConcurrentHashMap<>();
 
-        private final Poller writePoller;
-        private final Poller masterPoller;
-
         PerCarrierPollerGroup(PollerProvider provider) throws IOException {
             super(provider);
-
             this.writePoller = provider.writePoller(false);
-            if (USE_SUBPOLLER) {
-                this.masterPoller = provider.readPoller(false);
-            } else {
-                this.masterPoller = null;
-            }
+            this.masterPoller = provider.readPoller(false);
         }
 
         @Override
         void start() {
             startPlatformThread("Write-Poller", writePoller::pollerLoop);
-            if (masterPoller != null) {
-                startPlatformThread("Master-Poller", masterPoller::pollerLoop);
-            }
+            startPlatformThread("Master-Poller", masterPoller::pollerLoop);
         }
 
         /**
-         * Starts a read poller with the given name.
+         * Starts a read sub-poller in a virtual thread.
          * @throws UncheckedIOException if an I/O error occurs
          */
-        private Poller startReadPoller(String name) {
+        private Poller startReadSubPoller() {
+            assert Thread.currentThread().isVirtual() && ContinuationSupport.isSupported();
+            var scheduler = JLA.virtualThreadScheduler(Thread.currentThread());
+            Thread carrier = JLA.currentCarrierThread();
             try {
-                Poller readPoller = provider().readPoller(USE_SUBPOLLER);
-                if (USE_SUBPOLLER) {
-                    var scheduler = JLA.virtualThreadScheduler(Thread.currentThread());
-                    @SuppressWarnings("restricted")
-                    var _ = Thread.ofVirtual().scheduler(scheduler)
-                            .inheritInheritableThreadLocals(false)
-                            .name(name)
-                            .uncaughtExceptionHandler((_, e) -> e.printStackTrace())
-                            .start(() -> subPollerLoop(readPoller));
-                } else {
-                    startPlatformThread(name, () -> pollLoop(readPoller));
-                }
+                Poller readPoller = provider().readPoller(true);
+                @SuppressWarnings("restricted")
+                var _ = Thread.ofVirtual().scheduler(scheduler)
+                        .inheritInheritableThreadLocals(false)
+                        .name(carrier.getName() + "-Read-Poller")
+                        .uncaughtExceptionHandler((_, e) -> e.printStackTrace())
+                        .start(() -> subPollerLoop(readPoller));
                 return readPoller;
             } catch (IOException ioe) {
                 throw new UncheckedIOException(ioe);
@@ -724,10 +704,7 @@ public abstract class Poller {
                 try {
                     Thread carrier = JLA.currentCarrierThread();
                     try {
-                        readPoller = READ_POLLERS.computeIfAbsent(carrier, _ -> {
-                            String name = carrier.getName() + "-Read-Poller";
-                            return startReadPoller(name);
-                        });
+                        readPoller = READ_POLLERS.computeIfAbsent(carrier, _ -> startReadSubPoller());
                     } catch (UncheckedIOException uioe) {
                         throw uioe.getCause();
                     }
@@ -737,21 +714,9 @@ public abstract class Poller {
                 }
                 // may execute on a different carrier
                 readPoller.poll(fdVal, nanos, isOpen);
-                return;
-            }
-
-            // -XX:-VMContinuations or called from platform thread
-            if (masterPoller != null) {
-                masterPoller.poll(fdVal, nanos, isOpen);
             } else {
-                Poller readPoller;
-                try {
-                    readPoller = READ_POLLERS.computeIfAbsent(PLACEHOLDER,
-                            _ -> startReadPoller("Read-Poller"));
-                } catch (UncheckedIOException uioe) {
-                    throw uioe.getCause();
-                }
-                readPoller.poll(fdVal, nanos, isOpen);
+                // -XX:-VMContinuations or called from platform thread
+                masterPoller.poll(fdVal, nanos, isOpen);
             }
         }
 
@@ -761,20 +726,7 @@ public abstract class Poller {
         }
 
         /**
-         * Read-poller polling loop.
-         */
-        private void pollLoop(Poller readPoller) {
-            try {
-                readPoller.pollerLoop();
-            } finally {
-                // wakeup all threads waiting on file descriptors registered with the
-                // read poller, these I/O operation will migrate to another carrier.
-                readPoller.wakeupAll();
-            }
-        }
-
-        /**
-         * Read-poll sub-poller polling loop.
+         * Sub-poller polling loop.
          */
         private void subPollerLoop(Poller readPoller) {
             try {
