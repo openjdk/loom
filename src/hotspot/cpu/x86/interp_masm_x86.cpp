@@ -370,6 +370,10 @@ void InterpreterMacroAssembler::call_VM_preemptable_helper(Register oop_result,
     cmpptr(Address(r15_thread, Thread::pending_exception_offset()), NULL_WORD);
     Label ok;
     jcc(Assembler::equal, ok);
+    // Exception stub expects return pc to be at top of stack. We only need
+    // it to check Interpreter::contains(return_address) so anything will do.
+    lea(rscratch1, resume_pc);
+    push(rscratch1);
     jump(RuntimeAddress(StubRoutines::forward_exception_entry()));
     bind(ok);
   }
