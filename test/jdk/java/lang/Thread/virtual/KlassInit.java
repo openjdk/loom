@@ -94,6 +94,7 @@ class KlassInit {
     static CountDownLatch finishNew = new CountDownLatch(1);
     static CountDownLatch finishGetStatic = new CountDownLatch(1);
     static CountDownLatch finishPutStatic = new CountDownLatch(1);
+    static CountDownLatch finishFailedInit = new CountDownLatch(1);
 
     /**
      * Test that threads blocked waiting for klass to be initialized
@@ -426,6 +427,45 @@ class KlassInit {
             Arguments.of(30000, (Runnable) TestClass30000::m, finishInterrupt30000),
             Arguments.of(Integer.MAX_VALUE, (Runnable) TestClassMax::m, finishInterruptMax)
         );
+    }
+
+    /**
+     * Test case of threads blocked waiting for klass to be initialized
+     * when the klass initialization fails.
+     */
+    @Test
+    void testReleaseAtKlassInitFailedInit() throws Exception {
+        class TestClass {
+            static int[] a = {1, 2, 3};
+            static {
+                try {
+                    finishFailedInit.await();
+                    a[3] = 4;
+                } catch(InterruptedException e) {}
+            }
+            static void m() {
+            }
+        }
+
+        Thread[] vthreads = new Thread[MAX_VTHREAD_COUNT];
+        CountDownLatch[] started = new CountDownLatch[MAX_VTHREAD_COUNT];
+        for (int i = 0; i < MAX_VTHREAD_COUNT; i++) {
+            final int id = i;
+            started[i] = new CountDownLatch(1);
+            vthreads[i] = Thread.ofVirtual().start(() -> {
+                started[id].countDown();
+                TestClass.m();
+            });
+        }
+        for (int i = 0; i < MAX_VTHREAD_COUNT; i++) {
+            started[i].await();
+            await(vthreads[i], Thread.State.WAITING);
+        }
+
+        finishFailedInit.countDown();
+        for (int i = 0; i < MAX_VTHREAD_COUNT; i++) {
+            vthreads[i].join();
+        }
     }
 
     /**
