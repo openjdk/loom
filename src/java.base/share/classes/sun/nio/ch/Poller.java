@@ -137,12 +137,16 @@ public abstract class Poller {
      * that are scheduled with a custom virtual therad scheduler.
      */
     private static PollerGroup customSchedulerPollerGroup() {
-        try {
-            var group = new PollerPerCarrierPollerGroup(1);
-            group.start();
-            return group;
-        } catch (IOException ioe) {
-            throw new UncheckedIOException(ioe);
+        if (PROVIDER.supportsPollerMode(Mode.POLLER_PER_CARRIER)) {
+            try {
+                var group = new PollerPerCarrierPollerGroup(1);
+                group.start();
+                return group;
+            } catch (IOException ioe) {
+                throw new UncheckedIOException(ioe);
+            }
+        } else {
+            return DEFAULT_POLLER_GROUP;
         }
     }
 
