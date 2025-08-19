@@ -78,7 +78,6 @@ public class IoUringPoller extends Poller {
     // maps file descriptor to Thread when cancelling poll
     private final Map<Integer, Thread> cancels = new ConcurrentHashMap<>();
 
-
     IoUringPoller(boolean subPoller, boolean read) throws IOException {
         IOUringImpl ring = new IOUringImpl(SQ_SIZE, CQ_SIZE, 0);
         EventFD wakeupEvent = null;
@@ -172,7 +171,7 @@ public class IoUringPoller extends Poller {
 
     @Override
     void implRegister(int fd) throws IOException {
-        assert fd != 0;
+        assert fd > 0;  // fd == 0 used for wakeup
 
         if (pendingPollAdds == null) {
             // single submit
@@ -227,6 +226,7 @@ public class IoUringPoller extends Poller {
     @Override
     int poll(int timeout) throws IOException {
         if (timeout > 0) {
+            // timed polls not supported by this Poller
             throw new UnsupportedOperationException();
         }
         boolean block = (timeout == -1);
@@ -270,19 +270,29 @@ public class IoUringPoller extends Poller {
     }
 
     /**
-     * Submits any pending requests.
+     * Submits any pending requests. For use during cancellation to ensure that
+     * pending requests are consumed before another request is submitted.
      */
     private void submitPendingPollAdds() throws IOException {
         assert Thread.holdsLock(submitLock);
         if (pendingPollAdds != null) {
+            boolean stoleWakeup = false;
             Integer next = pendingPollAdds.poll();
             while (next != null) {
                 int fd = next.intValue();
-                if (fd != 0) {
+                if (fd == 0) {
+                    stoleWakeup = true;
+                } else {
+                    assert fd > 0;
                     submitPollAdd(ring, fd, event, fd);
                     enter(ring, 1);
                 }
                 next = pendingPollAdds.poll();
+            }
+
+            // return fd 0 to the pending requests if taken here
+            if (stoleWakeup) {
+                pendingPollAdds.offer(0);
             }
         }
     }
@@ -294,16 +304,18 @@ public class IoUringPoller extends Poller {
         try {
             while (!isShutdown()) {
                 int fd = pendingPollAdds.take();
+                assert fd >= 0;
                 synchronized (submitLock) {
                     int n = 0;
-                    if (fd != 0) {
+                    if (fd > 0) {
                         submitPollAdd(ring, fd, event, fd);
                         n++;
                     }
                     Integer next;
                     while (ring.sqfree() > 0 && ((next = pendingPollAdds.poll()) != null)) {
                         fd = next.intValue();
-                        if (fd != 0) {
+                        assert fd >= 0;
+                        if (fd > 0) {
                             submitPollAdd(ring, fd, event, fd);
                             n++;
                         }

@@ -27,16 +27,19 @@ package sun.nio.ch;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.lang.ref.Reference;
+import java.lang.Thread.VirtualThreadScheduler;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.misc.InnocuousThread;
@@ -52,22 +55,20 @@ import jdk.internal.vm.annotation.Stable;
 public abstract class Poller {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
-    private static final PollerGroup POLLER_GROUP;
-    static {
-        try {
-            PollerProvider provider = PollerProvider.provider();
-            Mode mode = pollerMode(provider.defaultPollerMode());
-            PollerGroup group = switch (mode) {
-                case SYSTEM_THREADS -> new SystemThreadsPollerGroup(provider);
-                case VTHREAD_POLLERS -> new VirtualThreadsPollerGroup(provider);
-                case PER_CARRIER -> new PerCarrierPollerGroup(provider);
-            };
-            group.start();
-            POLLER_GROUP = group;
-        } catch (IOException ioe) {
-            throw new ExceptionInInitializerError(ioe);
-        }
-    }
+    private static final PollerProvider PROVIDER = PollerProvider.provider();
+
+    // no default scheduler with -XX:-VMContinuations
+    private static final VirtualThreadScheduler DEFAULT_SCHEDULER =
+            ContinuationSupport.isSupported()
+                    ? JLA.defaultVirtualThreadScheduler()
+                    : null;
+
+    // PollerGroup for the default virtual thread scheduler
+    private static final PollerGroup DEFAULT_POLLER_GROUP = defaultPollerGroup();
+
+    // PollerGroup for virtual threads scheduled by custom schedulers
+    private static final Supplier<PollerGroup> CUSTOM_SCHEDULER_POLLER_GROUP =
+            StableValue.supplier(Poller::customSchedulerPollerGroup);
 
     // the poller or sub-poller thread
     private @Stable Thread owner;
@@ -83,14 +84,14 @@ public abstract class Poller {
      */
     enum Mode {
         /**
-         * ReadPoller and WritePoller are dedicated platform threads that block waiting
-         * for events and unpark virtual threads when file descriptors are ready for I/O.
+         * Read and write pollers are platform threads that block waiting for events and
+         * unpark virtual threads when file descriptors are ready for I/O.
          */
         SYSTEM_THREADS,
 
         /**
-         * ReadPoller and WritePoller threads are virtual threads that poll for events,
-         * yielding between polls and unparking virtual threads when file descriptors are
+         * Read and write pollers are virtual threads that poll for events, yielding
+         * between polls and unparking virtual threads when file descriptors are
          * ready for I/O. If there are no events then the poller threads park until there
          * are I/O events to poll. This mode helps to integrate polling with virtual
          * thread scheduling. The approach is similar to the default scheme in "User-level
@@ -100,10 +101,49 @@ public abstract class Poller {
         VTHREAD_POLLERS,
 
         /**
-         * A dedicated ReadPoller is created for each carrier thread.
-         * There is one system-wide (carrier agnostic) WritePoller.
+         * Read pollers are per-carrier virtual threads that poll for events, yielding
+         * between polls and unparking virtual threads when file descriptors are ready
+         * for I/O. If there are no events then the poller threads park until there
+         * are I/O events to poll. The write poller is a system-wide platform thread.
          */
-        PER_CARRIER
+        POLLER_PER_CARRIER
+    }
+
+    /**
+     * Create and return the PollerGroup to use when polling with virtual threads
+     * that are scheduled with the default virtual thread scheduler.
+     */
+    private static PollerGroup defaultPollerGroup() {
+        try {
+            Mode mode = pollerMode(PROVIDER.defaultPollerMode());
+            PollerGroup group = switch (mode) {
+                case SYSTEM_THREADS     -> new SystemThreadsPollerGroup();
+                case VTHREAD_POLLERS    -> new VThreadsPollerGroup();
+                case POLLER_PER_CARRIER -> {
+                    int defaultWritePollers = PROVIDER.defaultWritePollers(Mode.POLLER_PER_CARRIER);
+                    int writePollers = pollerCount("jdk.writePollers", defaultWritePollers);
+                    yield new PollerPerCarrierPollerGroup(writePollers);
+                }
+            };
+            group.start();
+            return group;
+        } catch (IOException ioe) {
+            throw new UncheckedIOException(ioe);
+        }
+    }
+
+    /**
+     * Create and return the PollerGroup to use when polling with virtual threads
+     * that are scheduled with a custom virtual therad scheduler.
+     */
+    private static PollerGroup customSchedulerPollerGroup() {
+        try {
+            var group = new PollerPerCarrierPollerGroup(1);
+            group.start();
+            return group;
+        } catch (IOException ioe) {
+            throw new UncheckedIOException(ioe);
+        }
     }
 
     /**
@@ -202,6 +242,19 @@ public abstract class Poller {
     }
 
     /**
+     * Returns the PollerGroup to use for the current thread.
+     */
+    private static PollerGroup pollerGroup() {
+        if (Thread.currentThread().isVirtual()
+                && ContinuationSupport.isSupported()
+                && JLA.virtualThreadScheduler(Thread.currentThread()) != DEFAULT_SCHEDULER) {
+            return CUSTOM_SCHEDULER_POLLER_GROUP.get();
+        } else {
+            return DEFAULT_POLLER_GROUP;
+        }
+    }
+
+    /**
      * Parks the current thread until a file descriptor is ready for the given op.
      * @param fdVal the file descriptor
      * @param event POLLIN or POLLOUT
@@ -209,7 +262,7 @@ public abstract class Poller {
      * @param isOpen supplies a boolean to indicate if the enclosing object is open
      */
     static void poll(int fdVal, int event, long nanos, BooleanSupplier isOpen) throws IOException {
-        POLLER_GROUP.poll(fdVal, event, nanos, isOpen);
+        pollerGroup().poll(fdVal, event, nanos, isOpen);
     }
 
     /**
@@ -218,7 +271,7 @@ public abstract class Poller {
      * @param nanos the waiting time or 0 to wait indefinitely
      */
     static void pollSelector(int fdVal, long nanos) throws IOException {
-        POLLER_GROUP.pollSelector(fdVal, nanos);
+        pollerGroup().pollSelector(fdVal, nanos);
     }
 
     /**
@@ -337,15 +390,7 @@ public abstract class Poller {
      * A group of poller threads that support virtual threads polling file descriptors.
      */
     private static abstract class PollerGroup {
-        private final PollerProvider provider;
-
-        PollerGroup(PollerProvider provider) {
-            this.provider = provider;
-        }
-
-        PollerProvider provider() {
-            return provider;
-        }
+        PollerGroup() { }
 
         /**
          * Starts the poller group and any system-wide poller threads.
@@ -375,46 +420,56 @@ public abstract class Poller {
         }
 
         /**
-         * Return the master poller for default scheduler, or null if no master poller.
+         * Return the master poller, or null if no master poller.
          */
-        abstract Poller defaultMasterPoller();
+        abstract Poller masterPoller();
 
         /**
-         * Return the read pollers for the default scheduler.
+         * Return the read pollers.
          */
-        abstract List<Poller> defaultReadPollers();
+        abstract List<Poller> readPollers();
 
         /**
-         * Return the write pollers for the default scheduler.
+         * Return the write pollers.
          */
-        abstract List<Poller> defaultWritePollers();
+        abstract List<Poller> writePollers();
+
+        /**
+         * Close the given pollers.
+         */
+        static void closeAll(Poller... pollers) {
+            for (Poller poller : pollers) {
+                if (poller != null) {
+                    try {
+                        poller.close();
+                    } catch (IOException _) { }
+                }
+            }
+        }
     }
 
     /**
-     * The poller group for the SYSTEM_THREADS polling mode. The read and write pollers
-     * are system-wide (scheduler agnostic) platform threads.
+     * SYSTEM_THREADS poller group. The read and write pollers are system-wide platform threads.
      */
     private static class SystemThreadsPollerGroup extends PollerGroup {
         // system-wide read and write pollers
         private final Poller[] readPollers;
         private final Poller[] writePollers;
 
-        SystemThreadsPollerGroup(PollerProvider provider) throws IOException {
-            super(provider);
-
+        SystemThreadsPollerGroup() throws IOException {
             int readPollerCount = pollerCount("jdk.readPollers",
-                    provider.defaultReadPollers(Mode.SYSTEM_THREADS));
+                    PROVIDER.defaultReadPollers(Mode.SYSTEM_THREADS));
             int writePollerCount = pollerCount("jdk.writePollers",
-                    provider.defaultWritePollers(Mode.SYSTEM_THREADS));
+                    PROVIDER.defaultWritePollers(Mode.SYSTEM_THREADS));
 
             Poller[] readPollers = new Poller[readPollerCount];
             Poller[] writePollers = new Poller[writePollerCount];
             try {
                 for (int i = 0; i < readPollerCount; i++) {
-                    readPollers[i] = provider.readPoller(false);
+                    readPollers[i] = PROVIDER.readPoller(false);
                 }
                 for (int i = 0; i < writePollerCount; i++) {
-                    writePollers[i] = provider.writePoller(false);
+                    writePollers[i] = PROVIDER.writePoller(false);
                 }
             } catch (Throwable e) {
                 closeAll(readPollers);
@@ -426,22 +481,6 @@ public abstract class Poller {
             this.writePollers = writePollers;
         }
 
-        /**
-         * Close the given pollers.
-         */
-        private static void closeAll(Poller... pollers) {
-            for (Poller poller : pollers) {
-                if (poller != null) {
-                    try {
-                        poller.close();
-                    } catch (IOException _) { }
-                }
-            }
-        }
-
-        /**
-         * Start poller threads.
-         */
         @Override
         void start() {
             Arrays.stream(readPollers).forEach(p -> {
@@ -453,12 +492,12 @@ public abstract class Poller {
         }
 
         private Poller readPoller(int fdVal) {
-            int index = provider().fdValToIndex(fdVal, readPollers.length);
+            int index = PROVIDER.fdValToIndex(fdVal, readPollers.length);
             return readPollers[index];
         }
 
         private Poller writePoller(int fdVal) {
-            int index = provider().fdValToIndex(fdVal, writePollers.length);
+            int index = PROVIDER.fdValToIndex(fdVal, writePollers.length);
             return writePollers[index];
         }
 
@@ -471,129 +510,93 @@ public abstract class Poller {
         }
 
         @Override
-        Poller defaultMasterPoller() {
+        Poller masterPoller() {
             return null;
         }
 
         @Override
-        List<Poller> defaultReadPollers() {
+        List<Poller> readPollers() {
             return List.of(readPollers);
         }
 
         @Override
-        List<Poller> defaultWritePollers() {
+        List<Poller> writePollers() {
             return List.of(writePollers);
         }
     }
 
     /**
-     * The poller group for the VTHREAD_POLLERS poller mode. The read and write pollers
-     * are scheduler-specific virtual threads. The default scheduler may have many read
-     * and write pollers. Custom schedulers have one read poller and one write poller.
-     * When read and write pollers must block then they register with a system-wide
-     * (scheduler agnostic) "master poller" that runs in a dedicated platform thread.
+     * VTHREAD_POLLERS poller group. The read and write pollers are virtual threads.
+     * When read and write pollers need to block then they register with a system-wide
+     * "master poller" that runs in a dedicated platform thread.
      */
-    private static class VirtualThreadsPollerGroup extends PollerGroup {
-        private static final Thread.VirtualThreadScheduler DEFAULT_SCHEDULER = JLA.defaultVirtualThreadScheduler();
-
-        // system-wide master poller
+    private static class VThreadsPollerGroup extends PollerGroup {
+        private final Poller[] readPollers;
+        private final Poller[] writePollers;
         private final Poller masterPoller;
 
-        // number of read and write pollers for default scheduler
-        private final int defaultReadPollerCount;
-        private final int defaultWritePollerCount;
+        // keep virtual thread pollers alive
+        private final Executor executor;
 
-        // maps scheduler to a set of read and write pollers
-        private record Pollers(ExecutorService executor, Poller[] readPollers, Poller[] writePollers) { }
-        private final Map<Thread.VirtualThreadScheduler, Pollers> POLLERS = new ConcurrentHashMap<>();
-
-        VirtualThreadsPollerGroup(PollerProvider provider) throws IOException {
-            super(provider);
-            this.defaultReadPollerCount = pollerCount("jdk.readPollers",
-                    provider.defaultReadPollers(Mode.VTHREAD_POLLERS));
-            this.defaultWritePollerCount = pollerCount("jdk.writePollers",
-                    provider.defaultWritePollers(Mode.VTHREAD_POLLERS));
-            this.masterPoller = provider.readPoller(false);
-        }
-
-        @Override
-        void start() {
-            startPlatformThread("Master-Poller", masterPoller::pollerLoop);
-        }
-
-        /**
-         * Create the read and write pollers for the given scheduler.
-         */
-        private Pollers createPollers(Thread.VirtualThreadScheduler scheduler) {
-            int readPollerCount;
-            int writePollerCount;
-            if (scheduler == DEFAULT_SCHEDULER) {
-                readPollerCount = defaultReadPollerCount;
-                writePollerCount = defaultWritePollerCount;
-            } else {
-                readPollerCount = 1;
-                writePollerCount = 1;
-            }
+        VThreadsPollerGroup() throws IOException {
+            int readPollerCount = pollerCount("jdk.readPollers",
+                    PROVIDER.defaultReadPollers(Mode.VTHREAD_POLLERS));
+            int writePollerCount = pollerCount("jdk.writePollers",
+                    PROVIDER.defaultWritePollers(Mode.VTHREAD_POLLERS));
 
             Poller[] readPollers = new Poller[readPollerCount];
             Poller[] writePollers = new Poller[writePollerCount];
+            Poller masterPoller = PROVIDER.readPoller(false);
             try {
                 for (int i = 0; i < readPollerCount; i++) {
-                    readPollers[i] = provider().readPoller(true);
+                    readPollers[i] = PROVIDER.readPoller(true);
                 }
                 for (int i = 0; i < writePollerCount; i++) {
-                    writePollers[i] = provider().writePoller(true);
+                    writePollers[i] = PROVIDER.writePoller(true);
                 }
-            } catch (IOException ioe) {
+            } catch (Throwable e) {
+                masterPoller.close();
                 closeAll(readPollers);
                 closeAll(writePollers);
-                throw new UncheckedIOException(ioe);
+                throw e;
             }
 
-            @SuppressWarnings("restricted")
+            this.readPollers = readPollers;
+            this.writePollers = writePollers;
+            this.masterPoller = masterPoller;
+
             ThreadFactory factory = Thread.ofVirtual()
-                    .scheduler(scheduler)
                     .inheritInheritableThreadLocals(false)
                     .name("SubPoller-", 0)
                     .uncaughtExceptionHandler((_, e) -> e.printStackTrace())
                     .factory();
-            ExecutorService executor = Executors.newThreadPerTaskExecutor(factory);
+            this.executor = Executors.newThreadPerTaskExecutor(factory);
+        }
 
+        @Override
+        void start() {
             Arrays.stream(readPollers).forEach(p -> {
                 executor.execute(() -> p.subPollerLoop(masterPoller));
             });
             Arrays.stream(writePollers).forEach(p -> {
                 executor.execute(() -> p.subPollerLoop(masterPoller));
             });
+            startPlatformThread("Master-Poller", masterPoller::pollerLoop);
+        }
 
-            return new Pollers(executor, readPollers, writePollers);
+        private Poller readPoller(int fdVal) {
+            int index = PROVIDER.fdValToIndex(fdVal, readPollers.length);
+            return readPollers[index];
+        }
+
+        private Poller writePoller(int fdVal) {
+            int index = PROVIDER.fdValToIndex(fdVal, writePollers.length);
+            return writePollers[index];
         }
 
         @Override
         void poll(int fdVal, int event, long nanos, BooleanSupplier isOpen) throws IOException {
-            Thread.VirtualThreadScheduler scheduler;
-            if (Thread.currentThread().isVirtual()) {
-                scheduler = JLA.virtualThreadScheduler(Thread.currentThread());
-            } else {
-                scheduler = DEFAULT_SCHEDULER;
-            }
-            Pollers pollers;
-            try {
-                pollers = POLLERS.computeIfAbsent(scheduler, _ -> createPollers(scheduler));
-            } catch (UncheckedIOException uioe) {
-                throw uioe.getCause();
-            }
-
-            Poller poller;
-            if (event == Net.POLLIN) {
-                Poller[] readPollers = pollers.readPollers();
-                int index = provider().fdValToIndex(fdVal, readPollers.length);
-                poller = readPollers[index];
-            } else {
-                Poller[] writePollers = pollers.writePollers();
-                int index = provider().fdValToIndex(fdVal, writePollers.length);
-                poller = writePollers[index];
-            }
+            Poller poller = (event == Net.POLLIN) ? readPoller(fdVal) : writePoller(fdVal);
             poller.poll(fdVal, nanos, isOpen);
         }
 
@@ -602,113 +605,118 @@ public abstract class Poller {
             masterPoller.poll(fdVal, nanos, () -> true);
         }
 
-        /**
-         * Close the given pollers.
-         */
-        private static void closeAll(Poller... pollers) {
-            for (Poller poller : pollers) {
-                if (poller != null) {
-                    try {
-                        poller.close();
-                    } catch (IOException _) { }
-                }
-            }
-        }
-
         @Override
-        Poller defaultMasterPoller() {
+        Poller masterPoller() {
             return masterPoller;
         }
 
         @Override
-        List<Poller> defaultReadPollers() {
-            Pollers pollers = POLLERS.get(DEFAULT_SCHEDULER);
-            return (pollers != null) ? List.of(pollers.readPollers()) : List.of();
+        List<Poller> readPollers() {
+            return List.of(readPollers);
         }
 
         @Override
-        List<Poller> defaultWritePollers() {
-            Pollers pollers = POLLERS.get(DEFAULT_SCHEDULER);
-            return (pollers != null) ? List.of(pollers.writePollers()) : List.of();
+        List<Poller> writePollers() {
+            return List.of(writePollers);
         }
     }
 
     /**
-     * The poller group for the PER_CARRIER polling mode. A dedicated read poller
-     * (running in a virtual thread) is created for each carrier thread. When a virtual
-     * thread polls a file descriptor for POLLIN, then it will use (almost always, not
-     * guaranteed) the read poller for its carrier. The read poller terminates if carrier
-     * thread terminates. There is one system-wide (carrier agnostic) write poller.
+     * POLLER_PER_CARRIER poller group. The read poller is a per-carrier virtual thread.
+     * When a virtual thread polls a file descriptor for POLLIN, then it will use (almost
+     * always, not guaranteed) the read poller for its carrier. When a read poller needs
+     * to block then it registers with a system-wide "master poller" that runs in a
+     * dedicated platform thread. The read poller terminates if the carrier terminates.
+     * The write pollers are system-wide platform threads (usually one).
      */
-    private static class PerCarrierPollerGroup extends PollerGroup {
-        private static final TerminatingThreadLocal<PerCarrierPollerGroup> POLLER_GROUP =
+    private static class PollerPerCarrierPollerGroup extends PollerGroup {
+        private record CarrierPoller(PollerPerCarrierPollerGroup group, Poller readPoller) { }
+        private static final TerminatingThreadLocal<CarrierPoller> CARRIER_POLLER =
             new TerminatingThreadLocal<>() {
                 @Override
-                protected void threadTerminated(PerCarrierPollerGroup pollerGroup) {
-                    pollerGroup.carrierTerminated();
+                protected void threadTerminated(CarrierPoller carrierPoller) {
+                    Poller readPoller = carrierPoller.readPoller();
+                    carrierPoller.group().carrierTerminated(readPoller);
                 }
             };
 
-        private final Poller writePoller;
+        private final Set<Poller> readPollers = ConcurrentHashMap.newKeySet();
+        private final Poller[] writePollers;
         private final Poller masterPoller;
 
-        // maps carrier thread to its read poller
-        private final Map<Thread, Poller> READ_POLLERS = new ConcurrentHashMap<>();
+        PollerPerCarrierPollerGroup(int writePollerCount) throws IOException {
+            Poller[] writePollers = new Poller[writePollerCount];
+            Poller masterPoller = PROVIDER.readPoller(false);
+            try {
+                for (int i = 0; i < writePollerCount; i++) {
+                    writePollers[i] = PROVIDER.writePoller(false);
+                }
+            } catch (Throwable e) {
+                masterPoller.close();
+                closeAll(writePollers);
+                throw e;
+            }
 
-        PerCarrierPollerGroup(PollerProvider provider) throws IOException {
-            super(provider);
-            this.writePoller = provider.writePoller(false);
-            this.masterPoller = provider.readPoller(false);
+            this.writePollers = writePollers;
+            this.masterPoller = masterPoller;
         }
 
         @Override
         void start() {
-            startPlatformThread("Write-Poller", writePoller::pollerLoop);
+            Arrays.stream(writePollers).forEach(p -> {
+                startPlatformThread("Write-Poller", p::pollerLoop);
+            });
             startPlatformThread("Master-Poller", masterPoller::pollerLoop);
+        }
+
+        private Poller writePoller(int fdVal) {
+            int index = PROVIDER.fdValToIndex(fdVal, writePollers.length);
+            return writePollers[index];
         }
 
         /**
          * Starts a read sub-poller in a virtual thread.
-         * @throws UncheckedIOException if an I/O error occurs
          */
-        private Poller startReadSubPoller() {
+        private Poller startReadPoller() throws IOException {
             assert Thread.currentThread().isVirtual() && ContinuationSupport.isSupported();
-            var scheduler = JLA.virtualThreadScheduler(Thread.currentThread());
             Thread carrier = JLA.currentCarrierThread();
-            try {
-                Poller readPoller = provider().readPoller(true);
-                @SuppressWarnings("restricted")
-                var _ = Thread.ofVirtual().scheduler(scheduler)
-                        .inheritInheritableThreadLocals(false)
-                        .name(carrier.getName() + "-Read-Poller")
-                        .uncaughtExceptionHandler((_, e) -> e.printStackTrace())
-                        .start(() -> subPollerLoop(readPoller));
-                return readPoller;
-            } catch (IOException ioe) {
-                throw new UncheckedIOException(ioe);
-            }
+            var scheduler = JLA.virtualThreadScheduler(Thread.currentThread());
+
+            // create read subpoller
+            Poller readPoller = PROVIDER.readPoller(true);
+            readPollers.add(readPoller);
+
+            // start virtual thread to execute sub-polling loop
+            @SuppressWarnings("restricted")
+            var _ = Thread.ofVirtual().scheduler(scheduler)
+                    .inheritInheritableThreadLocals(false)
+                    .name(carrier.getName() + "-Read-Poller")
+                    .uncaughtExceptionHandler((_, e) -> e.printStackTrace())
+                    .start(() -> subPollerLoop(readPoller));
+            return readPoller;
         }
 
         @Override
         void poll(int fdVal, int event, long nanos, BooleanSupplier isOpen) throws IOException {
             if (event == Net.POLLOUT) {
-                writePoller.poll(fdVal, nanos, isOpen);
+                writePoller(fdVal).poll(fdVal, nanos, isOpen);
                 return;
             }
 
             assert event == Net.POLLIN;
             if (Thread.currentThread().isVirtual() && ContinuationSupport.isSupported()) {
-                Poller readPoller;
                 // get read poller for this carrier
+                Poller readPoller;
                 Continuation.pin();
                 try {
-                    Thread carrier = JLA.currentCarrierThread();
-                    try {
-                        readPoller = READ_POLLERS.computeIfAbsent(carrier, _ -> startReadSubPoller());
-                    } catch (UncheckedIOException uioe) {
-                        throw uioe.getCause();
+                    CarrierPoller carrierPoller = CARRIER_POLLER.get();
+                    if (carrierPoller != null) {
+                        readPoller = carrierPoller.readPoller();
+                    } else {
+                        // first poll on this carrier
+                        readPoller = startReadPoller();
+                        CARRIER_POLLER.set(new CarrierPoller(this, readPoller));
                     }
-                    POLLER_GROUP.set(this);
                 } finally {
                     Continuation.unpin();
                 }
@@ -735,38 +743,37 @@ public abstract class Poller {
                 // wakeup all threads waiting on file descriptors registered with the
                 // read poller, these I/O operation will migrate to another carrier.
                 readPoller.wakeupAll();
+
+                // remove from serviceability view
+                readPollers.remove(readPoller);
             }
         }
 
         /**
          * Invoked by the carrier thread before it terminates.
          */
-        private void carrierTerminated() {
-            Poller readPoller = READ_POLLERS.remove(Thread.currentThread());
-            if (readPoller != null) {
-                readPoller.setShutdown();
-                try {
-                    readPoller.wakeupPoller();
-                } catch (Throwable e) {
-                    e.printStackTrace();
-                }
+        private void carrierTerminated(Poller readPoller) {
+            readPoller.setShutdown();
+            try {
+                readPoller.wakeupPoller();
+            } catch (Throwable e) {
+                e.printStackTrace();
             }
         }
 
         @Override
-        Poller defaultMasterPoller() {
+        Poller masterPoller() {
             return masterPoller;
         }
 
         @Override
-        List<Poller> defaultReadPollers() {
-            // return all read pollers for now.
-            return READ_POLLERS.values().stream().toList();
+        List<Poller> readPollers() {
+            return readPollers.stream().toList();
         }
 
         @Override
-        List<Poller> defaultWritePollers() {
-            return List.of(writePoller);
+        List<Poller> writePollers() {
+            return List.of(writePollers);
         }
     }
 
@@ -776,15 +783,15 @@ public abstract class Poller {
     private static Mode pollerMode(Mode defaultPollerMode) {
         String s = System.getProperty("jdk.pollerMode");
         if (s != null) {
-            if (s.equalsIgnoreCase(Mode.SYSTEM_THREADS.name()) || s.equals("1")) {
-                return Mode.SYSTEM_THREADS;
-            } else if (s.equalsIgnoreCase(Mode.VTHREAD_POLLERS.name()) || s.equals("2")) {
-                return Mode.VTHREAD_POLLERS;
-            } else if (s.equalsIgnoreCase(Mode.PER_CARRIER.name()) || s.equals("3")) {
-                return Mode.PER_CARRIER;
-            } else {
-                throw new RuntimeException("Can't parse '" + s + "' as polling mode");
-            }
+            int intValue = Integer.parseInt(s);
+            return switch (intValue) {
+                case 1 -> Mode.SYSTEM_THREADS;
+                case 2 -> Mode.VTHREAD_POLLERS;
+                case 3 -> Mode.POLLER_PER_CARRIER;
+                default -> {
+                    throw new RuntimeException(intValue + " is not a valid polling mode");
+                }
+            };
         } else {
             return defaultPollerMode;
         }
@@ -813,20 +820,20 @@ public abstract class Poller {
      * Return the master poller or null if there is no master poller.
      */
     public static Poller masterPoller() {
-        return POLLER_GROUP.defaultMasterPoller();
+        return DEFAULT_POLLER_GROUP.masterPoller();
     }
 
     /**
      * Return the list of read pollers.
      */
     public static List<Poller> readPollers() {
-        return POLLER_GROUP.defaultReadPollers();
+        return DEFAULT_POLLER_GROUP.readPollers();
     }
 
     /**
      * Return the list of write pollers.
      */
     public static List<Poller> writePollers() {
-        return POLLER_GROUP.defaultWritePollers();
+        return DEFAULT_POLLER_GROUP.writePollers();
     }
 }
