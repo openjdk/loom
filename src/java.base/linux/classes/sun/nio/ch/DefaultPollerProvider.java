@@ -26,6 +26,7 @@ package sun.nio.ch;
 
 import java.io.IOException;
 import jdk.internal.vm.ContinuationSupport;
+import static sun.nio.ch.Poller.Mode;
 
 /**
  * Default PollerProvider for Linux.
@@ -42,14 +43,14 @@ class DefaultPollerProvider extends PollerProvider {
     @Override
     Poller.Mode defaultPollerMode() {
         if (ContinuationSupport.isSupported()) {
-            return USE_IOURING ? Poller.Mode.PER_CARRIER : Poller.Mode.VTHREAD_POLLERS;
+            return USE_IOURING ? Mode.POLLER_PER_CARRIER : Mode.VTHREAD_POLLERS;
         } else {
             return Poller.Mode.SYSTEM_THREADS;
         }
     }
 
     @Override
-    int defaultReadPollers(Poller.Mode mode) {
+    int defaultReadPollers(Mode mode) {
         int ncpus = Runtime.getRuntime().availableProcessors();
         return switch (mode) {
             case SYSTEM_THREADS  -> Math.max(Integer.highestOneBit(ncpus / 4), 1);
