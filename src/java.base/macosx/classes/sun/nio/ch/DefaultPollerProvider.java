@@ -25,23 +25,12 @@
 package sun.nio.ch;
 
 import java.io.IOException;
-import jdk.internal.vm.ContinuationSupport;
-import sun.nio.ch.Poller.Mode;
 
 /**
  * Default PollerProvider for macOS.
  */
 class DefaultPollerProvider extends PollerProvider {
     DefaultPollerProvider() { }
-
-    @Override
-    boolean supportsPollerMode(Mode mode) {
-        if (ContinuationSupport.isSupported()) {
-            return true;
-        } else {
-            return (mode == Mode.SYSTEM_THREADS);
-        }
-    }
 
     @Override
     Poller readPoller(boolean subPoller) throws IOException {

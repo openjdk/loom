@@ -41,20 +41,11 @@ class DefaultPollerProvider extends PollerProvider {
     DefaultPollerProvider() { }
 
     @Override
-    boolean supportsPollerMode(Poller.Mode mode) {
-        if (ContinuationSupport.isSupported()) {
-            return true;
-        } else {
-            return (mode == Poller.Mode.SYSTEM_THREADS);
-        }
-    }
-
-    @Override
     Poller.Mode defaultPollerMode() {
         if (ContinuationSupport.isSupported()) {
-            return USE_IOURING ? Mode.POLLER_PER_CARRIER : Mode.VTHREAD_POLLERS;
+            return Mode.POLLER_PER_CARRIER;
         } else {
-            return Poller.Mode.SYSTEM_THREADS;
+            return Mode.SYSTEM_THREADS;
         }
     }
 
