@@ -51,7 +51,6 @@ import jdk.internal.vm.annotation.Hidden;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 import jdk.internal.vm.annotation.Stable;
 import sun.nio.ch.Interruptible;
-import sun.nio.ch.NativeThread;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
@@ -250,8 +249,8 @@ public class Thread implements Runnable {
         volatile boolean daemon;
         volatile int threadStatus;
 
-        // Native thread used for signalling, set lazily, read from any thread
-        volatile NativeThread nativeThread;
+        // Used by NativeThread for signalling, set lazily, read from any thread
+        @Stable long nativeThreadID;
 
         // This map is maintained by the ThreadLocal class
         ThreadLocal.ThreadLocalMap terminatingThreadLocals;
@@ -279,12 +278,12 @@ public class Thread implements Runnable {
         holder.terminatingThreadLocals = map;
     }
 
-    NativeThread nativeThread() {
-        return holder.nativeThread;
+    long nativeThreadID() {
+        return holder.nativeThreadID;
     }
 
-    void setNativeThread(NativeThread nt) {
-        holder.nativeThread = nt;
+    void setNativeThreadID(long id) {
+        holder.nativeThreadID = id;
     }
 
     /*
@@ -1480,7 +1479,7 @@ public class Thread implements Runnable {
 
     /**
      * Creates a virtual thread to execute a task and schedules it to execute.
-     * The thread is scheduled to the default virtual thread scheduler.
+     * The thread is scheduled by the default virtual thread scheduler.
      *
      * <p> This method is equivalent to:
      * <pre>{@code Thread.ofVirtual().start(task); }</pre>

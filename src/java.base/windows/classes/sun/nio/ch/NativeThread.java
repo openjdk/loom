@@ -25,39 +25,29 @@
 
 package sun.nio.ch;
 
+import java.util.concurrent.locks.LockSupport;
+
 public class NativeThread {
-    private final Thread thread;
+    private NativeThread() { }
 
-    private NativeThread(Thread thread) {
-        this.thread = thread;
+    /**
+     * Returns the Thread to signal the current thread or {@code null} if the current
+     * thread cannot be signalled.
+     */
+    public static Thread threadToSignal() {
+        Thread thread = Thread.currentThread();
+        return thread.isVirtual() ? thread : null;
     }
 
-    Thread thread() {
-        return thread;
-    }
-
-    static NativeThread current() {
-        Thread t = Thread.currentThread();
-        if (t.isVirtual()) {
-            return new NativeThread(t);
+    /**
+     * Signals the given thread.
+     * @throws UnsupportedOperationException is not supported
+     */
+    public static void signal(Thread thread) {
+        if (thread.isVirtual()) {
+            LockSupport.unpark(null);
         } else {
-            return null;
+            throw new UnsupportedOperationException();
         }
-    }
-
-    static NativeThread currentNativeThread() {
-        return null;
-    }
-
-    void signal() {
-        throw new UnsupportedOperationException();
-    }
-
-    static boolean isVirtualThread(NativeThread nt) {
-        return nt != null;
-    }
-
-    static boolean isNativeThread(NativeThread nt) {
-        return false;
     }
 }

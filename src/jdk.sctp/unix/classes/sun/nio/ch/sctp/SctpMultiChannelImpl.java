@@ -81,9 +81,9 @@ public class SctpMultiChannelImpl extends SctpMultiChannel
 
     private final int fdVal;
 
-    /* IDs of native threads doing send and receives, for signalling */
-    private volatile NativeThread receiverThread;
-    private volatile NativeThread senderThread;
+    /* Threads doing send and receives, for signalling */
+    private volatile Thread receiverThread;
+    private volatile Thread senderThread;
 
     /* Lock held by current receiving thread */
     private final Object receiveLock = new Object();
@@ -290,11 +290,11 @@ public class SctpMultiChannelImpl extends SctpMultiChannel
             if (state != ChannelState.KILLED)
                 SctpNet.preClose(fdVal);
 
-            if (NativeThread.isNativeThread(receiverThread))
-                receiverThread.signal();
+            if (receiverThread != null)
+                NativeThread.signal(receiverThread);
 
-            if (NativeThread.isNativeThread(senderThread))
-                senderThread.signal();
+            if (senderThread != null)
+                NativeThread.signal(senderThread);
 
             if (!isRegistered())
                 kill();
@@ -484,7 +484,7 @@ public class SctpMultiChannelImpl extends SctpMultiChannel
                         synchronized (stateLock) {
                             if(!isOpen())
                                 return null;
-                            receiverThread = NativeThread.current();
+                            receiverThread = NativeThread.threadToSignal();
                         }
 
                         do {
@@ -765,7 +765,7 @@ public class SctpMultiChannelImpl extends SctpMultiChannel
                 synchronized (stateLock) {
                     if(!isOpen())
                         return 0;
-                    senderThread = NativeThread.current();
+                    senderThread = NativeThread.threadToSignal();
 
                     /* Determine what address or association to send to */
                     Association assoc = messageInfo.association();

@@ -25,9 +25,9 @@
 
 package sun.nio.ch;
 
+import java.util.concurrent.locks.LockSupport;
 import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
-
 
 // Signalling operations on native threads
 //
@@ -41,78 +41,37 @@ import jdk.internal.access.SharedSecrets;
 
 public class NativeThread {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
-    private static final long VIRTUAL_THREAD_ID = -1L;
 
-    private final Thread thread;
-    private final long tid;
-
-    private NativeThread(Thread thread, long tid) {
-        this.thread = thread;
-        this.tid = tid;
-    }
-
-    Thread thread() {
-        return thread;
-    }
+    private NativeThread() { }
 
     /**
-     * Return a NativeThread for the current thread.
+     * Returns the Thread to signal the current thread.
+     *
+     * The first use of this method on a platform thread will capture the thread's
+     * native thread ID.
      */
-    public static NativeThread current() {
+    public static Thread threadToSignal() {
         Thread t = Thread.currentThread();
-        if (t.isVirtual()) {
-            // return new object for now
-            return new NativeThread(t, VIRTUAL_THREAD_ID);
-        } else {
-            NativeThread nt = JLA.nativeThread(t);
-            if (nt == null) {
-                nt = new NativeThread(t, current0());
-                JLA.setNativeThread(nt);
-            }
-            return nt;
+        if (!t.isVirtual() && JLA.nativeThreadID(t) == 0) {
+            JLA.setThreadNativeID(current0());
         }
+        return t;
     }
 
     /**
-     * Return a NativeThread for the current platform thread. Returns null if called
-     * from a virtual thread.
+     * Signals the given thread. For a platform thread it sends a signal to the thread.
+     * For a virtual thread it just unparks it.
+     * @throws IllegalStateException if the thread is a platform thread that hasn't set its native ID
      */
-    public static NativeThread currentNativeThread() {
-        Thread t = Thread.currentThread();
-        if (t.isVirtual()) {
-            return null;
+    public static void signal(Thread thread) {
+        if (thread.isVirtual()) {
+            LockSupport.unpark(thread);
         } else {
-            NativeThread nt = JLA.nativeThread(t);
-            if (nt == null) {
-                nt = new NativeThread(t, current0());
-                JLA.setNativeThread(nt);
-            }
-            return nt;
+            long id = JLA.nativeThreadID(thread);
+            if (id == 0)
+                throw new IllegalStateException("Native thread ID not set");
+            signal0(id);
         }
-    }
-
-    /**
-     * Return true if the given NativeThread is a platform thread.
-     */
-    public static boolean isNativeThread(NativeThread nt) {
-        return nt != null && nt.tid != VIRTUAL_THREAD_ID;
-    }
-
-    /**
-     * Return true if the given NativeThread is a virtual thread.
-     */
-    public static boolean isVirtualThread(NativeThread nt) {
-        return nt != null && nt.tid == VIRTUAL_THREAD_ID;
-    }
-
-    /**
-     * Signals this native thread.
-     * @throws UnsupportedOperationException if virtual thread
-     */
-    public void signal() {
-        if (tid == VIRTUAL_THREAD_ID)
-            throw new UnsupportedOperationException();
-        signal0(tid);
     }
 
     /**

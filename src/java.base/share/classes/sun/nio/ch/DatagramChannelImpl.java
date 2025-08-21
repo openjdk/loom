@@ -134,9 +134,9 @@ class DatagramChannelImpl
     private static final int ST_CLOSED = 3;
     private int state;
 
-    // IDs of native threads doing reads and writes, for signalling
-    private NativeThread readerThread;
-    private NativeThread writerThread;
+    // Threads doing reads and writes, for signalling
+    private Thread readerThread;
+    private Thread writerThread;
 
     // Local and remote (connected) address
     private InetSocketAddress localAddress;
@@ -523,7 +523,7 @@ class DatagramChannelImpl
             if (localAddress == null)
                 bindInternal(null);
             if (blocking)
-                readerThread = NativeThread.current();
+                readerThread = NativeThread.threadToSignal();
         }
         return remote;
     }
@@ -1030,7 +1030,7 @@ class DatagramChannelImpl
             if (localAddress == null)
                 bindInternal(null);
             if (blocking)
-                writerThread = NativeThread.current();
+                writerThread = NativeThread.threadToSignal();
         }
         return remote;
     }

@@ -55,7 +55,6 @@ import jdk.internal.vm.Continuation;
 import jdk.internal.vm.ContinuationScope;
 import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.ThreadContainer;
-import sun.nio.ch.NativeThread;
 import sun.reflect.annotation.AnnotationType;
 import sun.nio.ch.Interruptible;
 
@@ -574,14 +573,14 @@ public interface JavaLangAccess {
     Object scopedValueBindings();
 
     /**
-     * Returns the NativeThread for signalling, null if not set.
+     * Returns the native thread ID for the given platform thread or 0 if not set.
      */
-    NativeThread nativeThread(Thread thread);
+    long nativeThreadID(Thread thread);
 
     /**
-     * Sets the NativeThread for the current platform thread.
+     * Sets the native thread ID for the current platform thread.
      */
-    void setNativeThread(NativeThread nt);
+    void setThreadNativeID(long id);
 
     /**
      * Returns the innermost mounted continuation
