@@ -33,7 +33,7 @@ class NativeThreadSet {
     private final int initialCapacity;
     private Thread[] threads;     // array of platform threads, created lazily
     private int used;             // number of elements in threads array
-    private int otherThreads;     // count of virtual threads
+    private int otherThreads;     // additional threads that can't be signalled
     private boolean waitingToEmpty;
 
     NativeThreadSet(int n) {
@@ -47,7 +47,7 @@ class NativeThreadSet {
     int add() {
         synchronized (this) {
             final Thread t = NativeThread.threadToSignal();
-            if (t.isVirtual()) {
+            if (t == null || t.isVirtual()) {
                 otherThreads++;
                 return OTHER_THREAD_INDEX;
             }
