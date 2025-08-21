@@ -58,8 +58,8 @@ public class SctpServerChannelImpl extends SctpServerChannel
 
     private final int fdVal;
 
-    /* IDs of native thread doing accept, for signalling */
-    private volatile NativeThread thread;
+    /* thread doing accept, for signalling */
+    private volatile Thread thread;
 
     /* Lock held by thread currently blocked in this channel */
     private final Object lock = new Object();
@@ -222,7 +222,7 @@ public class SctpServerChannelImpl extends SctpServerChannel
                 begin();
                 if (!isOpen())
                     return null;
-                thread = NativeThread.current();
+                thread = NativeThread.threadToSignal();
                 for (;;) {
                     n = Net.accept(fd, newfd, isaa);
                     if ((n == IOStatus.INTERRUPTED) && isOpen())
@@ -253,8 +253,8 @@ public class SctpServerChannelImpl extends SctpServerChannel
         synchronized (stateLock) {
             if (state != ChannelState.KILLED)
                 SctpNet.preClose(fdVal);
-            if (NativeThread.isNativeThread(thread))
-                thread.signal();
+            if (thread != null)
+                NativeThread.signal(thread);
             if (!isRegistered())
                 kill();
         }

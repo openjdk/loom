@@ -63,8 +63,8 @@ class SourceChannelImpl
     private static final int ST_CLOSED = 2;
     private int state;
 
-    // ID of native thread doing read, for signalling
-    private NativeThread reader;
+    // Thread doing read, for signalling
+    private Thread readerThread;
 
     // True if the channel's socket has been forced into non-blocking mode
     // by a virtual thread. It cannot be reset. When the channel is in
@@ -120,7 +120,7 @@ class SourceChannelImpl
      */
     private boolean tryClose() throws IOException {
         assert Thread.holdsLock(stateLock) && state == ST_CLOSING;
-        if (reader == null && !isRegistered()) {
+        if (readerThread == null && !isRegistered()) {
             state = ST_CLOSED;
             nd.close(fd);
             return true;
@@ -152,7 +152,7 @@ class SourceChannelImpl
             assert state < ST_CLOSING;
             state = ST_CLOSING;
             if (!tryClose()) {
-                nd.preClose(fd, reader, null);
+                nd.preClose(fd, readerThread, null);
             }
         }
     }
@@ -270,7 +270,7 @@ class SourceChannelImpl
         synchronized (stateLock) {
             ensureOpen();
             if (blocking) {
-                reader = NativeThread.current();
+                readerThread = NativeThread.threadToSignal();
             }
         }
     }
@@ -286,7 +286,7 @@ class SourceChannelImpl
     {
         if (blocking) {
             synchronized (stateLock) {
-                reader = null;
+                readerThread = null;
                 if (state == ST_CLOSING) {
                     tryFinishClose();
                 }

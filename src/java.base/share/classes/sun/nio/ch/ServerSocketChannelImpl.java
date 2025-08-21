@@ -91,8 +91,8 @@ class ServerSocketChannelImpl
     private static final int ST_CLOSED = 2;
     private int state;
 
-    // ID of native thread currently blocked in this channel, for signalling
-    private NativeThread thread;
+    // Thread currently blocked in this channel, for signalling
+    private Thread thread;
 
     // Binding
     private SocketAddress localAddress; // null => unbound
@@ -351,7 +351,7 @@ class ServerSocketChannelImpl
             if (localAddress == null)
                 throw new NotYetBoundException();
             if (blocking)
-                thread = NativeThread.current();
+                thread = NativeThread.threadToSignal();
         }
     }
 

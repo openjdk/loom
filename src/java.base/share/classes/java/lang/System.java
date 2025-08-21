@@ -54,7 +54,6 @@ import java.util.Objects;
 import java.util.Properties;
 import java.util.ResourceBundle;
 import java.util.Set;
-import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
@@ -82,7 +81,6 @@ import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.ThreadContainer;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 import jdk.internal.vm.annotation.Stable;
-import sun.nio.ch.NativeThread;
 import sun.reflect.annotation.AnnotationType;
 import sun.nio.ch.Interruptible;
 import sun.nio.cs.UTF_8;
@@ -2270,12 +2268,12 @@ public final class System {
                 return Thread.scopedValueBindings();
             }
 
-            public NativeThread nativeThread(Thread thread) {
-                return thread.nativeThread();
+            public long nativeThreadID(Thread thread) {
+                return thread.nativeThreadID();
             }
 
-            public void setNativeThread(NativeThread nt) {
-                Thread.currentThread().setNativeThread(nt);
+            public void setThreadNativeID(long id) {
+                Thread.currentThread().setNativeThreadID(id);
             }
 
             public Continuation getContinuation(Thread thread) {

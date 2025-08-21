@@ -25,7 +25,6 @@
 package sun.nio.ch;
 
 import java.io.IOException;
-import sun.nio.ch.Poller.Mode;
 
 /**
  * Provider class for Poller implementations.
@@ -47,14 +46,14 @@ abstract class PollerProvider {
      * @implSpec The default implementation uses system threads.
      */
     Poller.Mode defaultPollerMode() {
-        return Mode.SYSTEM_THREADS;
+        return Poller.Mode.SYSTEM_THREADS;
     }
 
     /**
      * Default number of read pollers for the given mode. The count must be a power of 2.
      * @implSpec The default implementation returns 1.
      */
-    int defaultReadPollers(Mode mode) {
+    int defaultReadPollers(Poller.Mode mode) {
         return 1;
     }
 
@@ -62,7 +61,7 @@ abstract class PollerProvider {
      * Default number of write pollers for the given mode. The count must be a power of 2.
      * @implSpec The default implementation returns 1.
      */
-    int defaultWritePollers(Mode mode) {
+    int defaultWritePollers(Poller.Mode mode) {
         return 1;
     }
 
@@ -84,5 +83,5 @@ abstract class PollerProvider {
      * Creates a Poller for write ops.
      * @param subPoller true to create a sub-poller
      */
-    abstract Poller writePoller( boolean subPoller) throws IOException;
+    abstract Poller writePoller(boolean subPoller) throws IOException;
 }

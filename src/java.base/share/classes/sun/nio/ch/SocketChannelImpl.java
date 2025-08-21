@@ -114,9 +114,9 @@ class SocketChannelImpl
     private static final int ST_CLOSED = 4;
     private volatile int state;  // need stateLock to change
 
-    // IDs of native threads doing reads and writes, for signalling
-    private NativeThread readerThread;
-    private NativeThread writerThread;
+    // Threads doing reads and writes, for signalling
+    private Thread readerThread;
+    private Thread writerThread;
 
     // Binding
     private SocketAddress localAddress;
@@ -369,7 +369,7 @@ class SocketChannelImpl
             synchronized (stateLock) {
                 ensureOpen();
                 // record thread so it can be signalled if needed
-                readerThread = NativeThread.current();
+                readerThread = NativeThread.threadToSignal();
             }
         }
     }
@@ -523,7 +523,7 @@ class SocketChannelImpl
                 if (isOutputClosed)
                     throw new ClosedChannelException();
                 // record thread so it can be signalled if needed
-                writerThread = NativeThread.current();
+                writerThread = NativeThread.threadToSignal();
             }
         }
     }
@@ -674,7 +674,7 @@ class SocketChannelImpl
                 ensureOpenAndConnected();
                 if (isOutputClosed)
                     throw new ClosedChannelException();
-                writerThread = NativeThread.current();
+                writerThread = NativeThread.threadToSignal();
                 completed = true;
             }
         } finally {
@@ -877,7 +877,7 @@ class SocketChannelImpl
 
             if (blocking) {
                 // record thread so it can be signalled if needed
-                readerThread = NativeThread.current();
+                readerThread = NativeThread.threadToSignal();
             }
         }
     }
@@ -996,7 +996,7 @@ class SocketChannelImpl
                 throw new NoConnectionPendingException();
             if (blocking) {
                 // record thread so it can be signalled if needed
-                readerThread = NativeThread.current();
+                readerThread = NativeThread.threadToSignal();
             }
         }
     }
@@ -1218,8 +1218,8 @@ class SocketChannelImpl
                 throw new NotYetConnectedException();
             if (!isInputClosed) {
                 Net.shutdown(fd, Net.SHUT_RD);
-                if (NativeThread.isVirtualThread(readerThread)) {
-                    Poller.stopPoll(readerThread.thread());
+                if (readerThread != null && readerThread.isVirtual()) {
+                    Poller.stopPoll(readerThread);
                 }
                 isInputClosed = true;
             }
@@ -1235,8 +1235,8 @@ class SocketChannelImpl
                 throw new NotYetConnectedException();
             if (!isOutputClosed) {
                 Net.shutdown(fd, Net.SHUT_WR);
-                if (NativeThread.isVirtualThread(writerThread)) {
-                    Poller.stopPoll(writerThread.thread());
+                if (writerThread != null && writerThread.isVirtual()) {
+                    Poller.stopPoll(writerThread);
                 }
                 isOutputClosed = true;
             }

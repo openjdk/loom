@@ -75,23 +75,23 @@ abstract class NativeDispatcher {
      * if a platform thread is blocked on the file descriptor then the file descriptor is
      * dup'ed to a special fd and the thread signalled so that the syscall fails with EINTR.
      */
-    final void preClose(FileDescriptor fd, NativeThread reader, NativeThread writer) throws IOException {
-        if (NativeThread.isVirtualThread(reader)) {
-            Poller.stopPoll(reader.thread());
+    final void preClose(FileDescriptor fd, Thread reader, Thread writer) throws IOException {
+        if (reader != null && reader.isVirtual()) {
+            Poller.stopPoll(reader);
+            reader = null;
         }
-        if (NativeThread.isVirtualThread(writer)) {
-            Poller.stopPoll(writer.thread());
+        if (writer != null && writer.isVirtual()) {
+            Poller.stopPoll(writer);
+            writer = null;
         }
-        if (NativeThread.isNativeThread(reader) || NativeThread.isNativeThread(writer)) {
-            implPreClose(fd, reader, writer);
-        }
+        implPreClose(fd, reader, writer);
     }
 
     /**
      * This method does nothing by default. On Unix systems the file descriptor is dup'ed
      * to a special fd and native threads signalled.
      */
-    void implPreClose(FileDescriptor fd, NativeThread reader, NativeThread writer) throws IOException {
+    void implPreClose(FileDescriptor fd, Thread reader, Thread writer) throws IOException {
         // Do nothing by default; this is only needed on Unix
     }
 
