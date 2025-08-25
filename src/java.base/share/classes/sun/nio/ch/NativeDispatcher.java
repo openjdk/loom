@@ -77,13 +77,14 @@ abstract class NativeDispatcher {
      */
     final void preClose(FileDescriptor fd, Thread reader, Thread writer) throws IOException {
         if (reader != null && reader.isVirtual()) {
-            Poller.stopPoll(reader);
+            NativeThread.signal(reader);  // unparks virtual thread
             reader = null;
         }
         if (writer != null && writer.isVirtual()) {
-            Poller.stopPoll(writer);
+            NativeThread.signal(writer);  // unparks virtual thread
             writer = null;
         }
+        // dup2 and signal platform threads
         implPreClose(fd, reader, writer);
     }
 

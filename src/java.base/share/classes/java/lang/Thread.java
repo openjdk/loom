@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.Objects;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.StructureViolationException;
 import java.util.concurrent.locks.LockSupport;
@@ -816,6 +817,7 @@ public class Thread implements Runnable {
          *
          * @param vthread the virtual thread
          * @param task the task to execute
+         * @throws RejectedExecutionException if the scheduler cannot accept the task
          */
         void execute(Thread vthread, Runnable task);
 

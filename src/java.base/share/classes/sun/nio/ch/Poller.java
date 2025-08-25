@@ -130,13 +130,6 @@ public abstract class Poller {
     abstract void close() throws IOException;
 
     /**
-     * Returns the poller's thread owner.
-     */
-    private Thread owner() {
-        return owner;
-    }
-
-    /**
      * Sets the poller's thread owner.
      */
     private void setOwner() {
@@ -219,7 +212,7 @@ public abstract class Poller {
      * @param nanos the waiting time or 0 to wait indefinitely
      * @param isOpen supplies a boolean to indicate if the enclosing object is open
      */
-    static void poll(int fdVal, int event, long nanos, BooleanSupplier isOpen) throws IOException {
+    public static void poll(int fdVal, int event, long nanos, BooleanSupplier isOpen) throws IOException {
         POLLER_GROUP.poll(fdVal, event, nanos, isOpen);
     }
 
@@ -228,14 +221,14 @@ public abstract class Poller {
      * @param fdVal the Selector's file descriptor
      * @param nanos the waiting time or 0 to wait indefinitely
      */
-    static void pollSelector(int fdVal, long nanos) throws IOException {
+    public static void pollSelector(int fdVal, long nanos) throws IOException {
         POLLER_GROUP.pollSelector(fdVal, nanos);
     }
 
     /**
      * Unpark the given thread so that it stops polling.
      */
-    static void stopPoll(Thread thread) {
+    public static void stopPoll(Thread thread) {
         LockSupport.unpark(thread);
     }
 
@@ -360,9 +353,9 @@ public abstract class Poller {
          */
         abstract void poll(int fdVal, int event, long nanos, BooleanSupplier isOpen) throws IOException;
 
-       /**
-        * Parks the current thread until a Selector's file descriptor is ready.
-        */
+        /**
+         * Parks the current thread until a Selector's file descriptor is ready.
+         */
         void pollSelector(int fdVal, long nanos) throws IOException {
             poll(fdVal, Net.POLLIN, nanos, () -> true);
         }
@@ -545,7 +538,9 @@ public abstract class Poller {
 
         @Override
         void poll(int fdVal, int event, long nanos, BooleanSupplier isOpen) throws IOException {
-            Poller poller = (event == Net.POLLIN) ? readPoller(fdVal) : writePoller(fdVal);
+            Poller poller = (event == Net.POLLIN)
+                    ? readPoller(fdVal)
+                    : writePoller(fdVal);
             poller.poll(fdVal, nanos, isOpen);
         }
 
@@ -631,14 +626,14 @@ public abstract class Poller {
          */
         private Poller startReadPoller() throws IOException {
             assert Thread.currentThread().isVirtual() && ContinuationSupport.isSupported();
-            Thread carrier = JLA.currentCarrierThread();
-            var scheduler = JLA.virtualThreadScheduler(Thread.currentThread());
 
-            // create read subpoller
+            // create read sub-poller
             Poller readPoller = PROVIDER.readPoller(true);
             readPollers.add(readPoller);
 
             // start virtual thread to execute sub-polling loop
+            Thread carrier = JLA.currentCarrierThread();
+            var scheduler = JLA.virtualThreadScheduler(Thread.currentThread());
             @SuppressWarnings("restricted")
             var _ = Thread.ofVirtual()
                     .scheduler(scheduler)
@@ -743,13 +738,12 @@ public abstract class Poller {
     private static Mode pollerMode(Mode defaultPollerMode) {
         String s = System.getProperty("jdk.pollerMode");
         if (s != null) {
-            int intValue = Integer.parseInt(s);
-            return switch (intValue) {
-                case 1 -> Mode.SYSTEM_THREADS;
-                case 2 -> Mode.VTHREAD_POLLERS;
-                case 3 -> Mode.POLLER_PER_CARRIER;
+            return switch (s) {
+                case "1" -> Mode.SYSTEM_THREADS;
+                case "2" -> Mode.VTHREAD_POLLERS;
+                case "3" -> Mode.POLLER_PER_CARRIER;
                 default -> {
-                    throw new RuntimeException(intValue + " is not a valid polling mode");
+                    throw new RuntimeException(s + " is not a valid polling mode");
                 }
             };
         } else {
