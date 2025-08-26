@@ -45,7 +45,7 @@ public class NativeThread {
      */
     public static void signal(Thread thread) {
         if (thread.isVirtual()) {
-            LockSupport.unpark(null);
+            LockSupport.unpark(thread);
         } else {
             throw new UnsupportedOperationException();
         }
