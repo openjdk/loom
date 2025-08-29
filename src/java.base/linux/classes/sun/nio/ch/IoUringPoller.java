@@ -31,8 +31,6 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.LockSupport;
-import jdk.internal.access.JavaLangAccess;
-import jdk.internal.access.SharedSecrets;
 import jdk.internal.ref.CleanerFactory;
 import sun.nio.ch.iouring.IOUringImpl;
 import sun.nio.ch.iouring.Cqe;
@@ -45,12 +43,7 @@ import static jdk.internal.ffi.generated.iouring.iouring_h.IORING_OP_POLL_REMOVE
  */
 
 public class IoUringPoller extends Poller {
-    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
-
     private static final long ADDRESS_SIZE = ValueLayout.ADDRESS.byteSize();
-
-    // true to batch submits and reduce calls to io_using_enter
-    private static final boolean BATCH_SUBMITS = Boolean.getBoolean("jdk.io_uring.batchSubmits");
 
     // submition and completion queue sizes
     private static final int SQ_SIZE = 16;
@@ -71,9 +64,6 @@ public class IoUringPoller extends Poller {
 
     // used to coordinate access to submission queue
     private final Object submitLock = new Object();
-
-    // queue of file descriptors that are pending a poll add to submit
-    private final BlockingQueue<Integer> pendingPollAdds;
 
     // maps file descriptor to Thread when cancelling poll
     private final Map<Integer, Thread> cancels = new ConcurrentHashMap<>();
@@ -114,23 +104,6 @@ public class IoUringPoller extends Poller {
             this.cleaner = CleanerFactory.cleaner().register(this, closer);
         } else {
             this.cleaner = null;
-        }
-
-        // optionally start the (per-carrier) submit thread to batch submits
-        if (subPoller && BATCH_SUBMITS) {
-            this.pendingPollAdds = new LinkedTransferQueue<>();
-
-            var scheduler = JLA.virtualThreadScheduler(Thread.currentThread());
-            Thread carrier = JLA.currentCarrierThread();
-            String name = carrier.getName() + "-Submitter";
-            @SuppressWarnings("restricted")
-            var _ = Thread.ofVirtual().scheduler(scheduler)
-                    .inheritInheritableThreadLocals(false)
-                    .name(name)
-                    .uncaughtExceptionHandler((_, e) -> e.printStackTrace())
-                    .start(this::submitLoop);
-        } else {
-            this.pendingPollAdds = null;
         }
     }
 
@@ -173,17 +146,10 @@ public class IoUringPoller extends Poller {
     void implRegister(int fd) throws IOException {
         assert fd > 0;  // fd == 0 used for wakeup
 
-        if (pendingPollAdds == null) {
-            // single submit
-            synchronized (submitLock) {
-                // fd is the user data for IORING_OP_POLL_ADD request
-                submitPollAdd(ring, fd, event, fd);
-                enter(ring, 1);
-            }
-        } else {
-            // queue request to submit in batch
-            boolean inserted = pendingPollAdds.offer(fd);
-            assert inserted;
+        synchronized (submitLock) {
+            // fd is the user data for IORING_OP_POLL_ADD request
+            submitPollAdd(ring, fd, event, fd);
+            enter(ring, 1);
         }
     }
 
@@ -193,9 +159,6 @@ public class IoUringPoller extends Poller {
             cancels.put(fd, Thread.currentThread());
 
             synchronized (submitLock) {
-                // submit pending requests to ensure OP_POLL_ADD consumed before OP_POLL_REMOVE
-                submitPendingPollAdds();
-
                 // fd was the user data for IORING_OP_POLL_ADD request
                 // -fd is the user data for IORING_OP_POLL_REMOVE request
                 submitPollRemove(ring, fd, -fd);
@@ -216,11 +179,6 @@ public class IoUringPoller extends Poller {
 
         // causes subpoller to wakeup
         wakeupEvent.set();
-
-        // causes submit loop to wakeup
-        if (pendingPollAdds != null) {
-            pendingPollAdds.offer(0);
-        }
     }
 
     @Override
@@ -267,67 +225,6 @@ public class IoUringPoller extends Poller {
             }
         }
         return polled;
-    }
-
-    /**
-     * Submits any pending requests. For use during cancellation to ensure that
-     * pending requests are consumed before another request is submitted.
-     */
-    private void submitPendingPollAdds() throws IOException {
-        assert Thread.holdsLock(submitLock);
-        if (pendingPollAdds != null) {
-            boolean stoleWakeup = false;
-            Integer next = pendingPollAdds.poll();
-            while (next != null) {
-                int fd = next.intValue();
-                if (fd == 0) {
-                    stoleWakeup = true;
-                } else {
-                    assert fd > 0;
-                    submitPollAdd(ring, fd, event, fd);
-                    enter(ring, 1);
-                }
-                next = pendingPollAdds.poll();
-            }
-
-            // return fd 0 to the pending requests if taken here
-            if (stoleWakeup) {
-                pendingPollAdds.offer(0);
-            }
-        }
-    }
-
-    /**
-     * Submit loop to submit pending requests in batch, reducing calls to io_uring_enter.
-     */
-    private void submitLoop() {
-        try {
-            while (!isShutdown()) {
-                int fd = pendingPollAdds.take();
-                assert fd >= 0;
-                synchronized (submitLock) {
-                    int n = 0;
-                    if (fd > 0) {
-                        submitPollAdd(ring, fd, event, fd);
-                        n++;
-                    }
-                    Integer next;
-                    while (ring.sqfree() > 0 && ((next = pendingPollAdds.poll()) != null)) {
-                        fd = next.intValue();
-                        assert fd >= 0;
-                        if (fd > 0) {
-                            submitPollAdd(ring, fd, event, fd);
-                            n++;
-                        }
-                    }
-                    if (n > 0) {
-                        enter(ring, n);
-                    }
-                }
-            }
-        } catch (Throwable e) {
-            e.printStackTrace();
-        }
     }
 
     /**
