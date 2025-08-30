@@ -2428,11 +2428,11 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
       chunk = _cont.tail();  // reload oop in case of safepoint in resume_operation (if posting JVMTI events).
       JVMTI_ONLY(assert(_thread->contended_entered_monitor() == nullptr || _thread->contended_entered_monitor() == _monitor, ""));
     } else {
-      // Preemption cancelled in moniterenter case. We actually acquired
-      // the monitor after freezing all frames so nothing to do. In case
-      // of preemption on ObjectLocker during klass init, we released the
-      // monitor already at ~ObjectLocker so here we just set _monitor to
-      // nullptr so we know there is no need to release it later.
+      // Preemption cancelled on moniterenter or ObjectLocker case. We
+      // actually acquired the monitor after freezing all frames so no
+      // need to call resume_operation. If this is the ObjectLocker case
+      // we released the monitor already at ~ObjectLocker, so here we set
+      // _monitor to nullptr to indicate there is no need to release it later.
       preempt_kind = Continuation::monitorenter;
       _monitor = nullptr;
     }
