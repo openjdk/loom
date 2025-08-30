@@ -36,7 +36,6 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 import jdk.internal.event.VirtualThreadEndEvent;
 import jdk.internal.event.VirtualThreadStartEvent;
 import jdk.internal.event.VirtualThreadSubmitFailedEvent;
@@ -1197,9 +1196,8 @@ final class VirtualThread extends BaseVirtualThread {
         StackTraceElement[] stackTrace;
         do {
             stackTrace = (carrierThread != null)
-                ? super.asyncGetStackTrace()              // mounted
-                : supplyIfUnmounted(cont::getStackTrace,  // unmounted
-                                    () -> new StackTraceElement[0]);
+                    ? super.asyncGetStackTrace()  // mounted
+                    : tryGetStackTrace();         // unmounted
             if (stackTrace == null) {
                 Thread.yield();
             }
@@ -1208,17 +1206,14 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Invokes a supplier to produce a non-null result if this virtual thread is unmounted.
-     * @param supplyIfAlive invoked if this virtual thread is unmounted and alive. The
-     *      virtual thread is suspended while the supplier executes
-     * @param supplyIfNotAlive invoked if this virtual thread is not alive
-     * @return the result; {@code null} if mounted, suspended or in transition
+     * Returns the stack trace for this virtual thread if it is unmounted.
+     * Returns null if the thread is mounted or in transition.
      */
-    <T> T supplyIfUnmounted(Supplier<T> supplyIfAlive, Supplier<T> supplyIfNotAlive) {
+    private StackTraceElement[] tryGetStackTrace() {
         int initialState = state() & ~SUSPENDED;
         switch (initialState) {
             case NEW, STARTED, TERMINATED -> {
-                return supplyIfNotAlive.get();  // has not yet executed or terminated
+                return new StackTraceElement[0];  // unmounted, empty stack
             }
             case RUNNING, PINNED, TIMED_PINNED -> {
                 return null;   // mounted
@@ -1241,36 +1236,38 @@ final class VirtualThread extends BaseVirtualThread {
             return null;
         }
 
+        // get stack trace and restore state
+        StackTraceElement[] stack;
         try {
-            return supplyIfAlive.get();
+            stack = cont.getStackTrace();
         } finally {
             assert state == suspendedState;
             setState(initialState);
-
-            boolean resubmit = switch (initialState) {
-                case UNPARKED, UNBLOCKED, YIELDED -> {
-                    // resubmit as task may have run while suspended
-                    yield true;
-                }
-                case PARKED, TIMED_PARKED -> {
-                    // resubmit if unparked while suspended
-                    yield parkPermit && compareAndSetState(initialState, UNPARKED);
-                }
-                case BLOCKED -> {
-                    // resubmit if unblocked while suspended
-                    yield blockPermit && compareAndSetState(BLOCKED, UNBLOCKED);
-                }
-                case WAIT, TIMED_WAIT -> {
-                    // resubmit if notified or interrupted while waiting (Object.wait)
-                    // waitTimeoutExpired will retry if the timed expired when suspended
-                    yield (notified || interrupted) && compareAndSetState(initialState, UNBLOCKED);
-                }
-                default -> throw new InternalError();
-            };
-            if (resubmit) {
-                submitRunContinuation();
-            }
         }
+        boolean resubmit = switch (initialState) {
+            case UNPARKED, UNBLOCKED, YIELDED -> {
+                // resubmit as task may have run while suspended
+                yield true;
+            }
+            case PARKED, TIMED_PARKED -> {
+                // resubmit if unparked while suspended
+                yield parkPermit && compareAndSetState(initialState, UNPARKED);
+            }
+            case BLOCKED -> {
+                // resubmit if unblocked while suspended
+                yield blockPermit && compareAndSetState(BLOCKED, UNBLOCKED);
+            }
+            case WAIT, TIMED_WAIT -> {
+                // resubmit if notified or interrupted while waiting (Object.wait)
+                // waitTimeoutExpired will retry if the timed expired when suspended
+                yield (notified || interrupted) && compareAndSetState(initialState, UNBLOCKED);
+            }
+            default -> throw new InternalError();
+        };
+        if (resubmit) {
+            submitRunContinuation();
+        }
+        return stack;
     }
 
     @Override
