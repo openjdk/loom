@@ -1410,4 +1410,15 @@ class ThreadInClassInitializer : public StackObj {
   }
 };
 
+class ThreadWaitingForClassInit : public StackObj {
+  JavaThread* _thread;
+ public:
+  ThreadWaitingForClassInit(JavaThread* thread, InstanceKlass* ik) : _thread(thread) {
+    _thread->set_class_to_be_initialized(ik);
+  }
+  ~ThreadWaitingForClassInit() {
+    _thread->set_class_to_be_initialized(nullptr);
+  }
+};
+
 #endif // SHARE_RUNTIME_JAVATHREAD_HPP

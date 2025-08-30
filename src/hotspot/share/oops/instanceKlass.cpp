@@ -1214,9 +1214,8 @@ void InstanceKlass::initialize_impl(TRAPS) {
                                jt->name(), external_name(), init_thread_name());
       }
       wait = true;
-      jt->set_class_to_be_initialized(this);
+      ThreadWaitingForClassInit twcl(THREAD, this);
       ol.wait_uninterruptibly(CHECK_PREEMPTABLE);
-      jt->set_class_to_be_initialized(nullptr);
     }
 
     // Step 3

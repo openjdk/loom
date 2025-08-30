@@ -747,7 +747,6 @@ void ObjectLocker::wait_uninterruptibly(TRAPS) {
   if (_thread->preempting()) {
     _skip_exit = true;
     _thread->set_pending_preempted_exception();
-    _thread->set_class_to_be_initialized(nullptr);
   }
 }
 
