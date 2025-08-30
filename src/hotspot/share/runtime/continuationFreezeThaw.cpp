@@ -2426,6 +2426,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
       }
       _monitor = mon;        // remember monitor since we might need it on handle_preempted_continuation()
       chunk = _cont.tail();  // reload oop in case of safepoint in resume_operation (if posting JVMTI events).
+      JVMTI_ONLY(assert(_thread->contended_entered_monitor() == nullptr || _thread->contended_entered_monitor() == _monitor, ""));
     } else {
       // Preemption cancelled in moniterenter case. We actually acquired
       // the monitor after freezing all frames so nothing to do. In case
@@ -2739,6 +2740,11 @@ intptr_t* ThawBase::redo_vmcall(JavaThread* current, frame& top) {
       oop vthread = current->vthread();
       assert(java_lang_VirtualThread::state(vthread) == java_lang_VirtualThread::RUNNING, "wrong state for vthread");
       java_lang_VirtualThread::set_state(vthread, java_lang_VirtualThread::YIELDING);
+#if INCLUDE_JVMTI
+      if (current->contended_entered_monitor() != nullptr) {
+        current->set_contended_entered_monitor(nullptr);
+      }
+#endif
     }
     log_develop_trace(continuations, preempt)("Preempted " INT64_FORMAT " again%s", tid, cancelled ? "(preemption cancelled, setting state to YIELDING)" : "");
   } else {
