@@ -98,7 +98,7 @@ public class IoUringPoller extends Poller {
         this.readyEvent = readyEvent;
         this.wakeupEvent = wakeupEvent;
 
-        // create action to io_uring instance, register cleaner if this is a subpoller
+        // create action to close io_uring instance, register cleaner if this is a subpoller
         this.closer = closer(ring, readyEvent, wakeupEvent);
         if (subPoller) {
             this.cleaner = CleanerFactory.cleaner().register(this, closer);
