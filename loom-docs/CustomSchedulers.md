@@ -59,3 +59,19 @@ Custom schedulers are _not closable_. They are managed by the garbage collector 
 a custom scheduler can be collected when all virtual thread assigned to the scheduler
 have terminated and the scheduler is otherwise unreachable. The lifecycle of carrier
 threads is managed by the scheduler.
+
+## Poller modes
+
+Socket I/O in the context of virtual threads uses a platform specific I/O event notification
+facility such as `kqueue`, `epoll`, or `io_uring`. The implementation uses of set of internal
+_poller threads_ that consume events from the I/O event notification facility to unpark
+virtual threads that are blocked in socket operations. The implementation has a number
+of _poller modes_. On macOS and Windows there is a set of platform threads that wait for
+events. On Linux, the poller threads that consume the events from the I/O event notification
+facility are virtual threads assigned to the default scheduler.
+
+When using a custom scheduler it may be useful to use the poller mode that creates an I/O
+event notification system and a poller virtual thread per carrier thread. The poller
+thread terminates if the carrier terminates; any outstanding socket I/O operations
+are moved to a different carrier's I/O event notification facility. This poller mode is
+currently implemented on Linux and macOS and is used when running with `-Djdk.pollerMode=3`.

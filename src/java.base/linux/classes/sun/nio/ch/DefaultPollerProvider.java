@@ -43,7 +43,7 @@ class DefaultPollerProvider extends PollerProvider {
     @Override
     Poller.Mode defaultPollerMode() {
         if (ContinuationSupport.isSupported()) {
-            return Mode.POLLER_PER_CARRIER;
+            return Mode.VTHREAD_POLLERS;
         } else {
             return Mode.SYSTEM_THREADS;
         }
