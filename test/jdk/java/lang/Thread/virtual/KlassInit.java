@@ -26,7 +26,7 @@
  * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @requires vm.continuations & vm.opt.LockingMode != 1
- * @run junit/othervm -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
+@run junit/othervm/timeout=480 -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
  */
 
 /*
@@ -34,7 +34,7 @@
  * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @requires vm.continuations & vm.opt.LockingMode != 1
- * @run junit/othervm -Xint -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
+@run junit/othervm/timeout=480 -Xint -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
  */
 
 /*
@@ -42,7 +42,7 @@
  * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @requires vm.continuations & vm.opt.LockingMode != 1
- * @run junit/othervm -Xcomp -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
+@run junit/othervm/timeout=480 -Xcomp -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
  */
 
 /*
@@ -50,7 +50,7 @@
  * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @requires vm.continuations & vm.opt.LockingMode != 1
- * @run junit/othervm -Xcomp -XX:TieredStopAtLevel=1 -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
+@run junit/othervm/timeout=480 -Xcomp -XX:TieredStopAtLevel=1 -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
  */
 
 /*
@@ -58,7 +58,7 @@
  * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @requires vm.continuations & vm.opt.LockingMode != 1
- * @run junit/othervm -Xcomp -XX:-TieredCompilation -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
+@run junit/othervm/timeout=480 -Xcomp -XX:-TieredCompilation -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
  */
 
 /*
@@ -66,7 +66,7 @@
  * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @requires vm.debug == true & vm.continuations & vm.opt.LockingMode != 1
- * @run junit/othervm -XX:+UnlockDiagnosticVMOptions -XX:+FullGCALot -XX:FullGCALotInterval=1000 -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
+@run junit/othervm/timeout=480 -XX:+UnlockDiagnosticVMOptions -XX:+FullGCALot -XX:FullGCALotInterval=1000 -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
  */
 
 import java.util.ArrayList;
