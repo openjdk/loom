@@ -340,7 +340,7 @@ public class IOUringImpl {
 
         if ((sq.getSQFlags() & IORING_SQ_NEED_WAKEUP()) > 0) {
             if (TRACE) System.out.println("pollingEnter: waking up kernel");
-            enter(n, 0, IORING_ENTER_SQ_WAKEUP());
+            enter(0, 0, IORING_ENTER_SQ_WAKEUP());
         }
         if (TRACE) System.out.printf("pollingEnter [fd:%d] return\n", this.fd);
     }
