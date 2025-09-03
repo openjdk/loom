@@ -68,8 +68,13 @@ public class IoUringPoller extends Poller {
     // maps file descriptor to Thread when cancelling poll
     private final Map<Integer, Thread> cancels = new ConcurrentHashMap<>();
 
+    static int sqpoll_idle_time =
+        Integer.getInteger("jdk.io_uring.sqpoll_idle", 0);
+
     IoUringPoller(boolean subPoller, boolean read) throws IOException {
-        IOUringImpl ring = new IOUringImpl(SQ_SIZE, CQ_SIZE, 0);
+        IOUringImpl ring = new IOUringImpl(
+            SQ_SIZE, CQ_SIZE, 0, 0, 0, sqpoll_idle_time);
+
         EventFD wakeupEvent = null;
         EventFD readyEvent = null;
 
@@ -231,11 +236,15 @@ public class IoUringPoller extends Poller {
      * Invoke io_uring_enter to submit the SQE entries
      */
     private static void enter(IOUringImpl ring, int n) throws IOException {
-        int ret = ring.enter(n, 0, 0);
-        if (ret < 0) {
-            throw new IOException("io_uring_enter failed, ret=" + ret);
+        if (sqpoll_idle_time > 0) {
+            ring.pollingEnter(n);
+        } else {
+            int ret = ring.enter(n, 0, 0);
+            if (ret < 0) {
+                throw new IOException("io_uring_enter failed, ret=" + ret);
+            }
+            assert ret == n;
         }
-        assert ret == n;
     }
 
     /**
