@@ -1044,12 +1044,14 @@ class StructuredTaskScopeTest {
      */
     @Test
     void testOnTimeoutInvoked() throws Exception {
+        var scopeRef = new AtomicReference<StructuredTaskScope<?, ?>>();
         Thread owner = Thread.currentThread();
         var invokeCount = new AtomicInteger();
         var joiner = new Joiner<String, Void>() {
             @Override
             public void onTimeout() {
                 assertTrue(Thread.currentThread() == owner);
+                assertTrue(scopeRef.get().isCancelled());
                 invokeCount.incrementAndGet();
             }
             @Override
@@ -1059,9 +1061,11 @@ class StructuredTaskScopeTest {
         };
         try (var scope = StructuredTaskScope.open(joiner,
                 cf -> cf.withTimeout(Duration.ofMillis(100)))) {
-            // wait for scope to be cancelled by timeout
-            awaitCancelled(scope);
-
+            scopeRef.set(scope);
+            scope.fork(() -> {
+                Thread.sleep(Duration.ofDays(1));
+                return null;
+            });
             scope.join();
             assertEquals(1, invokeCount.get());
         }
