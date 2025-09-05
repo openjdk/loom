@@ -478,15 +478,13 @@ public sealed interface StructuredTaskScope<T, R>
      *
      * <p> If a {@code StructuredTaskScope} is opened with a {@linkplain
      * Configuration#withTimeout(Duration) timeout}, and the timeout expires before or
-     * while waiting in {@link StructuredTaskScope#join() join()}, then the {@code Joiners}'s
-     * {@link #onTimeout()} method is invoked to optionally throw {@link TimeoutException
-     * TimeoutException}. The default implementation throws {@code TimeoutException}.
-     * A {@code Joiner} implementation may implement this method to do nothing, in
-     * which case a timeout will {@linkplain StructuredTaskScope##Cancallation cancel} the
-     * scope, and the {@code join()} method will invoke the {@link #result()} method to
-     * produce the result. Implementing {@code onTimeout} to do nothing is useful for
-     * {@code Joiner} implementations that produce a result from subtasks that complete
-     * before the timeout expires.
+     * while waiting in {@link StructuredTaskScope#join() join()}, then the scope is
+     * {@linkplain StructuredTaskScope##Cancallation cancelled}, and the {@code Joiners}'s
+     * {@link #onTimeout()} method is invoked to notify the {@code Joiner} and optionally
+     * throw {@link TimeoutException TimeoutException}. If the {@code onTimeout()} method
+     * does not throw then the {@code join()} method will invoke the {@link #result()}
+     * method to produce a result. This result may be based on the outcome of subtasks
+     * that completed before the timeout expired.
      *
      * <p> Unless otherwise specified, passing a {@code null} argument to a method
      * in this class will cause a {@link NullPointerException} to be thrown.
@@ -565,9 +563,13 @@ public sealed interface StructuredTaskScope<T, R>
          * timeout, and the timeout expires before or while waiting in the {@code join}
          * method.
          *
-         * @implSpec The default implementation throws {@link TimeoutException}.
+         * @implSpec The default implementation throws {@link TimeoutException TimeoutException}.
          *
-         * @apiNote This method is invoked by the {@code join} method. It should not be
+         * @apiNote This method is intended for {@code Joiner} implementations that do not
+         * throw {@link TimeoutException TimeoutException}, or require a notification when
+         * the timeout expires before or while waiting in {@code join}.
+         *
+         * <p> This method is invoked by the {@code join} method. It should not be
          * invoked directly.
          *
          * @throws TimeoutException for {@code join} to throw
