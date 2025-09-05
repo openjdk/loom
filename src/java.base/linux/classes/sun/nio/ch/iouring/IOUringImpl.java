@@ -62,7 +62,7 @@ public class IOUringImpl {
     private static final Arena arena = Arena.ofAuto();
 
     private static final boolean TRACE = System
-            .getProperty("sun.nio.ch.iouring.trace", "false")
+            .getProperty("jdk.io_uring.trace", "false")
             .equalsIgnoreCase("true");
     private final SubmissionQueue sq;
     private final CompletionQueue cq;
