@@ -647,10 +647,4 @@ public abstract class SocketChannel
      */
     @Override
     public abstract SocketAddress getLocalAddress() throws IOException;
-
-    /**
-     * Descrc
-     * @return ass
-     */
-    public abstract int getFDVal();
 }
