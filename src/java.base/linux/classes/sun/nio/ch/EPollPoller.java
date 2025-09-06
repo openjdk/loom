@@ -46,7 +46,7 @@ class EPollPoller extends Poller {
     private final Runnable closer;
     private final Cleanable cleaner;
 
-    EPollPoller(boolean subPoller, boolean read) throws IOException {
+    EPollPoller(Poller.Mode mode, boolean subPoller, boolean read) throws IOException {
         int maxEvents = (subPoller) ? 16 : 64;
 
         int epfd = EPoll.create();
@@ -56,7 +56,7 @@ class EPollPoller extends Poller {
             address = EPoll.allocatePollArray(maxEvents);
 
             // register event with epoll to allow for wakeup
-            if (subPoller) {
+            if (subPoller && (mode == Poller.Mode.POLLER_PER_CARRIER)) {
                 eventfd = new EventFD();
                 IOUtil.configureBlocking(eventfd.efd(), false);
                 EPoll.ctl(epfd, EPOLL_CTL_ADD, eventfd.efd(), EPOLLIN);

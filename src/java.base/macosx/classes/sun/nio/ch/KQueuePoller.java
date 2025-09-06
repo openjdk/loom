@@ -46,7 +46,7 @@ class KQueuePoller extends Poller {
     private final Runnable closer;
     private final Cleanable cleaner;
 
-    KQueuePoller(boolean subPoller, boolean read) throws IOException {
+    KQueuePoller(Poller.Mode mode, boolean subPoller, boolean read) throws IOException {
         int maxEvents = (subPoller) ? 16 : 64;
 
         int kqfd = KQueue.create();
@@ -57,7 +57,7 @@ class KQueuePoller extends Poller {
             address = KQueue.allocatePollArray(maxEvents);
 
             // register one of the pipe with kqueue to allow for wakeup
-            if (subPoller) {
+            if (subPoller && (mode == Mode.POLLER_PER_CARRIER)) {
                 long fds = IOUtil.makePipe(false);
                 fd0 = (int) (fds >>> 32);
                 fd1 = (int) fds;

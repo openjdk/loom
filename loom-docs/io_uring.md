@@ -3,10 +3,12 @@
 ## 1. Poller implementation
 
 Simple Poller implementation that uses `IORING_OP_POLL_ADD` to poll a file descriptor.
+Selected when run with `-Djdk.io_uring=true`.
 
-Functional and works well with pollerMode=3 (`io_uring` instance per carrier thread)
-but will not perform as well as the `epoll` based Poller. Batching of submits
-reduce calls to `io_uring_enter`, but adds latency and reduces performance overall.
+Functional, and suited to pollerMode=3 (`io_uring` instance per carrier thread),
+but will not perform as well as the `epoll` based Poller. Batching of submits, to
+reduce calls to `io_uring_enter`, was prototyped but the batching added latency
+and reduced performance overall.
 
 
 ## 2. Poller implementation with submission queue polling

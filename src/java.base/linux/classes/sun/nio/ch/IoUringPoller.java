@@ -68,7 +68,7 @@ public class IoUringPoller extends Poller {
     // maps file descriptor to Thread when cancelling poll
     private final Map<Integer, Thread> cancels = new ConcurrentHashMap<>();
 
-    IoUringPoller(boolean subPoller, boolean read) throws IOException {
+    IoUringPoller(Poller.Mode mode, boolean subPoller, boolean read) throws IOException {
         IOUringImpl ring = new IOUringImpl(SQ_SIZE, CQ_SIZE, 0);
         EventFD wakeupEvent = null;
         EventFD readyEvent = null;
@@ -80,11 +80,13 @@ public class IoUringPoller extends Poller {
                 ring.register_eventfd(readyEvent.efd());
 
                 // wakeup event to allow for shutdown
-                wakeupEvent = new EventFD();
-                int efd = wakeupEvent.efd();
-                IOUtil.configureBlocking(efd, false);
-                submitPollAdd(ring, efd, Net.POLLIN, efd);
-                enter(ring, 1);
+                if (mode == Poller.Mode.POLLER_PER_CARRIER) {
+                    wakeupEvent = new EventFD();
+                    int efd = wakeupEvent.efd();
+                    IOUtil.configureBlocking(efd, false);
+                    submitPollAdd(ring, efd, Net.POLLIN, efd);
+                    enter(ring, 1);
+                }
             } catch (Throwable e) {
                 ring.close();
                 if (readyEvent != null) readyEvent.close();

@@ -30,7 +30,16 @@ import java.io.IOException;
  * Default PollerProvider for AIX.
  */
 class DefaultPollerProvider extends PollerProvider {
-    DefaultPollerProvider() { }
+    DefaultPollerProvider(Poller.Mode mode) {
+        if (mode != Poller.Mode.SYSTEM_THREADS) {
+            throw new UnsupportedOperationException();
+        }
+        super(mode);
+    }
+
+    DefaultPollerProvider() {
+        this(Poller.Mode.SYSTEM_THREADS);
+    }
 
     @Override
     Poller readPoller(boolean subPoller) throws IOException {

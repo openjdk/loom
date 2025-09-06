@@ -53,18 +53,16 @@ import jdk.internal.vm.annotation.Stable;
 public abstract class Poller {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
-    private static final PollerProvider PROVIDER = PollerProvider.provider();
-
-    // the poller group for the poller threads that support virtual threads doing I/O
+    // the poller group for the I/O pollers and poller threads
     private static final PollerGroup POLLER_GROUP = createPollerGroup();
 
-    // the poller or sub-poller thread
+    // the poller or sub-poller thread (used for observability only)
     private @Stable Thread owner;
 
     // maps file descriptors to parked Thread
     private final Map<Integer, Thread> map = new ConcurrentHashMap<>();
 
-    // shutdown if supported by poller group.
+    // shutdown (if supported by poller group)
     private volatile boolean shutdown;
 
     /**
@@ -102,13 +100,27 @@ public abstract class Poller {
      */
     private static PollerGroup createPollerGroup() {
         try {
-            Mode mode = pollerMode(PROVIDER.defaultPollerMode());
-            int readPollers = pollerCount("jdk.readPollers", PROVIDER.defaultReadPollers(mode));
-            int writePollers = pollerCount("jdk.writePollers", PROVIDER.defaultWritePollers(mode));
-            PollerGroup group = switch (mode) {
-                case SYSTEM_THREADS     -> new SystemThreadsPollerGroup(readPollers, writePollers);
-                case VTHREAD_POLLERS    -> new VThreadsPollerGroup(readPollers, writePollers);
-                case POLLER_PER_CARRIER -> new PollerPerCarrierPollerGroup(writePollers);
+            PollerProvider provider;
+            if (System.getProperty("jdk.pollerMode") instanceof String s) {
+                Mode mode = switch (s) {
+                    case "1" -> Mode.SYSTEM_THREADS;
+                    case "2" -> Mode.VTHREAD_POLLERS;
+                    case "3" -> Mode.POLLER_PER_CARRIER;
+                    default -> {
+                        throw new RuntimeException(s + " is not a valid polling mode");
+                    }
+                };
+                provider = PollerProvider.createProvider(mode);
+            } else {
+                provider = PollerProvider.createProvider();
+            }
+
+            int readPollers = pollerCount("jdk.readPollers", provider.defaultReadPollers());
+            int writePollers = pollerCount("jdk.writePollers", provider.defaultWritePollers());
+            PollerGroup group = switch (provider.pollerMode()) {
+                case SYSTEM_THREADS     -> new SystemThreadsPollerGroup(provider, readPollers, writePollers);
+                case VTHREAD_POLLERS    -> new VThreadsPollerGroup(provider, readPollers, writePollers);
+                case POLLER_PER_CARRIER -> new PollerPerCarrierPollerGroup(provider, writePollers);
             };
             group.start();
             return group;
@@ -341,7 +353,15 @@ public abstract class Poller {
      * A group of poller threads that support virtual threads polling file descriptors.
      */
     private static abstract class PollerGroup {
-        PollerGroup() { }
+        private final PollerProvider provider;
+
+        PollerGroup(PollerProvider provider) {
+            this.provider = provider;
+        }
+
+        final PollerProvider provider() {
+            return provider;
+        }
 
         /**
          * Starts the poller group and any system-wide poller threads.
@@ -407,15 +427,18 @@ public abstract class Poller {
         private final Poller[] readPollers;
         private final Poller[] writePollers;
 
-        SystemThreadsPollerGroup(int readPollerCount, int writePollerCount) throws IOException {
+        SystemThreadsPollerGroup(PollerProvider provider,
+                                 int readPollerCount,
+                                 int writePollerCount) throws IOException {
+            super(provider);
             Poller[] readPollers = new Poller[readPollerCount];
             Poller[] writePollers = new Poller[writePollerCount];
             try {
                 for (int i = 0; i < readPollerCount; i++) {
-                    readPollers[i] = PROVIDER.readPoller(false);
+                    readPollers[i] = provider.readPoller(false);
                 }
                 for (int i = 0; i < writePollerCount; i++) {
-                    writePollers[i] = PROVIDER.writePoller(false);
+                    writePollers[i] = provider.writePoller(false);
                 }
             } catch (Throwable e) {
                 closeAll(readPollers);
@@ -438,12 +461,12 @@ public abstract class Poller {
         }
 
         private Poller readPoller(int fdVal) {
-            int index = PROVIDER.fdValToIndex(fdVal, readPollers.length);
+            int index = provider().fdValToIndex(fdVal, readPollers.length);
             return readPollers[index];
         }
 
         private Poller writePoller(int fdVal) {
-            int index = PROVIDER.fdValToIndex(fdVal, writePollers.length);
+            int index = provider().fdValToIndex(fdVal, writePollers.length);
             return writePollers[index];
         }
 
@@ -484,17 +507,20 @@ public abstract class Poller {
         // keep virtual thread pollers alive
         private final Executor executor;
 
-        VThreadsPollerGroup(int readPollerCount, int writePollerCount) throws IOException {
-            Poller masterPoller = PROVIDER.readPoller(false);
+        VThreadsPollerGroup(PollerProvider provider,
+                            int readPollerCount,
+                            int writePollerCount) throws IOException {
+            super(provider);
+            Poller masterPoller = provider.readPoller(false);
             Poller[] readPollers = new Poller[readPollerCount];
             Poller[] writePollers = new Poller[writePollerCount];
 
             try {
                 for (int i = 0; i < readPollerCount; i++) {
-                    readPollers[i] = PROVIDER.readPoller(true);
+                    readPollers[i] = provider.readPoller(true);
                 }
                 for (int i = 0; i < writePollerCount; i++) {
-                    writePollers[i] = PROVIDER.writePoller(true);
+                    writePollers[i] = provider.writePoller(true);
                 }
             } catch (Throwable e) {
                 masterPoller.close();
@@ -527,12 +553,12 @@ public abstract class Poller {
         }
 
         private Poller readPoller(int fdVal) {
-            int index = PROVIDER.fdValToIndex(fdVal, readPollers.length);
+            int index = provider().fdValToIndex(fdVal, readPollers.length);
             return readPollers[index];
         }
 
         private Poller writePoller(int fdVal) {
-            int index = PROVIDER.fdValToIndex(fdVal, writePollers.length);
+            int index = provider().fdValToIndex(fdVal, writePollers.length);
             return writePollers[index];
         }
 
@@ -591,12 +617,14 @@ public abstract class Poller {
         /**
          * Create a PollerPerCarrierPollerGroup with the given number of write pollers.
          */
-        PollerPerCarrierPollerGroup(int writePollerCount) throws IOException {
-            Poller masterPoller = PROVIDER.readPoller(false);
+        PollerPerCarrierPollerGroup(PollerProvider provider,
+                                    int writePollerCount) throws IOException {
+            super(provider);
+            Poller masterPoller = provider.readPoller(false);
             Poller[] writePollers = new Poller[writePollerCount];
             try {
                 for (int i = 0; i < writePollerCount; i++) {
-                    writePollers[i] = PROVIDER.writePoller(false);
+                    writePollers[i] = provider.writePoller(false);
                 }
             } catch (Throwable e) {
                 masterPoller.close();
@@ -617,7 +645,7 @@ public abstract class Poller {
         }
 
         private Poller writePoller(int fdVal) {
-            int index = PROVIDER.fdValToIndex(fdVal, writePollers.length);
+            int index = provider().fdValToIndex(fdVal, writePollers.length);
             return writePollers[index];
         }
 
@@ -628,7 +656,7 @@ public abstract class Poller {
             assert Thread.currentThread().isVirtual() && ContinuationSupport.isSupported();
 
             // create read sub-poller
-            Poller readPoller = PROVIDER.readPoller(true);
+            Poller readPoller = provider().readPoller(true);
             readPollers.add(readPoller);
 
             // start virtual thread to execute sub-polling loop
@@ -729,25 +757,6 @@ public abstract class Poller {
         @Override
         List<Poller> writePollers() {
             return List.of(writePollers);
-        }
-    }
-
-    /**
-     * Returns the poller mode.
-     */
-    private static Mode pollerMode(Mode defaultPollerMode) {
-        String s = System.getProperty("jdk.pollerMode");
-        if (s != null) {
-            return switch (s) {
-                case "1" -> Mode.SYSTEM_THREADS;
-                case "2" -> Mode.VTHREAD_POLLERS;
-                case "3" -> Mode.POLLER_PER_CARRIER;
-                default -> {
-                    throw new RuntimeException(s + " is not a valid polling mode");
-                }
-            };
-        } else {
-            return defaultPollerMode;
         }
     }
 
