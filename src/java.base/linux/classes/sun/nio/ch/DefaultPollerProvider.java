@@ -26,7 +26,6 @@ package sun.nio.ch;
 
 import java.io.IOException;
 import jdk.internal.vm.ContinuationSupport;
-import sun.nio.ch.Poller.Mode;
 
 /**
  * Default PollerProvider for Linux.
@@ -38,42 +37,43 @@ class DefaultPollerProvider extends PollerProvider {
         USE_IOURING = "".equals(s) || Boolean.parseBoolean(s);
     }
 
-    DefaultPollerProvider() { }
+    DefaultPollerProvider(Poller.Mode mode) {
+        super(mode);
+    }
 
-    @Override
-    Poller.Mode defaultPollerMode() {
-        if (ContinuationSupport.isSupported()) {
-            return Mode.VTHREAD_POLLERS;
-        } else {
-            return Mode.SYSTEM_THREADS;
-        }
+    DefaultPollerProvider() {
+        this(ContinuationSupport.isSupported()
+                ? Poller.Mode.VTHREAD_POLLERS
+                : Poller.Mode.SYSTEM_THREADS);
     }
 
     @Override
-    int defaultReadPollers(Mode mode) {
+    int defaultReadPollers() {
         int ncpus = Runtime.getRuntime().availableProcessors();
-        return switch (mode) {
+        return switch (pollerMode()) {
             case SYSTEM_THREADS  -> Math.max(Integer.highestOneBit(ncpus / 4), 1);
             case VTHREAD_POLLERS -> Math.min(Integer.highestOneBit(ncpus), 32);
-            default              -> super.defaultReadPollers(mode);
+            default              -> super.defaultReadPollers();
         };
     }
 
     @Override
     Poller readPoller(boolean subPoller) throws IOException {
+        Poller.Mode mode = pollerMode();
         if (USE_IOURING) {
-            return new IoUringPoller(subPoller, true);
+            return new IoUringPoller(mode, subPoller, true);
         } else {
-            return new EPollPoller(subPoller, true);
+            return new EPollPoller(mode, subPoller, true);
         }
     }
 
     @Override
     Poller writePoller(boolean subPoller) throws IOException {
+        Poller.Mode mode = pollerMode();
         if (USE_IOURING) {
-            return new IoUringPoller(subPoller, false);
+            return new IoUringPoller(mode, subPoller, false);
         } else {
-            return new EPollPoller(subPoller, false);
+            return new EPollPoller(mode, subPoller, false);
         }
     }
 }
