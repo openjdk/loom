@@ -50,14 +50,14 @@ import static jdk.internal.ffi.generated.iouring.iouring_h.*;
 public class IoUringPoller extends Poller {
     private static final Arena ARENA = Arena.ofAuto();
     private static final long ADDRESS_SIZE = ValueLayout.ADDRESS.byteSize();
-    private static final int MAX_READV_BUF_SIZE = 8192;
+    private static final int MAX_BUF_SIZE = 8192;
+
+    // submission queue polling enabled if kernel thread idle time > 0 millis
+    private static final int SQPOLL_IDLE_TIME = Integer.getInteger("jdk.io_uring.sqpoll_idle", 0);
 
     // submition and completion queue sizes
-    private static final int SQ_SIZE_DEFAULT = 4;
-
-    static final int SQ_SIZE =
-        Integer.getInteger("jdk.io_uring.sqsize", SQ_SIZE_DEFAULT);
-
+    private static final int DEFAULT_SQ_SIZE = (SQPOLL_IDLE_TIME > 0) ? 64 : 4;
+    private static final int SQ_SIZE = Integer.getInteger("jdk.io_uring.sqsize", DEFAULT_SQ_SIZE);
     private static final int CQ_SIZE = Math.max(SQ_SIZE + 1, 1024);
 
     // max completion events to consume in a blocking poll and non-blocking subpoll
@@ -81,9 +81,6 @@ public class IoUringPoller extends Poller {
 
     // maps iovec to in progress readv/writev operations
     private final Map<Long, Op> ops;
-    
-    static final int sqpoll_idle_time =
-        Integer.getInteger("jdk.io_uring.sqpoll_idle", 0);
 
     // per poller cache of buf/iovec bufs used for readv/writve ops
     private final BlockingQueue<IoBufs> ioBufsQueue;
@@ -92,8 +89,7 @@ public class IoUringPoller extends Poller {
                   boolean subPoller,
                   boolean read,
                   boolean supportIoOps) throws IOException {
-	IOUring ring = new IOUring(
-            SQ_SIZE, CQ_SIZE, 0, 0, 0, sqpoll_idle_time); 
+        IOUring ring = new IOUring(SQ_SIZE, CQ_SIZE, 0, 0, 0, SQPOLL_IDLE_TIME);
         EventFD wakeupEvent = null;
         EventFD readyEvent = null;
 
@@ -214,7 +210,7 @@ public class IoUringPoller extends Poller {
     }
 
     /**
-     * Uses IORING_OP_READV op to read bytes into the given byte array.
+     * Uses IORING_OP_READV op to read bytes into a byte array.
      */
     @Override
     int implRead(int fd, byte[] b, int off, int len, long nanos, BooleanSupplier isOpen)
@@ -222,7 +218,13 @@ public class IoUringPoller extends Poller {
     {
         assert ops != null;
 
-        IoBufs bufs = takeIoBufs(len);
+        IoBufs bufs = takeIoBufs();
+
+        // prepare to read up to len bytes
+        len = Math.min(len, MAX_BUF_SIZE);
+        iovec.iov_len(bufs.vec(), len);
+
+        // use the iovec address as the user_data
         long udata = bufs.vec().address();
         var op = new Op(Thread.currentThread());
         ops.put(udata, op);
@@ -246,7 +248,7 @@ public class IoUringPoller extends Poller {
             res = op.result();
             try {
                 if (res > 0) {
-                    // copy bytes into byte[], need to improve this
+                    // copy bytes into the byte array
                     assert res <= len;
                     MemorySegment dst = MemorySegment.ofArray(b);
                     MemorySegment.copy(bufs.buf(), 0, dst, off, res);
@@ -257,6 +259,57 @@ public class IoUringPoller extends Poller {
                     throw new IOException("IORING_OP_READV failed errno=" + res);
                 } else {
                     // read did not complete, need to cancel. If the cancel fails then
+                    // we can't return the bufs to the cache.
+                    cancelOp(fd, bufs.vec().address());
+                    res = IOStatus.UNAVAILABLE;
+                }
+            } finally {
+                if (res != 0) {
+                    offerIoBufs(bufs);  // return to cache
+                }
+            }
+        }
+        return res;
+    }
+
+    /**
+     * Uses IORING_OP_WRITEV op to write bytes from a byte array.
+     */
+    @Override
+    int implWrite(int fd, byte[] b, int off, int len, BooleanSupplier isOpen) throws IOException {
+        assert ops != null;
+
+        IoBufs bufs = takeIoBufs();
+
+        // copy the bytes from the byte array into the buffer
+        len = Math.min(len, MAX_BUF_SIZE);
+        MemorySegment src = MemorySegment.ofArray(b);
+        MemorySegment.copy(src, off, bufs.buf(), 0, len);
+        iovec.iov_len(bufs.vec(), len);
+
+        // use the iovec address as the user_data
+        long udata = bufs.vec().address();
+        var op = new Op(Thread.currentThread());
+        ops.put(udata, op);
+
+        int res = 0;
+        try {
+            synchronized (submitLock) {
+                submitWrite(ring, fd, bufs.vec(), udata);
+            }
+            if (isOpen.getAsBoolean() && !isShutdown()) {
+                LockSupport.park();
+            }
+        } finally {
+            Op previous = ops.remove(udata);
+            assert previous == op;
+
+            res = op.result();
+            try {
+                if (res < 0) {
+                    throw new IOException("IORING_OP_WRITEV failed errno=" + res);
+                } else if (res == 0) {
+                    // write did not complete, need to cancel. If the cancel fails then
                     // we can't return the bufs to the cache.
                     cancelOp(fd, bufs.vec().address());
                     res = IOStatus.UNAVAILABLE;
@@ -344,7 +397,7 @@ public class IoUringPoller extends Poller {
      * Invoke io_uring_enter to submit the SQE entries
      */
     private static void enter(IOUring ring, int n) throws IOException {
-        if (sqpoll_idle_time > 0) {
+        if (SQPOLL_IDLE_TIME > 0) {
             ring.pollingEnter();
         } else {
             int ret = ring.enter(n, 0, 0);
@@ -406,6 +459,24 @@ public class IoUringPoller extends Poller {
     }
 
     /**
+     * Submit IORING_OP_WRITEV operation.
+     * @param fd file descriptior
+     * @param iov already populared iov struct
+     * @param udata the user data for the WRITEV op
+     */
+    private static void submitWrite(IOUring ring, int fd, MemorySegment iov, long udata)
+        throws IOException
+    {
+        Sqe sqe = new Sqe()
+                .opcode(IORING_OP_WRITEV())
+                .fd(fd)
+                .addr(iov).len(1).off(0)   // one buffer
+                .user_data(udata);
+        ring.submit(sqe);
+        enter(ring, 1);
+    }
+
+    /**
      * Cancels an operation submitted with the given user_data.
      */
     private void cancelOp(int fd, long req_udata) throws IOException {
@@ -448,7 +519,7 @@ public class IoUringPoller extends Poller {
 
         IoBufs() {
             vec = ARENA.allocate(iovec.$LAYOUT());
-            buf = ARENA.allocate(MAX_READV_BUF_SIZE);
+            buf = ARENA.allocate(MAX_BUF_SIZE);
             iovec.iov_base(vec, buf);
         }
 
@@ -456,12 +527,11 @@ public class IoUringPoller extends Poller {
         MemorySegment buf() { return buf; }
     }
 
-    private IoBufs takeIoBufs(int len) {
+    private IoBufs takeIoBufs() {
         IoBufs req = ioBufsQueue.poll();
         if (req == null) {
             req = new IoBufs();
         }
-        iovec.iov_len(req.vec(), Math.min(len, MAX_READV_BUF_SIZE));
         return req;
     }
 
