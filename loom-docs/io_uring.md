@@ -19,6 +19,7 @@ N represents the allowed idle time the kernel polling thread is allowed to spin 
 In order to check if the polling thread needs to be restarted the IOUring user
 calls `IORing.pollingEnter()` instead of `IOUring.enter` after each submission. 
 For the majority case where the thread is still running, this is only a cheap memory access.
+The default value for this parameter is zero, which means SQ polling is disabled.
 
 ## 3. Blocking read/write implemented on async readv/writev
 
