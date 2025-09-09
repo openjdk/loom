@@ -47,8 +47,9 @@ import jdk.internal.vm.ContinuationSupport;
 import jdk.internal.vm.annotation.Stable;
 
 /**
- * Polls file descriptors. Virtual threads invoke the poll method to park
- * until a given file descriptor is ready for I/O.
+ * I/O poller to allow virtual threads park until a file descriptor is ready for I/O.
+ * Implementations also optionally support read/write operations where virtual threads
+ * park until bytes are read or written.
  */
 public abstract class Poller {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
@@ -200,7 +201,6 @@ public abstract class Poller {
 
     /**
      * Wakeup the poller thread if blocked in poll.
-     *
      * @throws UnsupportedOperationException if not supported
      */
     void wakeupPoller() throws IOException {
@@ -417,6 +417,21 @@ public abstract class Poller {
                 }
             }
         }
+
+        /**
+         * Returns true if the read pollers in this poller group support read ops in
+         * addition to POLLIN polling.
+         */
+        boolean supportReadOps() {
+            return provider().supportReadOps();
+        }
+
+        /**
+         * Reads bytes into the given byte array.
+         * @throws UnsupportedOperationException if not supported
+         */
+        abstract int read(int fdVal,byte[] b, int off, int len, long nanos,
+                          BooleanSupplier isOpen) throws IOException;
     }
 
     /**
@@ -476,6 +491,12 @@ public abstract class Poller {
                     ? readPoller(fdVal)
                     : writePoller(fdVal);
             poller.poll(fdVal, nanos, isOpen);
+        }
+
+        @Override
+        int read(int fdVal, byte[] b, int off, int len, long nanos,
+                 BooleanSupplier isOpen) throws IOException {
+            return readPoller(fdVal).implRead(fdVal, b, off, len, nanos, isOpen);
         }
 
         @Override
@@ -568,6 +589,12 @@ public abstract class Poller {
                     ? readPoller(fdVal)
                     : writePoller(fdVal);
             poller.poll(fdVal, nanos, isOpen);
+        }
+
+        @Override
+        int read(int fdVal, byte[] b, int off, int len, long nanos,
+                 BooleanSupplier isOpen) throws IOException {
+            return readPoller(fdVal).implRead(fdVal, b, off, len, nanos, isOpen);
         }
 
         @Override
@@ -716,6 +743,12 @@ public abstract class Poller {
             masterPoller.poll(fdVal, nanos, () -> true);
         }
 
+        @Override
+        int read(int fdVal, byte[] b, int off, int len, long nanos,
+                 BooleanSupplier isOpen) throws IOException {
+            return readPoller().implRead(fdVal, b, off, len, nanos, isOpen);
+        }
+
         /**
          * Sub-poller polling loop.
          */
@@ -777,6 +810,35 @@ public abstract class Poller {
             throw new IllegalArgumentException(msg);
         }
         return count;
+    }
+
+
+    /**
+     * Returns true if read ops are supported in addition to POLLIN polling.
+     */
+    public static boolean supportReadOps() {
+        return POLLER_GROUP.supportReadOps();
+    }
+
+    /**
+     * Parks the current thread until bytes are read into the given byte array.
+     * @param isOpen supplies a boolean to indicate if the enclosing object is open
+     * @return the number of bytes read (>0), EOF (-1), or UNAVAILABLE (-2) if unparked
+     * or the timeout expires while waiting for bytes to be read
+     * @throws UnsupportedOperationException if not supported
+     */
+    public static int read(int fdVal, byte[] b, int off, int len, long nanos,
+                           BooleanSupplier isOpen) throws IOException {
+        return POLLER_GROUP.read(fdVal, b, off, len, nanos, isOpen);
+    }
+
+    /**
+     * Parks the current thread until bytes are read into the given byte array. This
+     * method is overridden by poller implementations that support this operation.
+     */
+    int implRead(int fdVal, byte[] b, int off, int len, long nanos,
+                 BooleanSupplier isOpen) throws IOException {
+        throw new UnsupportedOperationException();
     }
 
     /**

@@ -24,6 +24,7 @@
  */
 package sun.nio.ch;
 
+import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.ref.Cleaner.Cleanable;
@@ -31,22 +32,28 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.LockSupport;
+import java.util.function.BooleanSupplier;
 import jdk.internal.ref.CleanerFactory;
 import sun.nio.ch.iouring.IOUringImpl;
 import sun.nio.ch.iouring.Cqe;
 import sun.nio.ch.iouring.Sqe;
-import static jdk.internal.ffi.generated.iouring.iouring_h.IORING_OP_POLL_ADD;
-import static jdk.internal.ffi.generated.iouring.iouring_h.IORING_OP_POLL_REMOVE;
+import jdk.internal.ffi.generated.iouring.*;
+import static jdk.internal.ffi.generated.iouring.iouring_h.*;
 
 /**
  * Poller implementation based io_uring.
+ *
+ * @apiNote This implementation is experimental. There are many design choices, esp.
+ * around buffer management, that have to be explored.
  */
 
 public class IoUringPoller extends Poller {
+    private static final Arena ARENA = Arena.ofAuto();
     private static final long ADDRESS_SIZE = ValueLayout.ADDRESS.byteSize();
+    private static final int MAX_READV_BUF_SIZE = 8192;
 
     // submition and completion queue sizes
-    private static final int SQ_SIZE = 16;
+    private static final int SQ_SIZE = 4;
     private static final int CQ_SIZE = Math.max(SQ_SIZE + 1, 1024);
 
     // max completion events to consume in a blocking poll and non-blocking subpoll
@@ -68,7 +75,16 @@ public class IoUringPoller extends Poller {
     // maps file descriptor to Thread when cancelling poll
     private final Map<Integer, Thread> cancels = new ConcurrentHashMap<>();
 
-    IoUringPoller(Poller.Mode mode, boolean subPoller, boolean read) throws IOException {
+    // maps iovec to in progress readv/writev operations
+    private final Map<Long, Op> ops;
+
+    // per poller cache of buf/iovec bufs used for readv/writve ops
+    private final BlockingQueue<IoBufs> ioBufsQueue;
+
+    IoUringPoller(Poller.Mode mode,
+                  boolean subPoller,
+                  boolean read,
+                  boolean supportIoOps) throws IOException {
         IOUringImpl ring = new IOUringImpl(SQ_SIZE, CQ_SIZE, 0);
         EventFD wakeupEvent = null;
         EventFD readyEvent = null;
@@ -99,6 +115,15 @@ public class IoUringPoller extends Poller {
         this.ring = ring;
         this.readyEvent = readyEvent;
         this.wakeupEvent = wakeupEvent;
+
+        // setup if supporting readv/writev ops
+        if (supportIoOps) {
+            this.ops = new ConcurrentHashMap<>();
+            this.ioBufsQueue = new LinkedTransferQueue<>();
+        } else {
+            this.ops = null;
+            this.ioBufsQueue = null;
+        }
 
         // create action to close io_uring instance, register cleaner if this is a subpoller
         this.closer = closer(ring, readyEvent, wakeupEvent);
@@ -144,6 +169,9 @@ public class IoUringPoller extends Poller {
         readyEvent.reset();
     }
 
+    /**
+     * Initiate polling the given file descriptor.
+     */
     @Override
     void implRegister(int fd) throws IOException {
         assert fd > 0;  // fd == 0 used for wakeup
@@ -155,6 +183,9 @@ public class IoUringPoller extends Poller {
         }
     }
 
+    /**
+     * Stop polling of the given file descriptorr if not already polled.
+     */
     @Override
     void implDeregister(int fd, boolean polled) throws IOException {
         if (!polled && !isShutdown()) {
@@ -171,6 +202,63 @@ public class IoUringPoller extends Poller {
                 LockSupport.park();
             }
         }
+    }
+
+    /**
+     * Uses IORING_OP_READV op to read bytes into the given byte array.
+     */
+    @Override
+    int implRead(int fd, byte[] b, int off, int len, long nanos, BooleanSupplier isOpen)
+        throws IOException
+    {
+        assert ops != null;
+
+        IoBufs bufs = takeIoBufs(len);
+        long udata = bufs.vec().address();
+        var op = new Op(Thread.currentThread());
+        ops.put(udata, op);
+
+        int res = 0;
+        try {
+            synchronized (submitLock) {
+                submitRead(ring, fd, bufs.vec(), udata);
+            }
+            if (isOpen.getAsBoolean() && !isShutdown()) {
+                if (nanos > 0) {
+                    LockSupport.parkNanos(nanos);
+                } else {
+                    LockSupport.park();
+                }
+            }
+        } finally {
+            Op previous = ops.remove(udata);
+            assert previous == op;
+
+            res = op.result();
+            try {
+                if (res > 0) {
+                    // copy bytes into byte[], need to improve this
+                    assert res <= len;
+                    MemorySegment dst = MemorySegment.ofArray(b);
+                    MemorySegment.copy(bufs.buf(), 0, dst, off, res);
+                } else if (res == -1) {
+                    // EOF
+                } else if (res < 0) {
+                    // read failed
+                    throw new IOException("IORING_OP_READV failed errno=" + res);
+                } else {
+                    // read did not complete, need to cancel. If the cancel fails then
+                    // we can't return the bufs to the cache.
+                    cancelOp(fd, bufs.vec().address());
+                    res = IOStatus.UNAVAILABLE;
+                }
+            } finally {
+                if (res != 0) {
+                    offerIoBufs(bufs);  // return to cache
+                }
+            }
+        }
+        return res;
     }
 
     @Override
@@ -204,16 +292,30 @@ public class IoUringPoller extends Poller {
     }
 
     /**
-     * Poll up to max sockets without blocking. Also handles the completion of any
-     * POLL_REMOVE operations.
-     * @retutn the number of sockets polled
+     * Poll or handle completions up to the given max without blocking. This method also
+     * handles the completion of any cancelled operations.
+     * @retutn the number of sockets polled and I/O operations completed
      */
     private int tryPoll(int max) {
         int polled = 0;
         Cqe cqe;
         while (polled < max && ((cqe = ring.pollCompletion()) != null)) {
-            // user data is fd or -fd
-            int fd = (int) cqe.user_data();
+            long udata = cqe.user_data();
+
+            // handle read ops
+            if (ops != null) {
+                Op op = ops.get(udata);
+                if (op != null) {
+                    int res = cqe.res();
+                    op.setResult((res != 0) ? res : -1);   // map 0 to -1 at EOF
+                    LockSupport.unpark(op.thread());
+                    polled++;
+                    continue;
+                }
+            }
+
+            // handle poll and cancls ops, user data is fd or -fd
+            int fd = (int) udata;
             if (fd > 0 && (wakeupEvent == null || fd != wakeupEvent.efd())) {
                 // poll done
                 polled(fd);
@@ -270,5 +372,87 @@ public class IoUringPoller extends Poller {
                 .addr(address)
                 .user_data(udata);
         ring.submit(sqe);
+    }
+
+    /**
+     * Submit IORING_OP_READV operation.
+     * @param fd file descriptior
+     * @param iov already populared iov struct
+     * @param udata the user data for the READV op
+     */
+    private static void submitRead(IOUringImpl ring, int fd, MemorySegment iov, long udata)
+        throws IOException
+    {
+        Sqe sqe = new Sqe()
+                .opcode(IORING_OP_READV())
+                .fd(fd)
+                .addr(iov).len(1).off(0)   // one buffer
+                .user_data(udata);
+        ring.submit(sqe);
+        enter(ring, 1);
+    }
+
+    /**
+     * Cancels an operation submitted with the given user_data.
+     */
+    private void cancelOp(int fd, long req_udata) throws IOException {
+        @SuppressWarnings("restricted")
+        MemorySegment address = MemorySegment.ofAddress(req_udata).reinterpret(ADDRESS_SIZE);
+        cancels.put(fd, Thread.currentThread());
+        synchronized (submitLock) {
+            Sqe sqe = new Sqe()
+                    .opcode(IORING_OP_ASYNC_CANCEL())
+                    .addr(address)
+                    .user_data(-fd);   // user data for IORING_OP_ASYNC_CANCEL
+            ring.submit(sqe);
+            enter(ring, 1);
+        }
+        while (cancels.containsKey(fd) && !isShutdown()) {
+            LockSupport.park();
+        }
+    }
+
+    private static class Op {
+        final Thread thread;
+        volatile int result;
+        Op(Thread thread) {
+            this.thread = thread;
+        }
+        Thread thread() {
+            return thread;
+        }
+        int result() {
+            return result;
+        }
+        void setResult(int result) {
+            this.result = result;
+        }
+    }
+
+    private static class IoBufs {
+        final MemorySegment vec;
+        final MemorySegment buf;
+
+        IoBufs() {
+            vec = ARENA.allocate(iovec.$LAYOUT());
+            buf = ARENA.allocate(MAX_READV_BUF_SIZE);
+            iovec.iov_base(vec, buf);
+        }
+
+        MemorySegment vec() { return vec; }
+        MemorySegment buf() { return buf; }
+    }
+
+    private IoBufs takeIoBufs(int len) {
+        IoBufs req = ioBufsQueue.poll();
+        if (req == null) {
+            req = new IoBufs();
+        }
+        iovec.iov_len(req.vec(), Math.min(len, MAX_READV_BUF_SIZE));
+        return req;
+    }
+
+    private void offerIoBufs(IoBufs req) {
+        ioBufsQueue.offer(req);
     }
 }
