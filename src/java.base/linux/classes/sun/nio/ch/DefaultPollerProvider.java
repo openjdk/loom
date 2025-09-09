@@ -32,9 +32,17 @@ import jdk.internal.vm.ContinuationSupport;
  */
 class DefaultPollerProvider extends PollerProvider {
     private static final boolean USE_IOURING;
+    private static final boolean USE_IORING_OP_READV;
     static {
         String s = System.getProperty("jdk.io_uring");
-        USE_IOURING = "".equals(s) || Boolean.parseBoolean(s);
+        if ("".equals(s) || Boolean.parseBoolean(s)) {
+            USE_IOURING = true;
+            s = System.getProperty("jdk.io_uring.readv");
+            USE_IORING_OP_READV = "".equals(s) || Boolean.parseBoolean(s);
+        } else {
+            USE_IOURING = false;
+            USE_IORING_OP_READV = false;
+        }
     }
 
     DefaultPollerProvider(Poller.Mode mode) {
@@ -61,7 +69,9 @@ class DefaultPollerProvider extends PollerProvider {
     Poller readPoller(boolean subPoller) throws IOException {
         Poller.Mode mode = pollerMode();
         if (USE_IOURING) {
-            return new IoUringPoller(mode, subPoller, true);
+            boolean supportReadOps = USE_IORING_OP_READV
+                    && ((mode == Poller.Mode.SYSTEM_THREADS) || subPoller);
+            return new IoUringPoller(mode, subPoller, true, supportReadOps);
         } else {
             return new EPollPoller(mode, subPoller, true);
         }
@@ -71,9 +81,14 @@ class DefaultPollerProvider extends PollerProvider {
     Poller writePoller(boolean subPoller) throws IOException {
         Poller.Mode mode = pollerMode();
         if (USE_IOURING) {
-            return new IoUringPoller(mode, subPoller, false);
+            return new IoUringPoller(mode, subPoller, false, false);
         } else {
             return new EPollPoller(mode, subPoller, false);
         }
+    }
+
+    @Override
+    boolean supportReadOps() {
+        return USE_IORING_OP_READV;
     }
 }

@@ -22,7 +22,8 @@ the submission queue.
 
 (not in loom repo at this time)
 
-Uses `IORING_OP_READV` and `IORING_OP_WRITEV` with caller owned buffer and iovec.
+Extends Poller implementation to support read and write operations using `IORING_OP_READV`
+and `IORING_OP_WRITEV`.
 
 
 ## 4. Blocking read/write implemented on async readv/writev with registered buffers
