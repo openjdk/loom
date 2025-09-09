@@ -59,14 +59,14 @@ class WEPollPoller extends Poller {
     }
 
     @Override
-    void implRegister(int fdVal) throws IOException {
+    void implStartPoll(int fdVal) throws IOException {
         int err = WEPoll.ctl(handle, EPOLL_CTL_ADD, fdVal, (event | EPOLLONESHOT));
         if (err != 0)
             throw new IOException("epoll_ctl failed: " + err);
     }
 
     @Override
-    void implDeregister(int fdVal, boolean polled) {
+    void implStopPoll(int fdVal, boolean polled) {
         WEPoll.ctl(handle, EPOLL_CTL_DEL, fdVal, 0);
     }
 

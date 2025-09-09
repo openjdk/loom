@@ -33,15 +33,19 @@ import jdk.internal.vm.ContinuationSupport;
 class DefaultPollerProvider extends PollerProvider {
     private static final boolean USE_IOURING;
     private static final boolean USE_IORING_OP_READV;
+    private static final boolean USE_IORING_OP_WRITEV;
     static {
         String s = System.getProperty("jdk.io_uring");
         if ("".equals(s) || Boolean.parseBoolean(s)) {
             USE_IOURING = true;
             s = System.getProperty("jdk.io_uring.readv");
             USE_IORING_OP_READV = "".equals(s) || Boolean.parseBoolean(s);
+            s = System.getProperty("jdk.io_uring.writev");
+            USE_IORING_OP_WRITEV = "".equals(s) || Boolean.parseBoolean(s);
         } else {
             USE_IOURING = false;
             USE_IORING_OP_READV = false;
+            USE_IORING_OP_WRITEV = false;
         }
     }
 
@@ -69,6 +73,7 @@ class DefaultPollerProvider extends PollerProvider {
     Poller readPoller(boolean subPoller) throws IOException {
         Poller.Mode mode = pollerMode();
         if (USE_IOURING) {
+            // read poller is system thread in SYSTEM_THREADS mode
             boolean supportReadOps = USE_IORING_OP_READV
                     && ((mode == Poller.Mode.SYSTEM_THREADS) || subPoller);
             return new IoUringPoller(mode, subPoller, true, supportReadOps);
@@ -81,7 +86,10 @@ class DefaultPollerProvider extends PollerProvider {
     Poller writePoller(boolean subPoller) throws IOException {
         Poller.Mode mode = pollerMode();
         if (USE_IOURING) {
-            return new IoUringPoller(mode, subPoller, false, false);
+            // write poller is system thread in SYSTEM_THREADS and POLLER_PER_CARRIER modes
+            boolean supportWriteOps = USE_IORING_OP_WRITEV
+                    && ((mode != Poller.Mode.VTHREAD_POLLERS) || subPoller);
+            return new IoUringPoller(mode, subPoller, false, supportWriteOps);
         } else {
             return new EPollPoller(mode, subPoller, false);
         }
@@ -90,5 +98,10 @@ class DefaultPollerProvider extends PollerProvider {
     @Override
     boolean supportReadOps() {
         return USE_IORING_OP_READV;
+    }
+
+    @Override
+    boolean supportWriteOps() {
+        return USE_IORING_OP_WRITEV;
     }
 }

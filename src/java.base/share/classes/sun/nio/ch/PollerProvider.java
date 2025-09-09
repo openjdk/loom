@@ -97,4 +97,12 @@ abstract class PollerProvider {
     boolean supportReadOps() {
         return false;
     }
+
+    /**
+     * Returns true if write pollers support write ops in addition to POLLOUT polling.
+     * @implSpec The default implementation returns false.
+     */
+    boolean supportWriteOps() {
+        return false;
+    }
 }
