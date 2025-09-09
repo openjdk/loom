@@ -170,10 +170,10 @@ public class IoUringPoller extends Poller {
     }
 
     /**
-     * Initiate polling the given file descriptor.
+     * Submits a IORING_OP_POLL_ADD op to poll a file descriptor for read or write.
      */
     @Override
-    void implRegister(int fd) throws IOException {
+    void implStartPoll(int fd) throws IOException {
         assert fd > 0;  // fd == 0 used for wakeup
 
         synchronized (submitLock) {
@@ -184,10 +184,11 @@ public class IoUringPoller extends Poller {
     }
 
     /**
-     * Stop polling of the given file descriptorr if not already polled.
+     * Submits a IORING_OP_POLL_REMOVE op, and waits for it complete, to stop polling
+     * a file descriptor. A no-op if already polled.
      */
     @Override
-    void implDeregister(int fd, boolean polled) throws IOException {
+    void implStopPoll(int fd, boolean polled) throws IOException {
         if (!polled && !isShutdown()) {
             cancels.put(fd, Thread.currentThread());
 

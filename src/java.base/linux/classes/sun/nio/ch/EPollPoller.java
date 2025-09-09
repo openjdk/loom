@@ -111,7 +111,7 @@ class EPollPoller extends Poller {
     }
 
     @Override
-    void implRegister(int fdVal) throws IOException {
+    void implStartPoll(int fdVal) throws IOException {
         // re-enable if already registered but disabled (previously polled)
         int err = EPoll.ctl(epfd, EPOLL_CTL_MOD, fdVal, (event | EPOLLONESHOT));
         if (err == ENOENT)
@@ -121,7 +121,7 @@ class EPollPoller extends Poller {
     }
 
     @Override
-    void implDeregister(int fdVal, boolean polled) {
+    void implStopPoll(int fdVal, boolean polled) {
         // event is disabled if already polled
         if (!polled) {
             EPoll.ctl(epfd, EPOLL_CTL_DEL, fdVal, 0);
