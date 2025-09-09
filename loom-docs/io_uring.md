@@ -13,10 +13,12 @@ and reduced performance overall.
 
 ## 2. Poller implementation with submission queue polling
 
-(not in loom repo at this time)
-
 Builds on prototype 1 but uses `IORING_SETUP_SQPOLL` to use a kernel thread to poll
-the submission queue.
+the submission queue. To use this, set `-Djdk.io_uring.sqpoll_idle=<N>`. 
+N represents the allowed idle time the kernel polling thread is allowed to spin for. 
+In order to check if the polling thread needs to be restarted the IOUring user
+calls `IORing.pollingEnter()` instead of `IOUring.enter` after each submission. 
+For the majority case where the thread is still running, this is only a cheap memory access.
 
 ## 3. Blocking read/write implemented on async readv/writev
 
