@@ -519,27 +519,23 @@ public class IOUring {
         protected int getHead(boolean withAcquire) {
             int val = (int)(withAcquire
                 ? addrH.getAcquire(head, 0) : addrH.get(head, 0));
-            //int val = (int)(addrH.getVolatile(head, 0));
             return val;
         }
 
         protected int getTail(boolean withAcquire) {
             int val = (int)(withAcquire
                 ? addrH.getAcquire(tail, 0L) : addrH.get(tail, 0L));
-            //int val = (int)(addrH.getVolatile(tail, 0));
             return val;
         }
 
         // Used by CompletionQueue
         protected void setHead(int val) {
             addrH.setRelease(head, 0L, val);
-            //addrH.setVolatile(head, 0L, val);
         }
 
         // Used by SubmissionQueue
         protected void setTail(int val) {
             addrH.setRelease(tail, 0L, val);
-            //addrH.setVolatile(tail, 0L, val);
         }
     }
 
