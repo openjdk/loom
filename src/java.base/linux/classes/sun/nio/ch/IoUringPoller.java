@@ -53,7 +53,11 @@ public class IoUringPoller extends Poller {
     private static final int MAX_READV_BUF_SIZE = 8192;
 
     // submition and completion queue sizes
-    private static final int SQ_SIZE = 4;
+    private static final int SQ_SIZE_DEFAULT = 16;
+
+    static final int SQ_SIZE =
+        Integer.getInteger("jdk.io_uring.sqsize", SQ_SIZE_DEFAULT);
+
     private static final int CQ_SIZE = Math.max(SQ_SIZE + 1, 1024);
 
     // max completion events to consume in a blocking poll and non-blocking subpoll
@@ -77,6 +81,9 @@ public class IoUringPoller extends Poller {
 
     // maps iovec to in progress readv/writev operations
     private final Map<Long, Op> ops;
+    
+    static final int sqpoll_idle_time =
+        Integer.getInteger("jdk.io_uring.sqpoll_idle", 0);
 
     // per poller cache of buf/iovec bufs used for readv/writve ops
     private final BlockingQueue<IoBufs> ioBufsQueue;
@@ -85,7 +92,8 @@ public class IoUringPoller extends Poller {
                   boolean subPoller,
                   boolean read,
                   boolean supportIoOps) throws IOException {
-        IOUringImpl ring = new IOUringImpl(SQ_SIZE, CQ_SIZE, 0);
+	IOUringImpl ring = new IOUringImpl(
+            SQ_SIZE, CQ_SIZE, 0, 0, 0, sqpoll_idle_time); 
         EventFD wakeupEvent = null;
         EventFD readyEvent = null;
 
@@ -335,11 +343,15 @@ public class IoUringPoller extends Poller {
      * Invoke io_uring_enter to submit the SQE entries
      */
     private static void enter(IOUringImpl ring, int n) throws IOException {
-        int ret = ring.enter(n, 0, 0);
-        if (ret < 0) {
-            throw new IOException("io_uring_enter failed, ret=" + ret);
+        if (sqpoll_idle_time > 0) {
+            ring.pollingEnter(n);
+        } else {
+            int ret = ring.enter(n, 0, 0);
+            if (ret < 0) {
+                throw new IOException("io_uring_enter failed, ret=" + ret);
+            }
+            assert ret == n;
         }
-        assert ret == n;
     }
 
     /**
