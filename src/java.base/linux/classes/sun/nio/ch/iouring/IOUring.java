@@ -52,17 +52,17 @@ import static jdk.internal.ffi.generated.iouring.iouring_h_1.IORING_UNREGISTER_E
  * {@link Cqe#user_data()} field of the {@code Cqe} which contains the
  * same 64-bit (long) value that was supplied in the submitted {@link Sqe}.
  * <p>
- * Some IOUringImpl operations work with kernel registered direct ByteBuffers.
- * When creating an IOUringImpl instance, a number of these buffers can be
+ * Some IOUring operations work with kernel registered direct ByteBuffers.
+ * When creating an IOUring instance, a number of these buffers can be
  * created in a pool. Registered buffers are not used with regular
- * IOUringImpl read/write operations.
+ * IOUring read/write operations.
  */
 @SuppressWarnings("restricted")
-public class IOUringImpl {
+public class IOUring {
     private static final Arena arena = Arena.ofAuto();
 
     private static final boolean TRACE = System
-            .getProperty("sun.nio.ch.iouring.trace", "false")
+            .getProperty("jdk.io_uring.trace", "false")
             .equalsIgnoreCase("true");
     private final SubmissionQueue sq;
     private final CompletionQueue cq;
@@ -80,7 +80,7 @@ public class IOUringImpl {
      * Currently, the completion queue returned will be double the size
      * of the Submission queue.
      */
-    public IOUringImpl(int entries) throws IOException {
+    public IOUring(int entries) throws IOException {
         this(entries, 0, 0);
     }
 
@@ -91,8 +91,8 @@ public class IOUringImpl {
      * @param flags io_uring_params flags
      * @throws IOException if an IOException occurs
      */
-    public IOUringImpl(int sq_entries, int cq_entries, int flags) throws IOException {
-        this(sq_entries, cq_entries, 0, 0, -1);
+    public IOUring(int sq_entries, int cq_entries, int flags) throws IOException {
+        this(sq_entries, cq_entries, 0, 0, -1, 0);
     }
 
     /**
@@ -105,18 +105,33 @@ public class IOUringImpl {
      * @param flags io_uring_params flags
      * @param nmappedBuffers number of mapped direct ByteBuffers to create
      * @param mappedBufsize size of each buffer in bytes
+     * @param poll_idle_time the number of milliseconds to allow kernel polling
+     *        thread to remain idle. {@code 0} means polling disabled.
      * @throws IOException if an IOException occurs
      */
-    public IOUringImpl(int sq_entries,
+    public IOUring(int sq_entries,
                        int cq_entries,
                        int flags,
                        int nmappedBuffers,
-                       int mappedBufsize) throws IOException {
+                       int mappedBufsize,
+                       int poll_idle_time) throws IOException {
+        if (TRACE)
+            System.out.printf("IOUring poll_idle_time = %d\n",
+                              poll_idle_time);
+
         MemorySegment params_seg = getSegmentFor(io_uring_params.$LAYOUT());
 
         if (cq_entries > 0) {
             io_uring_params.cq_entries(params_seg, cq_entries);
             flags |= IORING_SETUP_CQSIZE();
+        }
+
+        boolean polling = false;
+
+        if (poll_idle_time > 0) {
+            io_uring_params.sq_thread_idle(params_seg, poll_idle_time);
+            flags |= IORING_SETUP_SQPOLL();
+            polling = true;
         }
 
         if (flags != 0) {
@@ -129,6 +144,10 @@ public class IOUringImpl {
             throw new IOException(errorString(fd));
         }
 
+        if (poll_idle_time > 0) {
+            int i = io_uring_params.sq_thread_idle(params_seg);
+            if (TRACE) System.out.printf("poll_idle_time = %d\n", i);
+        }
         mappedBuffers = new KMappedBuffers(nmappedBuffers, mappedBufsize);
         if (nmappedBuffers > 0) {
             mappedBuffers.register(fd);
@@ -140,6 +159,7 @@ public class IOUringImpl {
         // Offsets to cqe array and the sqe index array
         int cq_off_cqes = io_cqring_offsets.cqes(cq_off_seg);
         int sq_off_array = io_sqring_offsets.array(sq_off_seg);
+        int sq_off_flags = io_sqring_offsets.flags(sq_off_seg);
 
         // Acual number of entries in each Q
         sq_entries = io_uring_params.sq_entries(params_seg);
@@ -180,12 +200,12 @@ public class IOUringImpl {
                 cq_mask);
 
         sq = new SubmissionQueue(sqe_seg.asSlice(sq_off_array),
-                cqes_seg.asSlice(io_cqring_offsets.head(sq_off_seg)),
-                cqes_seg.asSlice(io_cqring_offsets.tail(sq_off_seg)),
-                sq_mask,
+                sqe_seg.asSlice(io_sqring_offsets.head(sq_off_seg)),
+                sqe_seg.asSlice(io_sqring_offsets.tail(sq_off_seg)),
+                sq_mask, sqe_seg.asSlice(sq_off_flags), polling,
                 sqes);
         if (TRACE)
-            System.out.printf("IOUringImpl: ringfd: %d\n", fd);
+            System.out.printf("IOUring: ringfd: %d\n", fd);
     }
 
 
@@ -268,14 +288,19 @@ public class IOUringImpl {
     }
 
     /**
-     * Asynchronously submits an Sqe to this IOUringImpl. Can be called
+     * Asynchronously submits an Sqe to this IOUring. Can be called
      * multiple times before enter().
      *
      * @param sqe
      * @throws IOException if submission q full
      */
     public void submit(Sqe sqe) throws IOException {
-        sq.submit(sqe);
+        if (!sq.submit(sqe)) {
+            enter(0, 0, IORING_ENTER_SQ_WAIT());
+            if (!sq.submit(sqe)) {
+                throw new IOException("Submission Queue full: wait failed");
+            }
+        }
         if (TRACE)
             System.out.printf("submit: %s \n", sqe);
     }
@@ -296,10 +321,33 @@ public class IOUringImpl {
      *         the number of Sqes successfully submitted.
      */
     public int enter(int nsubmit, int nreceive, int flags) throws IOException {
+        if (TRACE) System.out.printf("enter([fd:%d] %d, %d, %d) called\n",
+            this.fd, nsubmit, nreceive, flags);
+
         if (nreceive > 0) {
             flags |= IORING_ENTER_GETEVENTS();
         }
-        return io_uring_enter(this.fd, nsubmit, nreceive, flags);
+        int res = io_uring_enter(this.fd, nsubmit, nreceive, flags);
+        if (TRACE) System.out.printf("enter [fd:%d] returns %d\n",
+                                     this.fd, res);
+        return res;
+    }
+
+    /**
+     * In polling mode, use this instead of enter() on the submission side
+     * to check if kernel poller needs to be woken up. It checks if the kernel
+     * polling thread has exited, and if so it restarts it.
+     */
+    public void pollingEnter() throws IOException {
+        if (TRACE) System.out.printf("pollingEnter([fd:%d]) called\n", this.fd);
+        if (!sq.polling())
+            throw new IllegalStateException("IOUring not in polling mode");
+
+        if ((sq.getSQFlags() & IORING_SQ_NEED_WAKEUP()) > 0) {
+            if (TRACE) System.out.println("pollingEnter: waking up kernel");
+            enter(0, 0, IORING_ENTER_SQ_WAKEUP());
+        }
+        if (TRACE) System.out.printf("pollingEnter [fd:%d] return\n", this.fd);
     }
 
     /**
@@ -399,7 +447,7 @@ public class IOUringImpl {
 
     /**
      * Returns a mapped direct ByteBuffer or {@code null} if none available.
-     * Mapped buffers must be used with some IOUringImpl operations such as
+     * Mapped buffers must be used with some IOUring operations such as
      * {@code IORING_OP_WRITE_FIXED} and {@code IORING_OP_READ_FIXED}.
      * Buffers must be returned after use with
      * {@link #returnRegisteredBuffer(ByteBuffer)}.
@@ -493,7 +541,11 @@ public class IOUringImpl {
 
     final class SubmissionQueue extends QueueImplBase {
         final MemorySegment sqes;
+        final MemorySegment flags;
         final int n_sqes;
+        final VarHandle flagsH;  // handle for accessing flags
+        final boolean polling;
+
         static final int sqe_layout_size =
             (int)io_uring_sqe.$LAYOUT().byteSize();
 
@@ -501,20 +553,25 @@ public class IOUringImpl {
             (int)io_uring_sqe.$LAYOUT().byteAlignment();
 
         SubmissionQueue(MemorySegment ringSeg, MemorySegment head,
-                        MemorySegment tail, int mask, MemorySegment sqes) {
+                        MemorySegment tail, int mask,
+                        MemorySegment flags, boolean polling,
+                        MemorySegment sqes) {
             super(ringSeg, head, tail, mask, ValueLayout.JAVA_INT);
             this.sqes = sqes;
+            this.flags = flags;
+            this.polling = polling;
+            this.flagsH = ValueLayout.JAVA_INT.varHandle();
             this.n_sqes = (int) (sqes.byteSize() / sqe_layout_size);
         }
 
         /**
          * Submits an Sqe to Submission Q.
          * @param sqe
-         * @throws IOException if Q full
+         * @return true if the submission succeeded, false if the Q is full
          */
-        public void submit(Sqe sqe) throws IOException {
+        public boolean submit(Sqe sqe) throws IOException {
             if (ringFull()) {
-                throw new IOException("Submission Queue full");
+                return false;
             }
 
             int tailVal = getTail(false);
@@ -549,8 +606,26 @@ public class IOUringImpl {
             io_uring_sqe.len(slot, sqe.len().orElse(0));
             // Populate the tail slot
             ringSeg.setAtIndex(ValueLayout.JAVA_INT, tailIndex, tailIndex);
-            //Util.print(slot, "SQE");
             setTail(++tailVal);
+            return true;
+        }
+
+        /*
+         * Returns the SQ flags for this ring. Currently this is only used
+         * to read the IORING_SQ_NEED_WAKEUP if submission Q being used in
+         * SQPOLL mode. The kernel sets this flag if the kernel polling
+         * thread needs to be woken up.
+         */
+        public int getSQFlags() {
+            int res = (int)flagsH.getOpaque(flags, 0);
+            return res;
+        }
+
+        /**
+         * Returns whether this Submission Q is using polling
+         */
+        public boolean polling() {
+            return this.polling;
         }
     }
 

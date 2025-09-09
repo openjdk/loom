@@ -34,7 +34,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.BooleanSupplier;
 import jdk.internal.ref.CleanerFactory;
-import sun.nio.ch.iouring.IOUringImpl;
+import sun.nio.ch.iouring.IOUring;
 import sun.nio.ch.iouring.Cqe;
 import sun.nio.ch.iouring.Sqe;
 import jdk.internal.ffi.generated.iouring.*;
@@ -53,7 +53,11 @@ public class IoUringPoller extends Poller {
     private static final int MAX_READV_BUF_SIZE = 8192;
 
     // submition and completion queue sizes
-    private static final int SQ_SIZE = 4;
+    private static final int SQ_SIZE_DEFAULT = 4;
+
+    static final int SQ_SIZE =
+        Integer.getInteger("jdk.io_uring.sqsize", SQ_SIZE_DEFAULT);
+
     private static final int CQ_SIZE = Math.max(SQ_SIZE + 1, 1024);
 
     // max completion events to consume in a blocking poll and non-blocking subpoll
@@ -61,7 +65,7 @@ public class IoUringPoller extends Poller {
     private static final int MAX_EVENTS_PER_SUBPOLL = 8;
 
     private final int event;
-    private final IOUringImpl ring;
+    private final IOUring ring;
     private final EventFD readyEvent;   // completion events posted to CQ ring
     private final EventFD wakeupEvent;  // wakeup event, used for shutdown
 
@@ -77,6 +81,9 @@ public class IoUringPoller extends Poller {
 
     // maps iovec to in progress readv/writev operations
     private final Map<Long, Op> ops;
+    
+    static final int sqpoll_idle_time =
+        Integer.getInteger("jdk.io_uring.sqpoll_idle", 0);
 
     // per poller cache of buf/iovec bufs used for readv/writve ops
     private final BlockingQueue<IoBufs> ioBufsQueue;
@@ -85,7 +92,8 @@ public class IoUringPoller extends Poller {
                   boolean subPoller,
                   boolean read,
                   boolean supportIoOps) throws IOException {
-        IOUringImpl ring = new IOUringImpl(SQ_SIZE, CQ_SIZE, 0);
+	IOUring ring = new IOUring(
+            SQ_SIZE, CQ_SIZE, 0, 0, 0, sqpoll_idle_time); 
         EventFD wakeupEvent = null;
         EventFD readyEvent = null;
 
@@ -137,7 +145,7 @@ public class IoUringPoller extends Poller {
     /**
      * Returns an action to close the io_uring and release other resources.
      */
-    private static Runnable closer(IOUringImpl ring, EventFD readyEvent, EventFD wakeupEvent) {
+    private static Runnable closer(IOUring ring, EventFD readyEvent, EventFD wakeupEvent) {
         return () -> {
             try {
                 ring.close();
@@ -335,18 +343,22 @@ public class IoUringPoller extends Poller {
     /**
      * Invoke io_uring_enter to submit the SQE entries
      */
-    private static void enter(IOUringImpl ring, int n) throws IOException {
-        int ret = ring.enter(n, 0, 0);
-        if (ret < 0) {
-            throw new IOException("io_uring_enter failed, ret=" + ret);
+    private static void enter(IOUring ring, int n) throws IOException {
+        if (sqpoll_idle_time > 0) {
+            ring.pollingEnter();
+        } else {
+            int ret = ring.enter(n, 0, 0);
+            if (ret < 0) {
+                throw new IOException("io_uring_enter failed, ret=" + ret);
+            }
+            assert ret == n;
         }
-        assert ret == n;
     }
 
     /**
      * Submit IORING_OP_POLL_ADD operation.
      */
-    private static void submitPollAdd(IOUringImpl ring,
+    private static void submitPollAdd(IOUring ring,
                                       int fd,
                                       int events,
                                       long udata) throws IOException {
@@ -363,7 +375,7 @@ public class IoUringPoller extends Poller {
      * @param req_udata the user data to identify the original POLL_ADD
      * @param udata the user data for the POLL_REMOVE op
      */
-    private static void submitPollRemove(IOUringImpl ring,
+    private static void submitPollRemove(IOUring ring,
                                          long req_udata,
                                          long udata) throws IOException {
         @SuppressWarnings("restricted")
@@ -381,7 +393,7 @@ public class IoUringPoller extends Poller {
      * @param iov already populared iov struct
      * @param udata the user data for the READV op
      */
-    private static void submitRead(IOUringImpl ring, int fd, MemorySegment iov, long udata)
+    private static void submitRead(IOUring ring, int fd, MemorySegment iov, long udata)
         throws IOException
     {
         Sqe sqe = new Sqe()
