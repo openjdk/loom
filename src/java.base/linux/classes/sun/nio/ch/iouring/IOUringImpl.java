@@ -295,7 +295,12 @@ public class IOUringImpl {
      * @throws IOException if submission q full
      */
     public void submit(Sqe sqe) throws IOException {
-        sq.submit(sqe);
+        if (!sq.submit(sqe)) {
+            enter(0, 0, IORING_ENTER_SQ_WAIT());
+            if (!sq.submit(sqe)) {
+                throw new IOException("Submission Queue full: wait failed");
+            }
+        }
         if (TRACE)
             System.out.printf("submit: %s \n", sqe);
     }
@@ -566,11 +571,11 @@ public class IOUringImpl {
         /**
          * Submits an Sqe to Submission Q.
          * @param sqe
-         * @throws IOException if Q full
+         * @return true if the submission succeeded, false if the Q is full
          */
-        public void submit(Sqe sqe) throws IOException {
+        public boolean submit(Sqe sqe) throws IOException {
             if (ringFull()) {
-                throw new IOException("Submission Queue full");
+                return false;
             }
 
             int tailVal = getTail(false);
@@ -606,6 +611,7 @@ public class IOUringImpl {
             // Populate the tail slot
             ringSeg.setAtIndex(ValueLayout.JAVA_INT, tailIndex, tailIndex);
             setTail(++tailVal);
+            return true;
         }
 
         /*

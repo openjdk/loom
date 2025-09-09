@@ -46,7 +46,11 @@ public class IoUringPoller extends Poller {
     private static final long ADDRESS_SIZE = ValueLayout.ADDRESS.byteSize();
 
     // submition and completion queue sizes
-    private static final int SQ_SIZE = 16;
+    private static final int SQ_SIZE_DEFAULT = 16;
+
+    static final int SQ_SIZE =
+        Integer.getInteger("jdk.io_uring.sqsize", SQ_SIZE_DEFAULT);
+
     private static final int CQ_SIZE = Math.max(SQ_SIZE + 1, 1024);
 
     // max completion events to consume in a blocking poll and non-blocking subpoll
