@@ -52,13 +52,13 @@ import static jdk.internal.ffi.generated.iouring.iouring_h_1.IORING_UNREGISTER_E
  * {@link Cqe#user_data()} field of the {@code Cqe} which contains the
  * same 64-bit (long) value that was supplied in the submitted {@link Sqe}.
  * <p>
- * Some IOUringImpl operations work with kernel registered direct ByteBuffers.
- * When creating an IOUringImpl instance, a number of these buffers can be
+ * Some IOUring operations work with kernel registered direct ByteBuffers.
+ * When creating an IOUring instance, a number of these buffers can be
  * created in a pool. Registered buffers are not used with regular
- * IOUringImpl read/write operations.
+ * IOUring read/write operations.
  */
 @SuppressWarnings("restricted")
-public class IOUringImpl {
+public class IOUring {
     private static final Arena arena = Arena.ofAuto();
 
     private static final boolean TRACE = System
@@ -80,7 +80,7 @@ public class IOUringImpl {
      * Currently, the completion queue returned will be double the size
      * of the Submission queue.
      */
-    public IOUringImpl(int entries) throws IOException {
+    public IOUring(int entries) throws IOException {
         this(entries, 0, 0);
     }
 
@@ -91,7 +91,7 @@ public class IOUringImpl {
      * @param flags io_uring_params flags
      * @throws IOException if an IOException occurs
      */
-    public IOUringImpl(int sq_entries, int cq_entries, int flags) throws IOException {
+    public IOUring(int sq_entries, int cq_entries, int flags) throws IOException {
         this(sq_entries, cq_entries, 0, 0, -1, 0);
     }
 
@@ -109,14 +109,14 @@ public class IOUringImpl {
      *        thread to remain idle. {@code 0} means polling disabled.
      * @throws IOException if an IOException occurs
      */
-    public IOUringImpl(int sq_entries,
+    public IOUring(int sq_entries,
                        int cq_entries,
                        int flags,
                        int nmappedBuffers,
                        int mappedBufsize,
                        int poll_idle_time) throws IOException {
         if (TRACE)
-            System.out.printf("IOUringImpl poll_idle_time = %d\n",
+            System.out.printf("IOUring poll_idle_time = %d\n",
                               poll_idle_time);
 
         MemorySegment params_seg = getSegmentFor(io_uring_params.$LAYOUT());
@@ -205,7 +205,7 @@ public class IOUringImpl {
                 sq_mask, sqe_seg.asSlice(sq_off_flags), polling,
                 sqes);
         if (TRACE)
-            System.out.printf("IOUringImpl: ringfd: %d\n", fd);
+            System.out.printf("IOUring: ringfd: %d\n", fd);
     }
 
 
@@ -288,7 +288,7 @@ public class IOUringImpl {
     }
 
     /**
-     * Asynchronously submits an Sqe to this IOUringImpl. Can be called
+     * Asynchronously submits an Sqe to this IOUring. Can be called
      * multiple times before enter().
      *
      * @param sqe
@@ -335,11 +335,11 @@ public class IOUringImpl {
 
     /**
      * In polling mode, use this instead of enter() on the submission side
-     * to check if kernel poller needs to be woken up
+     * to check if kernel poller needs to be woken up. It checks if the kernel
+     * polling thread has exited, and if so it restarts it.
      */
-    public void pollingEnter(int n) throws IOException {
-        if (TRACE) System.out.printf("pollingEnter([fd:%d] %d) called\n",
-                                     this.fd, n);
+    public void pollingEnter() throws IOException {
+        if (TRACE) System.out.printf("pollingEnter([fd:%d]) called\n", this.fd);
         if (!sq.polling())
             throw new IllegalStateException("IOUring not in polling mode");
 
@@ -447,7 +447,7 @@ public class IOUringImpl {
 
     /**
      * Returns a mapped direct ByteBuffer or {@code null} if none available.
-     * Mapped buffers must be used with some IOUringImpl operations such as
+     * Mapped buffers must be used with some IOUring operations such as
      * {@code IORING_OP_WRITE_FIXED} and {@code IORING_OP_READ_FIXED}.
      * Buffers must be returned after use with
      * {@link #returnRegisteredBuffer(ByteBuffer)}.
