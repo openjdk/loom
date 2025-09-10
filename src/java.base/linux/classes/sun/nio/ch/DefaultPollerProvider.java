@@ -32,20 +32,20 @@ import jdk.internal.vm.ContinuationSupport;
  */
 class DefaultPollerProvider extends PollerProvider {
     private static final boolean USE_IOURING;
-    private static final boolean USE_IORING_OP_READV;
-    private static final boolean USE_IORING_OP_WRITEV;
+    private static final boolean USE_IORING_OP_READ;
+    private static final boolean USE_IORING_OP_WRITE;
     static {
         String s = System.getProperty("jdk.io_uring");
         if ("".equals(s) || Boolean.parseBoolean(s)) {
             USE_IOURING = true;
-            s = System.getProperty("jdk.io_uring.readv");
-            USE_IORING_OP_READV = "".equals(s) || Boolean.parseBoolean(s);
-            s = System.getProperty("jdk.io_uring.writev");
-            USE_IORING_OP_WRITEV = "".equals(s) || Boolean.parseBoolean(s);
+            s = System.getProperty("jdk.io_uring.read");
+            USE_IORING_OP_READ = "".equals(s) || Boolean.parseBoolean(s);
+            s = System.getProperty("jdk.io_uring.write");
+            USE_IORING_OP_WRITE = "".equals(s) || Boolean.parseBoolean(s);
         } else {
             USE_IOURING = false;
-            USE_IORING_OP_READV = false;
-            USE_IORING_OP_WRITEV = false;
+            USE_IORING_OP_READ = false;
+            USE_IORING_OP_WRITE = false;
         }
     }
 
@@ -74,7 +74,7 @@ class DefaultPollerProvider extends PollerProvider {
         Poller.Mode mode = pollerMode();
         if (USE_IOURING) {
             // read poller is system thread in SYSTEM_THREADS mode
-            boolean supportReadOps = USE_IORING_OP_READV
+            boolean supportReadOps = USE_IORING_OP_READ
                     && ((mode == Poller.Mode.SYSTEM_THREADS) || subPoller);
             return new IoUringPoller(mode, subPoller, true, supportReadOps);
         } else {
@@ -87,7 +87,7 @@ class DefaultPollerProvider extends PollerProvider {
         Poller.Mode mode = pollerMode();
         if (USE_IOURING) {
             // write poller is system thread in SYSTEM_THREADS and POLLER_PER_CARRIER modes
-            boolean supportWriteOps = USE_IORING_OP_WRITEV
+            boolean supportWriteOps = USE_IORING_OP_WRITE
                     && ((mode != Poller.Mode.VTHREAD_POLLERS) || subPoller);
             return new IoUringPoller(mode, subPoller, false, supportWriteOps);
         } else {
@@ -97,11 +97,11 @@ class DefaultPollerProvider extends PollerProvider {
 
     @Override
     boolean supportReadOps() {
-        return USE_IORING_OP_READV;
+        return USE_IORING_OP_READ;
     }
 
     @Override
     boolean supportWriteOps() {
-        return USE_IORING_OP_WRITEV;
+        return USE_IORING_OP_WRITE;
     }
 }
