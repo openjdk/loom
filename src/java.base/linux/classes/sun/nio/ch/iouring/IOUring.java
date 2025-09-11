@@ -365,7 +365,7 @@ public class IOUring {
      * Returns the number of free entries in the Submission Q
      */
     public int sqfree() {
-        return sq.nUsed();
+        return sq.nAvail();
     }
 
     /**
@@ -470,7 +470,7 @@ public class IOUring {
     /**
      * Common capabilities of SubmissionQueue and CompletionQueue
      */
-    sealed class QueueImplBase permits SubmissionQueue, CompletionQueue {
+    sealed abstract class QueueImplBase permits SubmissionQueue, CompletionQueue {
         protected final MemorySegment ringSeg;
         private final MemorySegment head, tail;
         protected final int ringMask;
@@ -504,21 +504,19 @@ public class IOUring {
             this.addrH = ValueLayout.JAVA_INT.varHandle();
         }
 
-        int nEntries() {
-            int n = Math.abs(getTail(false) - getHead(false));
-            return n;
-        }
+        abstract int nEntries();
 
         boolean ringFull() {
             return nEntries() == ringSize;
         }
 
-        int nUsed() {
+        int nAvail() {
             return ringSize - nEntries();
         }
+
         protected int getHead(boolean withAcquire) {
             int val = (int)(withAcquire
-                ? addrH.getAcquire(head, 0) : addrH.get(head, 0));
+                ? addrH.getAcquire(head, 0L) : addrH.get(head, 0L));
             return val;
         }
 
@@ -621,6 +619,12 @@ public class IOUring {
             return res;
         }
 
+        @Override
+        int nEntries() {
+            int n = Math.abs(getTail(false) - getHead(true));
+            return n;
+        }
+
         /**
          * Returns whether this Submission Q is using polling
          */
@@ -637,20 +641,27 @@ public class IOUring {
 
         public Cqe pollHead() {
             int headVal = getHead(false);
-            Cqe res = null;
             if (headVal != getTail(true)) {
                 int index = headVal & ringMask;
                 int offset = index * ringLayoutSize;
                 MemorySegment seg = ringSeg.asSlice(offset,
                         ringLayoutSize, ringLayoutAlignment);
-                res = new Cqe(
+                var res = new Cqe(
                         io_uring_cqe.user_data(seg),
                         io_uring_cqe.res(seg),
                         io_uring_cqe.flags(seg));
                 headVal++;
+                setHead(headVal);
+                return res;
+            } else {
+                return null;
             }
-            setHead(headVal);
-            return res;
+        }
+
+        @Override
+        int nEntries() {
+            int n = Math.abs(getTail(true) - getHead(false));
+            return n;
         }
     };
 

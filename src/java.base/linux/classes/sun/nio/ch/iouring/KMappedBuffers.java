@@ -48,7 +48,7 @@ import static jdk.internal.ffi.generated.iouring.iouring_h.IORING_REGISTER_BUFFE
  * and later registered with an IOUringImpl. Users must obtain a buffer from
  * this object to be used with any async/fixed I/O operation on the ring.
  */
-class KMappedBuffers {
+public class KMappedBuffers {
     private final List<ByteBuffer> registeredBufferList;
     private final ConcurrentLinkedQueue<ByteBuffer> registeredFreeList;
 
@@ -57,7 +57,7 @@ class KMappedBuffers {
             = new IdentityHashMap<>();
     private final Arena autoArena = Arena.ofAuto();
 
-    KMappedBuffers(int num, int size) throws IOException {
+    public KMappedBuffers(int num, int size) throws IOException {
         this.registeredBufferList = List.copyOf(getDirectBuffers(num, size));
         this.registeredFreeList = new ConcurrentLinkedQueue<>(registeredBufferList);
     }
@@ -77,7 +77,7 @@ class KMappedBuffers {
      *
      * @param buffers
      */
-    void register(int ringfd) throws IOException {
+    public void register(int ringfd) throws IOException {
         int index = 0;
         registeredBuffers.clear();
         int size = registeredBufferList.size();
@@ -106,16 +106,16 @@ class KMappedBuffers {
      * Returns a registered buffer.
      * @return
      */
-    ByteBuffer getRegisteredBuffer() {
+    public ByteBuffer getRegisteredBuffer() {
         return registeredFreeList.poll();
     }
 
-    void returnRegisteredBuffer(ByteBuffer buf) {
+    public void returnRegisteredBuffer(ByteBuffer buf) {
         checkAndGetIndexForBuffer(buf);
         registeredFreeList.add(buf);
     }
 
-    int checkAndGetIndexForBuffer(ByteBuffer buf) {
+    public int checkAndGetIndexForBuffer(ByteBuffer buf) {
         int ret;
         if ((ret = getRegisteredIndexFor(buf)) == -1) {
             throw new IllegalArgumentException("Not a a registered buffer");
@@ -127,7 +127,7 @@ class KMappedBuffers {
         return ret;
     }
 
-    int getRegisteredIndexFor(ByteBuffer buf) {
+    public int getRegisteredIndexFor(ByteBuffer buf) {
         Integer ind = registeredBuffers.get(buf);
         return ind == null ? -1 : ind.intValue();
     }
@@ -138,6 +138,7 @@ class KMappedBuffers {
             l.add(ByteBuffer.allocateDirect(size));
         return l;
     }
+
     private void registerBufferSegment(int ringfd, MemorySegment segment, int nentries) throws IOException {
         int ret;
         SystemCallContext ctx = SystemCallContext.get();
