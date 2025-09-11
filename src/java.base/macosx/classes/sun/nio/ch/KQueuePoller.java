@@ -116,14 +116,14 @@ class KQueuePoller extends Poller {
     }
 
     @Override
-    void implRegister(int fdVal) throws IOException {
+    void implStartPoll(int fdVal) throws IOException {
         int err = KQueue.register(kqfd, fdVal, filter, (EV_ADD|EV_ONESHOT));
         if (err != 0)
             throw new IOException("kevent failed: " + err);
     }
 
     @Override
-    void implDeregister(int fdVal, boolean polled) {
+    void implStopPoll(int fdVal, boolean polled) {
         // event was deleted if already polled
         if (!polled) {
             KQueue.register(kqfd, fdVal, filter, EV_DELETE);

@@ -13,18 +13,21 @@ and reduced performance overall.
 
 ## 2. Poller implementation with submission queue polling
 
-(not in loom repo at this time)
+Builds on prototype 1 but uses `IORING_SETUP_SQPOLL` to use a kernel thread to poll the
+submission queue. Enabled with `-Djdk.io_uring.sqpoll_idle=<N>` where N is the duration
+(in milliseconds) for the kernel thread to spin before sleeping.
 
-Builds on prototype 1 but uses `IORING_SETUP_SQPOLL` to use a kernel thread to poll
-the submission queue.
+For the majority case where the thread is still running, this is only a cheap memory access.
+The default value for this parameter is zero, which means submission queue polling is not
+enabled.
 
-## 3. Blocking read/write implemented on async readv/writev
+## 3. Blocking read/write implemented on async read/write
 
-(not in loom repo at this time)
+Extends Poller implementation to support read and write operations using `IORING_OP_READ`
+and `IORING_OP_WRITE`.
 
-Extends Poller implementation to support read and write operations using `IORING_OP_READV`
-and `IORING_OP_WRITEV`.
-
+Enable for `java.net.Socket` read/write with `-Djdk.io_uring.read=true` and
+`-Djdk.io_uring.write=true`.
 
 ## 4. Blocking read/write implemented on async readv/writev with registered buffers
 

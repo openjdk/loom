@@ -296,6 +296,13 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
                 throw new SocketException("Connection reset");
             if (isInputClosed)
                 return -1;
+
+            // experimental
+            if (Poller.supportReadOps() && Thread.currentThread().isVirtual()) {
+                n = Poller.read(fdVal(fd), b, off, len, remainingNanos, this::isOpen);
+                if (n != IOStatus.UNAVAILABLE) return n;
+            }
+
             configureNonBlockingIfNeeded(fd, remainingNanos > 0);
             if (remainingNanos > 0) {
                 // read with timeout
@@ -414,6 +421,13 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
         int n = 0;
         FileDescriptor fd = beginWrite();
         try {
+
+            // experimental
+            if (Poller.supportWriteOps() && Thread.currentThread().isVirtual()) {
+                n = Poller.write(fdVal(fd), b, off, len, this::isOpen);
+                if (n != IOStatus.UNAVAILABLE) return n;
+            }
+
             configureNonBlockingIfNeeded(fd, false);
             n = tryWrite(fd, b, off, len);
             while (IOStatus.okayToRetry(n) && isOpen()) {
