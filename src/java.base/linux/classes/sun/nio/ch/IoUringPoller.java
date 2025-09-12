@@ -201,7 +201,7 @@ public class IoUringPoller extends Poller {
         synchronized (submitLock) {
             // fd is the user data for IORING_OP_POLL_ADD request
             submitPollAdd(ring, fd, event, fd);
-            enter(ring, 1);
+            enter(1);
         }
     }
 
@@ -215,10 +215,12 @@ public class IoUringPoller extends Poller {
             cancels.put(fd, Thread.currentThread());
 
             synchronized (submitLock) {
+                // TBD if SQPOLL enabled, need IORING_OP_POLL_ADD to be processed
+
                 // fd was the user data for IORING_OP_POLL_ADD request
                 // -fd is the user data for IORING_OP_POLL_REMOVE request
                 submitPollRemove(fd, -fd);
-                enter(ring, 1);
+                enter(1);
             }
 
             while (cancels.containsKey(fd) && !isShutdown()) {
@@ -270,6 +272,8 @@ public class IoUringPoller extends Poller {
                         throw new IOException("IORING_OP_READ failed errno=" + (-res));
                     }
                 } else {
+                    // TBD if SQPOLL enabled, need the request to be processed before cancel
+
                     // read did not complete, need to cancel. If the cancel fails then
                     // we can't return the buffer to the cache.
                     cancelOp(fd, udata);
@@ -321,6 +325,8 @@ public class IoUringPoller extends Poller {
                 } else if (res < 0) {
                     throw new IOException("IORING_OP_WRITE failed errno=" + (-res));
                 } else {
+                    // TBD if SQPOLL enabled, need the request to be processed before cancel
+
                     // write did not complete, need to cancel. If the cancel fails then
                     // we can't return the buffer to the cache.
                     cancelOp(fd, udata);
@@ -420,6 +426,10 @@ public class IoUringPoller extends Poller {
         }
     }
 
+    private void enter(int n) throws IOException {
+        enter(ring, n);
+    }
+
     /**
      * Submit IORING_OP_POLL_ADD operation.
      */
@@ -466,7 +476,7 @@ public class IoUringPoller extends Poller {
                 .off(pos)  // file position or -1L
                 .user_data(udata);
         ring.submit(sqe);
-        enter(ring, 1);
+        enter(1);
     }
 
     /**
@@ -481,7 +491,7 @@ public class IoUringPoller extends Poller {
                 .off(pos)  // file position or -1L
                 .user_data(udata);
         ring.submit(sqe);
-        enter(ring, 1);
+        enter(1);
     }
 
     /**
@@ -497,7 +507,7 @@ public class IoUringPoller extends Poller {
                     .addr(address)
                     .user_data(-fd);   // user data for IORING_OP_ASYNC_CANCEL
             ring.submit(sqe);
-            enter(ring, 1);
+            enter(1);
         }
         while (cancels.containsKey(fd) && !isShutdown()) {
             LockSupport.park();
