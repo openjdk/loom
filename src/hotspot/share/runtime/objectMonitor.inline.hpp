@@ -134,17 +134,17 @@ inline void ObjectMonitor::add_to_contentions(int value) {
 
 inline void ObjectMonitor::inc_unmounted_vthreads() {
   assert(_unmounted_vthreads >= 0, "");
-  Atomic::inc(&_unmounted_vthreads, memory_order_relaxed);
+  AtomicAccess::inc(&_unmounted_vthreads, memory_order_relaxed);
 }
 
 inline void ObjectMonitor::dec_unmounted_vthreads() {
   assert(_unmounted_vthreads > 0, "");
-  Atomic::dec(&_unmounted_vthreads, memory_order_relaxed);
+  AtomicAccess::dec(&_unmounted_vthreads, memory_order_relaxed);
 }
 
 inline bool ObjectMonitor::has_unmounted_vthreads() const {
   assert(_unmounted_vthreads >= 0, "");
-  return Atomic::load(&_unmounted_vthreads) > 0;
+  return AtomicAccess::load(&_unmounted_vthreads) > 0;
 }
 
 inline void ObjectMonitor::set_recursions(size_t recursions) {
