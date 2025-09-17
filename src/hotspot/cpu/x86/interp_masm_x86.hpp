@@ -72,13 +72,14 @@ class InterpreterMacroAssembler: public MacroAssembler {
                            Register arg_1,
                            Register arg_2,
                            bool check_exceptions = true);
-
+  void restore_after_resume(bool is_native);
+ private:
   void call_VM_preemptable_helper(Register oop_result,
                                   address entry_point,
                                   int number_of_arguments,
                                   bool check_exceptions);
-  void restore_after_resume(bool is_native);
 
+ public:
   // Interpreter-specific registers
   void save_bcp() {
     movptr(Address(rbp, frame::interpreter_frame_bcp_offset * wordSize), _bcp_register);
