@@ -2694,6 +2694,7 @@ intptr_t* ThawBase::redo_vmcall(JavaThread* current, frame& top) {
     // These InterpreterRuntime entry points use JRT_ENTRY which uses a HandleMarkCleaner.
     // Create a HandeMark to avoid destroying so._conth.
     HandleMark hm(current);
+    DEBUG_ONLY(JavaThread::AtRedoVMCall apvmc(current);)
     if (code == Bytecodes::Code::_new) {
       InterpreterRuntime::_new(current, m->constants(), current_bytecode.get_index_u2(code));
     } else {

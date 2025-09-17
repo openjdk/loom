@@ -171,6 +171,15 @@ private:
   static void    verify_mdp(Method* method, address bcp, address mdp);
 #endif // ASSERT
   static MethodCounters* build_method_counters(JavaThread* current, Method* m);
+
+  // Virtual Thread Preemption
+#ifdef ASSERT
+  static bool is_preemptable_call(address entry_point) {
+    return entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter) ||
+           entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::resolve_from_cache) ||
+           entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::_new);
+  }
+#endif // ASSERT
 };
 
 

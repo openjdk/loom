@@ -516,6 +516,22 @@ class JavaThread: public Thread {
 
   InstanceKlass* preempt_init_klass() { return _preempt_init_klass; }
   void set_preempt_init_klass(InstanceKlass* ik) { _preempt_init_klass = ik; }
+
+  int _interp_at_preemptable_vmcall_cnt;
+  int interp_at_preemptable_vmcall_cnt() { return _interp_at_preemptable_vmcall_cnt; }
+
+  class AtRedoVMCall : public StackObj {
+    JavaThread* _thread;
+   public:
+    AtRedoVMCall(JavaThread *t) : _thread(t) {
+      _thread->_interp_at_preemptable_vmcall_cnt++;
+      assert(_thread->_interp_at_preemptable_vmcall_cnt > 0, "");
+    }
+    ~AtRedoVMCall() {
+      _thread->_interp_at_preemptable_vmcall_cnt--;
+      assert(_thread->_interp_at_preemptable_vmcall_cnt >= 0, "");
+    }
+  };
 #endif
 
 private:
@@ -917,6 +933,7 @@ public:
   static ByteSize jni_monitor_count_offset()  { return byte_offset_of(JavaThread, _jni_monitor_count); }
   static ByteSize preemption_cancelled_offset()  { return byte_offset_of(JavaThread, _preemption_cancelled); }
   static ByteSize preempt_alternate_return_offset() { return byte_offset_of(JavaThread, _preempt_alternate_return); }
+  DEBUG_ONLY(static ByteSize interp_at_preemptable_vmcall_cnt_offset() { return byte_offset_of(JavaThread, _interp_at_preemptable_vmcall_cnt); })
   static ByteSize unlocked_inflated_monitor_offset() { return byte_offset_of(JavaThread, _unlocked_inflated_monitor); }
 
 #if INCLUDE_JVMTI
