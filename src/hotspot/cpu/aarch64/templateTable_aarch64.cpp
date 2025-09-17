@@ -2498,7 +2498,7 @@ void TemplateTable::load_invokedynamic_entry(Register method) {
   // Call to the interpreter runtime to resolve invokedynamic
   address entry = CAST_FROM_FN_PTR(address, InterpreterRuntime::resolve_from_cache);
   __ mov(method, code); // this is essentially Bytecodes::_invokedynamic
-  __ call_VM_preemptable(noreg, entry, method);
+  __ call_VM(noreg, entry, method);
   // Update registers with resolved info
   __ load_resolved_indy_entry(cache, index);
   // Load-acquire the adapter method to match store-release in ResolvedIndyEntry::fill_in()
