@@ -1371,6 +1371,7 @@ void InterpreterMacroAssembler::call_VM_leaf_base(address entry_point,
 void InterpreterMacroAssembler::call_VM_base(Register oop_result,
                                              Register java_thread,
                                              Register last_java_sp,
+                                             Label*   return_pc,
                                              address  entry_point,
                                              int      number_of_arguments,
                                              bool     check_exceptions) {
@@ -1394,8 +1395,8 @@ void InterpreterMacroAssembler::call_VM_base(Register oop_result,
 #endif /* ASSERT */
   // super call
   MacroAssembler::call_VM_base(oop_result, noreg, last_java_sp,
-                               entry_point, number_of_arguments,
-                     check_exceptions);
+                               return_pc, entry_point,
+                               number_of_arguments, check_exceptions);
 // interpreter specific
   restore_bcp();
   restore_locals();
@@ -1421,9 +1422,8 @@ void InterpreterMacroAssembler::call_VM_preemptable_helper(Register oop_result,
   push_cont_fastpath();
 
   // Make VM call. In case of preemption set last_pc to the one we want to resume to.
-  adr(rscratch1, resume_pc);
-  str(rscratch1, Address(rthread, JavaThread::last_Java_pc_offset()));
-  MacroAssembler::call_VM_helper(oop_result, entry_point, number_of_arguments, check_exceptions);
+  // Note: call_VM_base will use resume_pc label to set last_Java_pc.
+  call_VM_base(oop_result, noreg, noreg, &resume_pc, entry_point, number_of_arguments, check_exceptions);
 
   pop_cont_fastpath();
 

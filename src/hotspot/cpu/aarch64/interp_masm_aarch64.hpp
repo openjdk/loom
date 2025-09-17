@@ -45,6 +45,7 @@ class InterpreterMacroAssembler: public MacroAssembler {
   virtual void call_VM_base(Register oop_result,
                             Register java_thread,
                             Register last_java_sp,
+                            Label*   return_pc,
                             address  entry_point,
                             int number_of_arguments,
                             bool check_exceptions);
