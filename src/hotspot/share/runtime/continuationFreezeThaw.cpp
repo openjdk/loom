@@ -2418,7 +2418,10 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
       preempt_kind = Continuation::object_locker;
       chunk->set_at_klass_init(false);
       _process_args_at_top = chunk->has_args_at_top();
-      if (_process_args_at_top) chunk->set_has_args_at_top(false);
+      if (_process_args_at_top) {
+        // Only needed for the top frame which will be thawed.
+        chunk->set_has_args_at_top(false);
+      }
     }
     chunk->set_preempted(false);
     retry_fast_path = true;

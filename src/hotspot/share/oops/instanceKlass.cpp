@@ -978,8 +978,9 @@ bool InstanceKlass::link_class_impl(TRAPS) {
     HandleMark hm(THREAD);
     Handle h_init_lock(THREAD, init_lock());
     ObjectLocker ol(h_init_lock, CHECK_PREEMPTABLE_false);
-    // Don't preempt once we own the monitor as that would complicate
-    // redoing the VM call (we don't expect to own this monitor).
+    // Don't allow preemption if we link/initialize classes below,
+    // since that would release this monitor while we are in the
+    // middle of linking this class.
     NoPreemptMark npm(THREAD);
 
     // rewritten will have been set if loader constraint error found
@@ -1266,8 +1267,8 @@ void InstanceKlass::initialize_impl(TRAPS) {
     }
   }
 
-  // Block preemption once we are the initializer thread.
-  // Unmounting now would complicate the reentrant case.
+  // Block preemption once we are the initializer thread. Unmounting now
+  // would complicate the reentrant case (identity is platform thread).
   NoPreemptMark npm(THREAD);
 
   // Step 7
