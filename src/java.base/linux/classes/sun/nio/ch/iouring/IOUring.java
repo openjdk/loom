@@ -138,10 +138,16 @@ public class IOUring {
             io_uring_params.flags(params_seg, flags);
         }
 
-        // call setup
-        fd = io_uring_setup(sq_entries, params_seg);
-        if (fd < 0) {
-            throw new IOException(errorString(fd));
+        try {
+            // call setup
+            fd = io_uring_setup(sq_entries, params_seg);
+            if (fd < 0) {
+                throw new IOException(errorString(fd));
+            }
+        } catch (Throwable t) {
+            if (TRACE)
+                t.printStackTrace();
+            throw t;
         }
 
         if (poll_idle_time > 0) {
@@ -328,9 +334,22 @@ public class IOUring {
             flags |= IORING_ENTER_GETEVENTS();
         }
         int res = io_uring_enter(this.fd, nsubmit, nreceive, flags);
-        if (TRACE) System.out.printf("enter [fd:%d] returns %d\n",
-                                     this.fd, res);
+        if (TRACE) System.out.printf("enter [fd:%d] returns %s\n",
+                                     this.fd, getError(res));
         return res;
+    }
+
+    /**
+     * Return a String that is either the integer value
+     * if it is greater than or equal to zero, or
+     * a description of the error if less than zero
+     */
+    public static String getError(int retcode) {
+        if (retcode >= 0) {
+            return Integer.toString(retcode);
+        } else {
+            return strerror(-retcode);
+        }
     }
 
     /**

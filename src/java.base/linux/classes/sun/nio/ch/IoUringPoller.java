@@ -365,7 +365,8 @@ public class IoUringPoller extends Poller {
         } else {
             int ret = ring.enter(0, 1, 0);  // wait for at least one completion
             if (ret < 0) {
-                throw new IOException("io_uring_enter failed, ret=" + ret);
+                throw new IOException("io_uring_enter failed, " +
+                    IOUring.getError(ret));
             }
             return tryPoll(max);
         }
@@ -420,7 +421,8 @@ public class IoUringPoller extends Poller {
         } else {
             int ret = ring.enter(n, 0, 0);
             if (ret < 0) {
-                throw new IOException("io_uring_enter failed, ret=" + ret);
+                throw new IOException("io_uring_enter failed, " +
+                    IOUring.getError(ret));
             }
             assert ret == n;
         }
