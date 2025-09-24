@@ -449,12 +449,19 @@ class KlassInit {
 
         Thread[] vthreads = new Thread[MAX_VTHREAD_COUNT];
         CountDownLatch[] started = new CountDownLatch[MAX_VTHREAD_COUNT];
+        AtomicInteger failedCount = new AtomicInteger();
         for (int i = 0; i < MAX_VTHREAD_COUNT; i++) {
             final int id = i;
             started[i] = new CountDownLatch(1);
             vthreads[i] = Thread.ofVirtual().start(() -> {
                 started[id].countDown();
-                TestClass.m();
+                try {
+                    TestClass.m();
+                } catch (NoClassDefFoundError e) {
+                    failedCount.getAndIncrement();
+                } catch (ExceptionInInitializerError e) {
+                    failedCount.getAndIncrement();
+                }
             });
         }
         for (int i = 0; i < MAX_VTHREAD_COUNT; i++) {
@@ -466,6 +473,7 @@ class KlassInit {
         for (int i = 0; i < MAX_VTHREAD_COUNT; i++) {
             vthreads[i].join();
         }
+        assertEquals(MAX_VTHREAD_COUNT, failedCount.get());
     }
 
     /**
