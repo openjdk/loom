@@ -838,14 +838,13 @@ void InterpreterRuntime::resolve_invoke(JavaThread* current, Bytecodes::Code byt
   methodHandle resolved_method;
 
   int method_index = last_frame.get_index_u2(bytecode);
-  { ProfileTrapsMark pt(current);
-    JvmtiHideSingleStepping jhss(current);
+  { JvmtiHideSingleStepping jhss(current);
+    ProfileTrapsMark pt(current);
     JavaThread* THREAD = current; // For exception macros.
     LinkResolver::resolve_invoke(info, receiver, pool,
                                  method_index, bytecode,
                                  StaticMode::initialize_klass_preemptable, CHECK_AND_CLEAR_PREEMPTED);
     resolved_method = methodHandle(current, info.resolved_method());
-    ResourceMark rm(THREAD);
   } // end JvmtiHideSingleStepping
 
   update_invoke_cp_cache_entry(info, bytecode, resolved_method, pool, method_index);
