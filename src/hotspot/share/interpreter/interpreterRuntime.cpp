@@ -1530,3 +1530,11 @@ JRT_LEAF(intptr_t, InterpreterRuntime::trace_bytecode(JavaThread* current, intpt
   return preserve_this_value;
 JRT_END
 #endif // !PRODUCT
+
+#ifdef ASSERT
+bool InterpreterRuntime::is_preemptable_call(address entry_point) {
+  return entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter) ||
+         entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::resolve_from_cache) ||
+         entry_point == CAST_FROM_FN_PTR(address, InterpreterRuntime::_new);
+}
+#endif // ASSERT
