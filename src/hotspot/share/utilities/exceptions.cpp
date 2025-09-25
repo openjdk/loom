@@ -62,6 +62,8 @@ void ThreadShadow::set_pending_exception(oop exception, const char* file, int li
 }
 
 void ThreadShadow::clear_pending_exception() {
+  assert(_pending_exception == nullptr || !_pending_exception->is_a(vmClasses::PreemptedException_klass()),
+         "unexpected PreemptedException, missing NoPreemptMark?");
   LogTarget(Debug, exceptions) lt;
   if (_pending_exception != nullptr && lt.is_enabled()) {
     ResourceMark rm;
@@ -84,22 +86,25 @@ void ThreadShadow::clear_pending_nonasync_exception() {
 
 void ThreadShadow::set_pending_preempted_exception() {
   assert(!has_pending_exception(), "");
-  // We always install the same dummy exception since we only want
-  // to use the TRAPS mechaninsm to bail out from all methods until
+  // We always install the same pre-allocated exception since we only
+  // want to use the TRAPS mechanism to bail out from all methods until
   // reaching the one using the CHECK_AND_CLEAR_PREEMPTED macro.
   set_pending_exception(Universe::preempted_exception_instance(), __FILE__, __LINE__);
 }
 
 void ThreadShadow::clear_pending_preempted_exception() {
-  if (_pending_exception->klass() == vmClasses::PreemptedException_klass()) {
-    clear_pending_exception();
+  assert(has_pending_exception(), "");
+  if (pending_exception()->is_a(vmClasses::PreemptedException_klass())) {
+    _pending_exception = nullptr;
+    _exception_file    = nullptr;
+    _exception_line    = 0;
   }
 }
 
 #ifdef ASSERT
 void ThreadShadow::check_preempted_exception() {
   assert(has_pending_exception(), "");
-  assert(pending_exception()->is_a(vmClasses::PreemptedException_klass()), "");
+  assert(pending_exception()->is_a(vmClasses::PreemptedException_klass()), "should only be PreemptedException");
 }
 #endif
 
@@ -338,6 +343,11 @@ Handle Exceptions::new_exception(JavaThread* thread, Symbol* name,
 
   if (!thread->has_pending_exception()) {
     assert(klass != nullptr, "klass must exist");
+    // We could get here while linking or initializing a klass
+    // from a preemptable call. Don't preempt here since before
+    // the exception is propagated we might make an upcall to
+    // Java to initialize the object with the cause of exception.
+    NoPreemptMark npm(thread);
     h_exception = JavaCalls::construct_new_instance(InstanceKlass::cast(klass),
                                 signature,
                                 args,
