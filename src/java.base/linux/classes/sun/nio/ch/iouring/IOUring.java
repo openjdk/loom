@@ -115,9 +115,10 @@ public class IOUring {
                        int nmappedBuffers,
                        int mappedBufsize,
                        int poll_idle_time) throws IOException {
-        if (TRACE)
-            System.out.printf("IOUring poll_idle_time = %d\n",
-                              poll_idle_time);
+        if (TRACE) {
+            System.out.printf("IOUring (sq:%d, cq:%d, flg:%d, nbufs:%d, bufsiz:%d, sqidle:%d)\n",
+                sq_entries, cq_entries, flags, nmappedBuffers, mappedBufsize, poll_idle_time);
+        }
 
         MemorySegment params_seg = getSegmentFor(io_uring_params.$LAYOUT());
 
@@ -237,8 +238,7 @@ public class IOUring {
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
-        ctx.throwIOExceptionOnError(ret);
-        return ret;
+        return ctx.throwIOExceptionOnError(ret);
     }
 
     private int initEpoll() throws IOException {
@@ -250,8 +250,7 @@ public class IOUring {
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
-        ctx.throwIOExceptionOnError(ret);
-        return ret;
+        return ctx.throwIOExceptionOnError(ret);
     }
 
     public void register_eventfd(int efd) throws IOException {
@@ -434,22 +433,33 @@ public class IOUring {
 
     private static int io_uring_setup(int entries, MemorySegment params)
             throws IOException {
+        SystemCallContext ctx = SystemCallContext.get();
+        int ret;
         try {
-            return (int) setup_fn.invokeExact(NR_io_uring_setup,
-                                              entries, params);
+            ret = (int)setup_fn.invokeExact(ctx.errnoCaptureSegment(),
+                                            NR_io_uring_setup, entries, params);
         } catch (Throwable t) {
             throw ioexception(t);
         }
+        return ctx.throwIOExceptionOnError(ret);
     }
+
+    private static final int EINTR = 4;
 
     private static int io_uring_enter(int fd, int to_submit, int min_complete,
                                       int flags) throws IOException {
+        SystemCallContext ctx = SystemCallContext.get();
+        int ret;
         try {
-            return (int) enter_fn.invokeExact(NR_io_uring_enter,
-                    fd, to_submit, min_complete, flags, MemorySegment.NULL);
+            do {
+                ret = (int) enter_fn.invokeExact(ctx.errnoCaptureSegment(),
+                            NR_io_uring_enter, fd, to_submit, min_complete,
+                            flags, MemorySegment.NULL);
+            } while (ret == -1 && ctx.lastErrno() == EINTR);
         } catch (Throwable t) {
             throw ioexception(t);
         }
+        return ctx.throwIOExceptionOnError(ret);
     }
 
     static IOException ioexception(Throwable t) {
@@ -820,7 +830,8 @@ public class IOUring {
                 ValueLayout.JAVA_INT,
                 ValueLayout.JAVA_INT,
                 ValueLayout.JAVA_INT,
-                ValueLayout.ADDRESS)
+                ValueLayout.ADDRESS),
+        SystemCallContext.errnoLinkerOption()
     );
 
     private static final MethodHandle enter_fn = locateStdHandle(
@@ -830,7 +841,8 @@ public class IOUring {
                 ValueLayout.JAVA_INT,
                 ValueLayout.JAVA_INT,
                 ValueLayout.JAVA_INT,
-                ValueLayout.ADDRESS) // sigset_t UNUSED for now
+                ValueLayout.ADDRESS),// sigset_t UNUSED for now
+        SystemCallContext.errnoLinkerOption()
     );
 
     // io_uring_register specifically for
