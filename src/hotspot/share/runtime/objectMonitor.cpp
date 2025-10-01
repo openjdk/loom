@@ -302,11 +302,26 @@ ObjectMonitor::ObjectMonitor(oop object) :
 
 ObjectMonitor::~ObjectMonitor() {
   _object.release(_oop_storage);
+  _object_strong.release(JavaThread::thread_oop_storage());
 }
 
 oop ObjectMonitor::object() const {
   check_object_context();
   return _object.resolve();
+}
+
+// Keep object protected during ObjectLocker preemption.
+void ObjectMonitor::set_object_strong() {
+  check_object_context();
+  if (_object_strong.is_empty()) {
+    if (Thread::TrySpinAcquire(&_object_strong_lock)) {
+      if (_object_strong.is_empty()) {
+        assert(_object.resolve() != nullptr, "");
+        _object_strong = OopHandle(JavaThread::thread_oop_storage(), _object.resolve());
+      }
+      Thread::SpinRelease(&_object_strong_lock);
+    }
+  }
 }
 
 void ObjectMonitor::ExitOnSuspend::operator()(JavaThread* current) {
@@ -1095,15 +1110,6 @@ void ObjectMonitor::reenter_internal(JavaThread* current, ObjectWaiter* currentN
   // the successor but cannot run due to having run out of carriers. This can
   // happen, for example, if this is a pinned virtual thread (or plain carrier)
   // waiting for a class to be initialized.
-  // In theory we only get here in the "notification" case where the thread has
-  // already been added to the _entry_list. But if the thread happened to be interrupted
-  // at the same time it was being notified, we could have read a state of TS_ENTER
-  // that led us here but the thread hasn't been added yet to the queue. In that
-  // case getting a false value from has_unmounted_vthreads() is not a guarantee
-  // that vthreads weren't added before this thread to the _entry_list. We will live
-  // with this corner case not only because it would be very rare, but also because
-  // if there are several carriers blocked in this same situation, this would only
-  // happen for the first one notified.
   bool do_timed_parked = has_unmounted_vthreads();
   static int MAX_RECHECK_INTERVAL = 1000;
   int recheck_interval = 1;
@@ -1161,6 +1167,9 @@ void ObjectMonitor::reenter_internal(JavaThread* current, ObjectWaiter* currentN
     // Invariant: after clearing _succ a contending thread
     // *must* retry  _owner before parking.
     OrderAccess::fence();
+
+    // See comment in notify_internal
+    do_timed_parked |= currentNode->_do_timed_park;
   }
 
   // Current has acquired the lock -- Unlink current from the _entry_list.
@@ -2069,8 +2078,13 @@ bool ObjectMonitor::notify_internal(JavaThread* current) {
         // Wake up the thread to alleviate some deadlocks cases where the successor
         // that will be picked up when this thread releases the monitor is an unmounted
         // virtual thread that cannot run due to having run out of carriers. Upon waking
-        // up, the thread will call reenter_internal() which will use time-park in case
+        // up, the thread will call reenter_internal() which will use timed-park in case
         // there is contention and there are still vthreads in the _entry_list.
+        // If the target was interrupted or the wait timed-out at the same time, it could
+        // have reached reenter_internal and read a false value of has_unmounted_vthreads()
+        // before we added it to the _entry_list above. To fix that, we set _do_timed_park
+        // which will be read by the target on the next loop iteration in reenter_internal.
+        iterator->_do_timed_park = true;
         JavaThread* t = iterator->thread();
         t->_ParkEvent->unpark();
       }
@@ -2516,6 +2530,7 @@ ObjectWaiter::ObjectWaiter(JavaThread* current) {
   _is_wait  = false;
   _at_reenter = false;
   _interrupted = false;
+  _do_timed_park = false;
   _active   = false;
 }
 

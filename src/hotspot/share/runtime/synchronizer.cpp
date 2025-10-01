@@ -495,7 +495,9 @@ ObjectLocker::ObjectLocker(Handle obj, TRAPS) : _thread(THREAD), _obj(obj),
       // otherwise just force other vthreads to preempt in case they try
       // to acquire this monitor.
       _skip_exit = !_thread->preemption_cancelled();
+      ObjectSynchronizer::read_monitor(_thread, _obj())->set_object_strong();
       _thread->set_pending_preempted_exception();
+
     }
   }
 }
@@ -510,6 +512,7 @@ void ObjectLocker::wait_uninterruptibly(TRAPS) {
   ObjectSynchronizer::waitUninterruptibly(_obj, 0, _thread);
   if (_thread->preempting()) {
     _skip_exit = true;
+    ObjectSynchronizer::read_monitor(_thread, _obj())->set_object_strong();
     _thread->set_pending_preempted_exception();
   }
 }

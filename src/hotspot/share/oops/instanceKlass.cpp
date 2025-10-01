@@ -793,6 +793,18 @@ oop InstanceKlass::init_lock() const {
   return lock;
 }
 
+// Set the initialization lock to null so the object can be GC'ed. Any racing
+// threads to get this lock will see a null lock and will not lock.
+// That's okay because they all check for initialized state after getting
+// the lock and return. For preempted vthreads we keep the oop protected
+// in the ObjectMonitor (see ObjectMonitor::set_object_strong()).
+void InstanceKlass::fence_and_clear_init_lock() {
+  // make sure previous stores are all done, notably the init_state.
+  OrderAccess::storestore();
+  java_lang_Class::clear_init_lock(java_mirror());
+  assert(!is_not_initialized(), "class must be initialized now");
+}
+
 void InstanceKlass::initialize_preemptable(TRAPS) {
   if (this->should_be_initialized()) {
     PREEMPT_ON_INIT_SUPPORTED_ONLY(PreemptableInitCall pic(THREAD, this);)
@@ -1368,6 +1380,7 @@ void InstanceKlass::set_initialization_state_and_notify(ClassState state, TRAPS)
     ObjectLocker ol(h_init_lock, THREAD);
     set_init_thread(nullptr); // reset _init_thread before changing _init_state
     set_init_state(state);
+    fence_and_clear_init_lock();
     ol.notify_all(CHECK);
   } else {
     assert(h_init_lock() != nullptr, "The initialization state should never be set twice");

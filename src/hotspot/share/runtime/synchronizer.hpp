@@ -126,6 +126,7 @@ public:
   static const char* inflate_cause_name(const InflateCause cause);
 
   inline static ObjectMonitor* read_monitor(markWord mark);
+  inline static ObjectMonitor* read_monitor(Thread* current, oop obj);
   inline static ObjectMonitor* read_monitor(Thread* current, oop obj, markWord mark);
 
   // Returns the identity hash value for an oop
