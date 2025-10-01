@@ -73,18 +73,27 @@ class SystemCallContext {
 
     /**
      * If ret < 0 then errno is checked and an IOException thrown
-     * containing the textual description of errno
+     * containing the textual description of errno.
+     * Otherwise, the value passed in is returned which allows
+     * calls of the form {@code return throwIOExceptionOnError(ret)}
      *
      * @param ret
      * @throws IOException
+     * @return the value passed in (when no exception thrown)
      */
-    public void throwIOExceptionOnError(int ret) throws IOException {
+    public int throwIOExceptionOnError(int ret) throws IOException {
         if (ret < 0) {
             ret = (int)errnoHandle().get(captureSegment, 0L);
             String errmsg = strerror(ret);
             throw new IOException(errmsg);
         }
+        return ret;
     }
+
+    public int lastErrno() {
+        return (int)errnoHandle().get(captureSegment, 0L);
+    }
+
     public VarHandle errnoHandle() {
         return errnoHandle;
     }
