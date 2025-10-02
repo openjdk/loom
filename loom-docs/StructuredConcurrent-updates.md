@@ -7,6 +7,9 @@ of the loom repo:
 - The `configFunction` parameter to the 3-arg `open` is changed from
 `Function<Configuration, Configuration>` to `UnaryOperator<Configuration>`.
 
+- `Subtask::get` and `Subtask::exception` changed to consistently throw if called from
+any thread before the scope owner has joined.
+
 - The `join` method is changed to invoke `Joiner::onTimeout` if a timeout is configured
 and the timeout expires before or while waiting. The `onTimeout` throws `TimeoutException`
 or may do nothing. This allows for `Joiner` implementation that are capable of returning
