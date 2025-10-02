@@ -42,7 +42,7 @@ to set the scheduler when creating a virtual thread. The following example uses 
 pool with 8 threads as the scheduler.
 
 ```
-ExecuorService pool = Executors.newFixedThreadPool(8);
+ExecutorService pool = Executors.newFixedThreadPool(8);
 var scheduler = Thread.VirtualThreadScheduler.adapt(pool);
 
 Thread thread = Thread.ofVirtual().scheduler(scheduler).start(() -> { });
