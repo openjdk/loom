@@ -45,6 +45,7 @@ class InterpreterRuntime: AllStatic {
   static void      set_bcp_and_mdp(address bcp, JavaThread* current);
   static void      note_trap_inner(JavaThread* current, int reason,
                                    const methodHandle& trap_method, int trap_bci);
+  static void      note_trap(JavaThread* current, int reason);
 
   // Inner work method for Interpreter's frequency counter overflow.
   static nmethod* frequency_counter_overflow_inner(JavaThread* current, address branch_bcp);
@@ -88,8 +89,6 @@ class InterpreterRuntime: AllStatic {
   static void    member_name_arg_or_null(JavaThread* current, address dmh, Method* m, address bcp);
 #endif
   static void    throw_pending_exception(JavaThread* current);
-
-  static void    note_trap(JavaThread* current, int reason);
 
   static void resolve_from_cache(JavaThread* current, Bytecodes::Code bytecode);
 

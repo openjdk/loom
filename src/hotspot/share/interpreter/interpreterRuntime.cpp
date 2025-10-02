@@ -121,23 +121,6 @@ public:
   frame& get_frame()                             { return _last_frame; }
 };
 
-class ProfileTrapsMark : public StackObj {
-  JavaThread* _thread;
- public:
-  ProfileTrapsMark(JavaThread* current) : _thread(current) {}
-  ~ProfileTrapsMark() {
-    JavaThread* THREAD = _thread;
-    if (HAS_PENDING_EXCEPTION) {
-      if (ProfileTraps && PENDING_EXCEPTION->klass()->name() == vmSymbols::java_lang_NullPointerException()) {
-        // Preserve the original exception across the call to note_trap()
-        PreserveExceptionMark pm(_thread);
-        // Recording the trap will help the compiler to potentially recognize this exception as "hot"
-        InterpreterRuntime::note_trap(_thread, Deoptimization::Reason_null_check);
-      }
-    }
-  }
-};
-
 //------------------------------------------------------------------------------------------------------------------------
 // State accessors
 
@@ -838,12 +821,24 @@ void InterpreterRuntime::resolve_invoke(JavaThread* current, Bytecodes::Code byt
   methodHandle resolved_method;
 
   int method_index = last_frame.get_index_u2(bytecode);
-  { JvmtiHideSingleStepping jhss(current);
-    ProfileTrapsMark pt(current);
+  {
+    JvmtiHideSingleStepping jhss(current);
     JavaThread* THREAD = current; // For exception macros.
     LinkResolver::resolve_invoke(info, receiver, pool,
                                  method_index, bytecode,
-                                 StaticMode::initialize_klass_preemptable, CHECK_AND_CLEAR_PREEMPTED);
+                                 StaticMode::initialize_klass_preemptable, THREAD);
+
+    if (HAS_PENDING_EXCEPTION) {
+      if (ProfileTraps && PENDING_EXCEPTION->klass()->name() == vmSymbols::java_lang_NullPointerException()) {
+        // Preserve the original exception across the call to note_trap()
+        PreserveExceptionMark pm(current);
+        // Recording the trap will help the compiler to potentially recognize this exception as "hot"
+        note_trap(current, Deoptimization::Reason_null_check);
+      }
+      CLEAR_PENDING_PREEMPTED_EXCEPTION;
+      return;
+    }
+
     resolved_method = methodHandle(current, info.resolved_method());
   } // end JvmtiHideSingleStepping
 
