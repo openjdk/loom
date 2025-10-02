@@ -552,8 +552,8 @@ class java_lang_ThreadGroup : AllStatic {
 
 
 // Interface to java.lang.VirtualThread objects
-#define VTHREAD_INJECTED_FIELDS(macro)                                  \
-  macro(java_lang_VirtualThread, objectWaiter, intptr_signature, false) \
+#define VTHREAD_INJECTED_FIELDS(macro)                                           \
+  macro(java_lang_VirtualThread,   objectWaiter,  intptr_signature,       false)
 
 class java_lang_VirtualThread : AllStatic {
  private:

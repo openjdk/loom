@@ -152,6 +152,9 @@ inline void stackChunkOopDesc::set_flag(uint8_t flag, bool value) {
   uint32_t flags = this->flags();
   set_flags((uint8_t)(value ? flags |= flag : flags &= ~flag));
 }
+inline void stackChunkOopDesc::clear_flags() {
+  set_flags(0);
+}
 
 inline bool stackChunkOopDesc::has_mixed_frames() const { return is_flag(FLAG_HAS_INTERPRETED_FRAMES); }
 inline void stackChunkOopDesc::set_has_mixed_frames(bool value) {

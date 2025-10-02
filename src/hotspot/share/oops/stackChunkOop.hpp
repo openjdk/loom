@@ -129,6 +129,7 @@ public:
   inline bool is_flag_acquire(uint8_t flag) const;
   inline void set_flag(uint8_t flag, bool value);
   inline bool try_set_flags(uint8_t prev_flags, uint8_t new_flags);
+  inline void clear_flags();
 
   inline bool has_mixed_frames() const;
   inline void set_has_mixed_frames(bool value);
