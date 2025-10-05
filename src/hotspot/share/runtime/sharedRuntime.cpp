@@ -99,6 +99,8 @@
   SHARED_STUBS_DO(SHARED_STUB_FIELD_DEFINE)
 #undef SHARED_STUB_FIELD_DEFINE
 
+nmethod*            SharedRuntime::_cont_doYield_stub;
+
 #if 0
 // TODO tweak global stub name generation to match this
 #define SHARED_STUB_NAME_DECLARE(name, type) "Shared Runtime " # name "_blob",

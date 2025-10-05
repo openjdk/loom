@@ -525,19 +525,19 @@ FreezeBase::FreezeBase(JavaThread* thread, ContinuationWrapper& cont, intptr_t* 
   assert(_cont.chunk_invariant(), "");
   assert(!Interpreter::contains(_cont.entryPC()), "");
 #if !defined(PPC64) || defined(ZERO)
-  static const int do_yield_frame_size = frame::metadata_words;
+  static const int doYield_stub_frame_size = frame::metadata_words;
 #else
-  static const int do_yield_frame_size = frame::native_abi_reg_args_size >> LogBytesPerWord;
+  static const int doYield_stub_frame_size = frame::native_abi_reg_args_size >> LogBytesPerWord;
 #endif
   // With preemption doYield() might not have been resolved yet
-  assert(_preempt || ContinuationEntry::do_yield_nmethod()->frame_size() == do_yield_frame_size, "");
+  assert(_preempt || SharedRuntime::cont_doYield_stub()->frame_size() == doYield_stub_frame_size, "");
 
   if (preempt) {
     _last_frame = _thread->last_frame();
   }
 
   // properties of the continuation on the stack; all sizes are in words
-  _cont_stack_top    = frame_sp + (!preempt ? do_yield_frame_size : 0); // we don't freeze the doYield stub frame
+  _cont_stack_top    = frame_sp + (!preempt ? doYield_stub_frame_size : 0); // we don't freeze the doYield stub frame
   _cont_stack_bottom = _cont.entrySP() + (_cont.argsize() == 0 ? frame::metadata_words_at_top : 0)
       - ContinuationHelper::frame_align_words(_cont.argsize()); // see alignment in thaw
 
@@ -906,7 +906,7 @@ frame FreezeBase::freeze_start_frame() {
 
 frame FreezeBase::freeze_start_frame_yield_stub() {
   frame f = _thread->last_frame();
-  assert(ContinuationEntry::do_yield_nmethod()->contains(f.pc()), "must be");
+  assert(SharedRuntime::cont_doYield_stub()->contains(f.pc()), "must be");
   f = sender<ContinuationHelper::NonInterpretedUnknownFrame>(f);
   assert(Continuation::is_frame_in_continuation(_thread->last_continuation(), f), "");
   return f;

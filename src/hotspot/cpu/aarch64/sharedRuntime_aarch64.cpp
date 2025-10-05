@@ -1348,7 +1348,7 @@ nmethod* SharedRuntime::generate_native_wrapper(MacroAssembler* masm,
     if (method->is_continuation_enter_intrinsic()) {
       ContinuationEntry::set_enter_code(nm, interpreted_entry_offset);
     } else if (method->is_continuation_yield_intrinsic()) {
-      ContinuationEntry::set_yield_code(nm);
+      _cont_doYield_stub = nm;
     } else {
       guarantee(false, "Unknown Continuation native intrinsic");
     }
