@@ -1116,11 +1116,11 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
     if (_thread->at_preemptable_init()) {
       assert(top_frame.is_interpreted_frame(), "only InterpreterRuntime::_new/resolve_from_cache allowed");
       chunk->set_at_klass_init(true);
-      Method* m = top_frame.interpreter_frame_method();
-      Bytecode current_bytecode = Bytecode(m, top_frame.interpreter_frame_bcp());
-      Bytecodes::Code code = current_bytecode.code();
-      int exp_size = top_frame.interpreter_frame_expression_stack_size();
-      if (code == Bytecodes::Code::_invokestatic && exp_size > 0) {
+      methodHandle m (_thread, top_frame.interpreter_frame_method());
+      Bytecode_invoke call = Bytecode_invoke_check(m, top_frame.interpreter_frame_bci());
+      assert(!call.is_valid() || call.is_invokestatic(), "only invokestatic allowed");
+      if (call.is_invokestatic() && call.size_of_parameters() > 0) {
+        assert(top_frame.interpreter_frame_expression_stack_size() > 0, "should have parameters in exp stack");
         chunk->set_has_args_at_top(true);
       }
     }
