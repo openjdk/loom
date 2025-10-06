@@ -2050,7 +2050,7 @@ protected:
   int _align_size;
   DEBUG_ONLY(intptr_t* _top_stack_address);
 
-  // Only used for some preemption cases.
+  // Only used for preemption on ObjectLocker
   ObjectMonitor* _monitor;
 
   StackChunkFrameStream<ChunkFrames::Mixed> _stream;
@@ -2702,10 +2702,9 @@ intptr_t* ThawBase::redo_vmcall(JavaThread* current, frame& top) {
     current->set_preempt_alternate_return(nullptr);
     bool cancelled = current->preemption_cancelled();
     if (cancelled) {
-      // Instead of calling thaw again from the preempt stub just unmount anyways with
-      // state of YIELDING. This will give a chance for other vthreads to run while
-      // minimizing repeated loops of "thaw->redo_vmcall->try_preempt->preemption_cancelled->thaw..."
-      // in case of multiple vthreads contending for the same init_lock().
+      // Since preemption was cancelled, the thread will call thaw again from the preempt
+      // stub. These retries could happen several times due to contention on the init_lock,
+      // so just let the vthread umount to give a chance for other vthreads to run.
       current->set_preemption_cancelled(false);
       oop vthread = current->vthread();
       assert(java_lang_VirtualThread::state(vthread) == java_lang_VirtualThread::RUNNING, "wrong state for vthread");
