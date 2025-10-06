@@ -65,8 +65,6 @@ inline bool ObjectSynchronizer::quick_enter(oop obj, BasicLock* lock, JavaThread
 }
 
 inline void ObjectSynchronizer::exit(oop object, BasicLock* lock, JavaThread* current) {
-  current->dec_held_monitor_count();
-
   LightweightSynchronizer::exit(object, lock, current);
 }
 
