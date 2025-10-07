@@ -1427,13 +1427,22 @@ public class ForkJoinPool extends AbstractExecutorService
 
         // specialized execution methods
 
-        /**
-         * Runs the given task, as well as remaining local tasks.
+        /*
+         * Two version (lifo and fifo) of top-level execution, split
+         * across modes to better isolate task dispatch and local
+         * processing from top-level scheduling.
          */
-        final void topLevelExec(ForkJoinTask<?> task, int fifo) {
+        final void topLevelExecLifo(ForkJoinTask<?> task) {
             while (task != null) {
                 task.doExec();
-                task = (fifo == 0) ? localPop() : localPoll();
+                task = localPop();
+            }
+        }
+
+        final void topLevelExecFifo(ForkJoinTask<?> task) {
+            while (task != null) {
+                task.doExec();
+                task = localPoll();
             }
         }
 
@@ -2009,7 +2018,10 @@ public class ForkJoinPool extends AbstractExecutorService
                                 if (nt != null &&         // confirm a[nk]
                                     U.getReference(a, np) == nt)
                                     signalWork(a, nk);    // propagate
-                                w.topLevelExec(t, fifo);  // run t & its subtasks
+                                if (fifo != 0)            // run t & its subtasks
+                                    w.topLevelExecFifo(t);
+                                else
+                                    w.topLevelExecLifo(t);
                             }
                         }
                     }
@@ -2027,16 +2039,16 @@ public class ForkJoinPool extends AbstractExecutorService
     private int deactivate(WorkQueue w) {
         int idle = 1;
         if (w != null) {                        // always true; hoist checks
-            int inactive = w.phase |= IDLE;     // set status
-            int activePhase = inactive + IDLE;  // phase value when reactivated
-            long ap = activePhase & LMASK, pc = ctl, qc;
-            do {                                // enqueue
-                qc = ap | ((pc - RC_UNIT) & UMASK);
-                w.stackPred = (int)pc;          // set ctl stack link
-            } while (pc != (pc = compareAndExchangeCtl(pc, qc)));
-
+            int p = w.phase, idlePhase = p | IDLE, activePhase = p + (IDLE << 1);
+            long pc = ctl, qc = (activePhase & LMASK) | ((pc - RC_UNIT) & UMASK);
+            w.stackPred = (int)pc;              // set ctl stack link
+            w.phase = idlePhase;
+            if (!compareAndSetCtl(pc, qc)) {    // try to enqueue
+                w.phase = p;                    // back out on contention
+                idle = 0;
+            }
             WorkQueue[] qs; int n; long e;
-            if (((e = runState) & STOP) == 0 && // quiescence checks
+            if (idle != 0 && ((e = runState) & STOP) == 0 && // quiescence checks
                 ((e & SHUTDOWN) == 0L || (qc & RC_MASK) > 0L || quiescent() <= 0) &&
                 (qs = queues) != null && (n = qs.length) > 1) {
                 long psp = pc & LMASK;          // ctl predecessor prefix
@@ -2070,37 +2082,38 @@ public class ForkJoinPool extends AbstractExecutorService
      */
     private int awaitWork(WorkQueue w, int activePhase, int qsize) {
         int idle = 1;
-        int spins = qsize | (qsize - 1);      // approx traversal cost
-        if (w != null) {                      // always true; hoist checks
-            boolean trimmable; long deadline, c;
-            long trimTime = (w.source == INVALID_ID) ? TIMEOUT_SLOP : keepAlive;
-            if ((w.config & CLEAR_TLS) != 0 && // instanceof check always true
+        if ((runState & STOP) == 0L && w != null) {
+            int cfg = w.config;
+            long waitTime = (w.source == INVALID_ID) ? 0L : keepAlive;
+            long deadline = waitTime + System.currentTimeMillis();
+            int spins = (qsize << 1) | (qsize - 1); // approx traversal cost
+            if ((cfg & CLEAR_TLS) != 0 &&     // instanceof check always true
                 Thread.currentThread() instanceof ForkJoinWorkerThread f)
                 f.resetThreadLocals();        // clear while accessing thread state
             LockSupport.setCurrentBlocker(this);
-            if (trimmable = (((c = ctl) & RC_MASK) == 0L && (int)c == activePhase))
-                deadline = trimTime + System.currentTimeMillis();
-            else
-                deadline = 0L;
             for (;;) {
-                int s = spins, trim;
                 Thread.interrupted();         // clear status
-                if ((runState & STOP) != 0L)
-                    break;
+                int s = spins;
                 while ((idle = w.phase - activePhase) != 0 && --s != 0)
-                    Thread.onSpinWait();      // spin before blocking
+                    Thread.onSpinWait();      // spin before/between parks
                 if (idle == 0)
                     break;
-                if (trimmable &&
-                    (trim = tryTrim(w, activePhase, deadline)) != 0) {
-                    if (trim > 0)
-                        break;
-                    trimmable = false;
-                    deadline = 0L;
+                if ((runState & STOP) != 0L)
+                    break;
+                boolean trimmable = false;    // use timed wait if trimmable
+                long d = 0L, c;
+                if (((c = ctl) & RC_MASK) == 0L && (int)c == activePhase) {
+                    if (deadline - System.currentTimeMillis() <= TIMEOUT_SLOP) {
+                        if (tryTrim(w, c, activePhase))
+                            break;
+                        continue;             // lost race to trim
+                    }
+                    d = deadline;
+                    trimmable = true;
                 }
                 w.parking = 1;                // enable unpark and recheck
                 if ((idle = w.phase - activePhase) != 0)
-                    U.park(trimmable, deadline);
+                    U.park(trimmable, d);
                 w.parking = 0;                // close unpark window
                 if (idle == 0 || (idle = w.phase - activePhase) == 0)
                     break;
@@ -2112,35 +2125,29 @@ public class ForkJoinPool extends AbstractExecutorService
 
     /**
      * Tries to remove and deregister worker after timeout, and release
-     * another to do the same.
-     * @return > 0: trimmed, < 0 : not trimmable, else 0
+     * another to do the same unless new tasks are found.
      */
-    private int tryTrim(WorkQueue w, int activePhase, long deadline) {
-        long c, nc; int stat, vp, i; WorkQueue[] vs; WorkQueue v;
-        long waitTime = deadline - System.currentTimeMillis();
-        if ((int)(c = ctl) != activePhase || w == null)
-            stat = -1;                      // no longer ctl top
-        else if (waitTime > TIMEOUT_SLOP)
-            stat = 0;                       // spurious wakeup
-        else if (!compareAndSetCtl(
-                     c, nc = ((w.stackPred & LMASK) | (RC_MASK & c) |
-                               (TC_MASK & (c - TC_UNIT)))))
-            stat = -1;                      // lost race to signaller
-        else {
-            stat = 1;
-            w.source = DROPPED;
-            w.phase = activePhase;
-            if ((vp = (int)nc) != 0 && (vs = queues) != null &&
-                vs.length > (i = vp & SMASK) && (v = vs[i]) != null &&
-                compareAndSetCtl(           // try to wake up next waiter
-                    nc, ((UMASK & (nc + RC_UNIT)) |
-                         (nc & TC_MASK) | (v.stackPred & LMASK)))) {
-                v.source = INVALID_ID;      // enable cascaded timeouts
-                v.phase = vp;
-                U.unpark(v.owner);
+    private boolean tryTrim(WorkQueue w, long c, int activePhase) {
+        if (w != null) {
+            int vp, i; WorkQueue[] vs; WorkQueue v;
+            long nc = ((w.stackPred & LMASK) |
+                       ((RC_MASK & c) | (TC_MASK & (c - TC_UNIT))));
+            if (compareAndSetCtl(c, nc)) {
+                w.source = DROPPED;
+                w.phase = activePhase;
+                if ((vp = (int)nc) != 0 && (vs = queues) != null &&
+                    vs.length > (i = vp & SMASK) && (v = vs[i]) != null &&
+                    compareAndSetCtl(           // try to wake up next waiter
+                        nc, ((v.stackPred & LMASK) |
+                             ((UMASK & (nc + RC_UNIT)) | (nc & TC_MASK))))) {
+                    v.source = INVALID_ID;      // enable cascaded timeouts
+                    v.phase = vp;
+                    U.unpark(v.owner);
+                }
+                return true;
             }
         }
-        return stat;
+        return false;
     }
 
     /**
