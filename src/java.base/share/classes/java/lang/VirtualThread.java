@@ -63,17 +63,17 @@ final class VirtualThread extends BaseVirtualThread {
     private static final Unsafe U = Unsafe.getUnsafe();
     private static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
 
+    private static final BuiltinDefaultScheduler BUILTIN_DEFAULT_SCHEDULER;
     private static final VirtualThreadScheduler DEFAULT_SCHEDULER;
-    private static final boolean IS_CUSTOM_DEFAULT_SCHEDULER;
     static {
+        BuiltinDefaultScheduler builtinDefaultScheduler = createBuiltinDefaultScheduler();
+        BUILTIN_DEFAULT_SCHEDULER = builtinDefaultScheduler;
         // experimental
         String propValue = System.getProperty("jdk.virtualThreadScheduler.implClass");
         if (propValue != null) {
-            DEFAULT_SCHEDULER = createCustomDefaultScheduler(propValue);
-            IS_CUSTOM_DEFAULT_SCHEDULER = true;
+            DEFAULT_SCHEDULER = createDefaultScheduler(builtinDefaultScheduler, propValue);
         } else {
-            DEFAULT_SCHEDULER = createDefaultForkJoinPoolScheduler();
-            IS_CUSTOM_DEFAULT_SCHEDULER = false;
+            DEFAULT_SCHEDULER = builtinDefaultScheduler;
         }
     }
 
@@ -209,7 +209,7 @@ final class VirtualThread extends BaseVirtualThread {
      * Returns true if using a custom default scheduler.
      */
     static boolean isCustomDefaultScheduler() {
-        return IS_CUSTOM_DEFAULT_SCHEDULER;
+        return DEFAULT_SCHEDULER != BUILTIN_DEFAULT_SCHEDULER;
     }
 
     /**
@@ -400,7 +400,7 @@ final class VirtualThread extends BaseVirtualThread {
      * @see ForkJoinPool#lazySubmit(ForkJoinTask)
      */
     private void lazySubmitRunContinuation() {
-        if (scheduler == DEFAULT_SCHEDULER
+        if (scheduler == BUILTIN_DEFAULT_SCHEDULER
                 && currentCarrierThread() instanceof CarrierThread ct
                 && ct.getQueuedTaskCount() == 0) {
             try {
@@ -423,7 +423,8 @@ final class VirtualThread extends BaseVirtualThread {
      * @throws RejectedExecutionException
      */
     private void externalSubmitRunContinuation() {
-        if (scheduler == DEFAULT_SCHEDULER && currentCarrierThread() instanceof CarrierThread ct) {
+        if (scheduler == BUILTIN_DEFAULT_SCHEDULER
+                && currentCarrierThread() instanceof CarrierThread ct) {
             try {
                 ct.getPool().externalSubmit(ForkJoinTask.adapt(runContinuation));
             } catch (RejectedExecutionException ree) {
@@ -445,7 +446,8 @@ final class VirtualThread extends BaseVirtualThread {
      * @throws OutOfMemoryError
      */
     private void externalSubmitRunContinuationOrThrow() {
-        if (scheduler == DEFAULT_SCHEDULER && currentCarrierThread() instanceof CarrierThread ct) {
+        if (scheduler == BUILTIN_DEFAULT_SCHEDULER
+                && currentCarrierThread() instanceof CarrierThread ct) {
             try {
                 ct.getPool().externalSubmit(ForkJoinTask.adapt(runContinuation));
             } catch (RejectedExecutionException ree) {
@@ -1451,14 +1453,13 @@ final class VirtualThread extends BaseVirtualThread {
      * default scheduler. The class is public in an exported package, has a public
      * one-arg or no-arg constructor, and is visible to the system class loader.
      */
-    private static VirtualThreadScheduler createCustomDefaultScheduler(String cn) {
+    private static VirtualThreadScheduler createDefaultScheduler(BuiltinDefaultScheduler builtin, String cn) {
         try {
             Class<?> clazz = Class.forName(cn, true, ClassLoader.getSystemClassLoader());
             VirtualThreadScheduler scheduler;
             try {
                 // 1-arg constructor
                 Constructor<?> ctor = clazz.getConstructor(VirtualThreadScheduler.class);
-                var builtin = createDefaultForkJoinPoolScheduler();
                 scheduler = (VirtualThreadScheduler) ctor.newInstance(builtin.externalView());
             } catch (NoSuchMethodException e) {
                 // 0-arg constructor
@@ -1476,7 +1477,7 @@ final class VirtualThread extends BaseVirtualThread {
     /**
      * Creates the built-in default ForkJoinPool scheduler.
      */
-    private static BuiltinDefaultScheduler createDefaultForkJoinPoolScheduler() {
+    private static BuiltinDefaultScheduler createBuiltinDefaultScheduler() {
         int parallelism, maxPoolSize, minRunnable;
         String parallelismValue = System.getProperty("jdk.virtualThreadScheduler.parallelism");
         String maxPoolSizeValue = System.getProperty("jdk.virtualThreadScheduler.maxPoolSize");
