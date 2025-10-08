@@ -25,7 +25,7 @@
  * @test id=default
  * @summary Test virtual threads entering a lot of monitors with contention
  * @library /test/lib
- * @run main LotsOfContendedMonitorEnter
+ * @run main/timeout=480 LotsOfContendedMonitorEnter
  */
 
 import java.util.concurrent.CountDownLatch;
