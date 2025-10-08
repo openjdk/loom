@@ -193,7 +193,7 @@ static void verify_continuation(oop continuation) { Continuation::debug_verify_c
 
 static void do_deopt_after_thaw(JavaThread* thread);
 static bool do_verify_after_thaw(JavaThread* thread, stackChunkOop chunk, outputStream* st);
-static void log_frames(JavaThread* thread, bool dolog = false);
+static void log_frames(JavaThread* thread, bool dolog = true);
 static void log_frames_after_thaw(JavaThread* thread, ContinuationWrapper& cont, intptr_t* sp);
 static void print_frame_layout(const frame& f, bool callee_complete, outputStream* st = tty);
 static void verify_frame_kind(const frame& top, Continuation::preempt_kind preempt_kind, Method** m_ptr = nullptr, const char** code_name_ptr = nullptr, int* bci_ptr = nullptr);
@@ -1724,9 +1724,6 @@ bool FreezeBase::check_valid_fast_path() {
 }
 
 static void verify_frame_kind(const frame& top, Continuation::preempt_kind preempt_kind, Method** m_ptr, const char** code_name_ptr, int* bci_ptr) {
-  JavaThread* current = JavaThread::current();
-  ResourceMark rm(current);
-
   Method* m;
   const char* code_name;
   int bci;
@@ -1744,6 +1741,8 @@ static void verify_frame_kind(const frame& top, Continuation::preempt_kind preem
       assert(at_sync_method || at_sync_bytecode, "");
       bci = at_sync_method ? -1 : top.interpreter_frame_bci();
     } else {
+      JavaThread* current = JavaThread::current();
+      ResourceMark rm(current);
       CodeBlob* cb = top.cb();
       RegisterMap reg_map(current,
                   RegisterMap::UpdateMap::skip,
@@ -1791,6 +1790,8 @@ static void verify_frame_kind(const frame& top, Continuation::preempt_kind preem
 
 static void log_preempt_after_freeze(ContinuationWrapper& cont) {
   JavaThread* current = cont.thread();
+  int64_t tid = current->monitor_owner_id();
+
   StackChunkFrameStream<ChunkFrames::Mixed> sfs(cont.tail());
   frame top_frame = sfs.to_frame();
   bool at_init = current->at_preemptable_init();
@@ -1807,14 +1808,14 @@ static void log_preempt_after_freeze(ContinuationWrapper& cont) {
 
   ResourceMark rm(current);
   if (bci < 0) {
-    log_trace(continuations, preempt)("Preempted " INT64_FORMAT " while synchronizing on %smethod %s", current->monitor_owner_id(), m->is_native() ? "native " : "", m->external_name());
+    log_trace(continuations, preempt)("Preempted " INT64_FORMAT " while synchronizing on %smethod %s", tid, m->is_native() ? "native " : "", m->external_name());
   } else if (m->is_object_wait0()) {
-    log_trace(continuations, preempt)("Preempted " INT64_FORMAT " at native method %s", current->monitor_owner_id(), m->external_name());
+    log_trace(continuations, preempt)("Preempted " INT64_FORMAT " at native method %s", tid, m->external_name());
   } else {
     Klass* k = current->preempt_init_klass();
     assert(k != nullptr || !at_init, "");
-    log_trace(continuations, preempt)("Preempted " INT64_FORMAT " at %s(bci:%d) in method %s %s%s", current->monitor_owner_id(),
-            code_name, bci, m->external_name(), at_init ? "trying to initialize klass " : "", at_init ? k->external_name() : "");
+    log_trace(continuations, preempt)("Preempted " INT64_FORMAT " at %s(bci:%d) in method %s %s%s", tid, code_name, bci,
+            m->external_name(), at_init ? "trying to initialize klass " : "", at_init ? k->external_name() : "");
   }
 }
 #endif // ASSERT
@@ -1859,7 +1860,7 @@ static inline freeze_result freeze_internal(JavaThread* current, intptr_t* const
 
 #ifdef ASSERT
   log_trace(continuations)("~~~~ freeze sp: " INTPTR_FORMAT "JavaThread: " INTPTR_FORMAT, p2i(current->last_continuation()->entry_sp()), p2i(current));
-  log_frames(current, false);
+  log_frames(current);
 #endif
 
   CONT_JFR_ONLY(EventContinuationFreeze event;)
@@ -2387,7 +2388,7 @@ NOINLINE intptr_t* Thaw<ConfigT>::thaw_slow(stackChunkOop chunk, Continuation::t
       assert(!mon_acquired || mon->has_owner(_thread), "invariant");
       if (!mon_acquired) {
         // Failed to acquire monitor. Return to enterSpecial to unmount again.
-        log_trace(continuations, tracking)("Failed to acquire monitor, unmounting again");
+        log_develop_trace(continuations, preempt)("Failed to acquire monitor, unmounting again");
         return push_cleanup_continuation();
       }
       _monitor = mon;        // remember monitor since we might need it on handle_preempted_continuation()
@@ -2738,7 +2739,6 @@ NOINLINE void ThawBase::recurse_thaw_interpreted_frame(const frame& hf, frame& c
 
   if (UNLIKELY(seen_by_gc())) {
     if (is_top && _process_args_at_top) {
-      log_trace(continuations, tracking)("Processing arguments in recurse_thaw_interpreted_frame");
       _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>(_stream, SmallRegisterMap::instance_with_args());  
     } else {
       _cont.tail()->do_barriers<stackChunkOopDesc::BarrierType::Store>(_stream, SmallRegisterMap::instance_no_args());  
@@ -2996,7 +2996,6 @@ void ThawBase::finish_thaw(frame& f) {
   push_return_frame(f);
    // can only fix caller after push_return_frame (due to callee saved regs)
   if (_process_args_at_top) {
-    log_trace(continuations, tracking)("Processing arguments in finish_thaw");
     chunk->fix_thawed_frame(f, SmallRegisterMap::instance_with_args());
   } else {
     chunk->fix_thawed_frame(f, SmallRegisterMap::instance_no_args());  
@@ -3164,7 +3163,7 @@ static bool do_verify_after_thaw(JavaThread* thread, stackChunkOop chunk, output
 
 static void log_frames(JavaThread* thread, bool dolog) {
   const static int show_entry_callers = 3;
-  LogTarget(Trace, continuations, tracking) lt;
+  LogTarget(Trace, continuations) lt;
   if (!lt.develop_is_enabled() || !dolog) {
     return;
   }

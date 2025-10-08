@@ -324,8 +324,6 @@ inline intptr_t* ThawBase::push_cleanup_continuation() {
 
   sp[-1] = (intptr_t)ContinuationEntry::cleanup_pc();
   sp[-2] = (intptr_t)enterSpecial.fp();
-
-  log_develop_trace(continuations, preempt)("push_cleanup_continuation initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT, p2i(sp + 2 * frame::metadata_words), p2i(sp));
   return sp;
 }
 
@@ -334,8 +332,6 @@ inline intptr_t* ThawBase::push_preempt_adapter() {
   intptr_t* sp = enterSpecial.sp();
 
   sp[-1] = (intptr_t)StubRoutines::cont_preempt_stub();
-
-  log_develop_trace(continuations, preempt)("push_preempt_adapter initial sp: " INTPTR_FORMAT " final sp: " INTPTR_FORMAT, p2i(sp + 2 * frame::metadata_words), p2i(sp));
   return sp;
 }
 
