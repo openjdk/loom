@@ -25,48 +25,54 @@
  * @test id=default
  * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
- * @requires vm.continuations & vm.opt.LockingMode != 1
-@run junit/othervm/timeout=480 -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
+ * @requires vm.continuations
+ * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
+ * @run junit/othervm/timeout=480 -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
  */
 
 /*
  * @test id=Xint
  * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
- * @requires vm.continuations & vm.opt.LockingMode != 1
-@run junit/othervm/timeout=480 -Xint -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
+ * @requires vm.continuations
+ * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
+ * @run junit/othervm/timeout=480 -Xint -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
  */
 
 /*
  * @test id=Xcomp
  * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
- * @requires vm.continuations & vm.opt.LockingMode != 1
-@run junit/othervm/timeout=480 -Xcomp -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
+ * @requires vm.continuations
+ * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
+ * @run junit/othervm/timeout=480 -Xcomp -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
  */
 
 /*
  * @test id=Xcomp-TieredStopAtLevel1
  * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
- * @requires vm.continuations & vm.opt.LockingMode != 1
-@run junit/othervm/timeout=480 -Xcomp -XX:TieredStopAtLevel=1 -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
+ * @requires vm.continuations
+ * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
+ * @run junit/othervm/timeout=480 -Xcomp -XX:TieredStopAtLevel=1 -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
  */
 
 /*
  * @test id=Xcomp-noTieredCompilation
  * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
- * @requires vm.continuations & vm.opt.LockingMode != 1
-@run junit/othervm/timeout=480 -Xcomp -XX:-TieredCompilation -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
+ * @requires vm.continuations
+ * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
+ * @run junit/othervm/timeout=480 -Xcomp -XX:-TieredCompilation -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
  */
 
 /*
  * @test id=gc
  * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
- * @requires vm.debug == true & vm.continuations & vm.opt.LockingMode != 1
-@run junit/othervm/timeout=480 -XX:+UnlockDiagnosticVMOptions -XX:+FullGCALot -XX:FullGCALotInterval=1000 -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
+ * @requires vm.debug == true & vm.continuations
+ * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
+ * @run junit/othervm/timeout=480 -XX:+UnlockDiagnosticVMOptions -XX:+FullGCALot -XX:FullGCALotInterval=1000 -XX:CompileCommand=exclude,KlassInit::lambda$testReleaseAtKlassInit* -XX:CompileCommand=exclude,KlassInit$$Lambda*::run -XX:CompileCommand=exclude,KlassInit$1Driver::foo KlassInit
  */
 
 import java.util.ArrayList;
