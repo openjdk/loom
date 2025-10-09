@@ -385,7 +385,7 @@ void InterpreterMacroAssembler::call_VM_preemptable_helper(Register oop_result,
 
   bind(not_preempted);
   if (check_exceptions) {
-    // check for pending exceptions (java_thread is set upon return)
+    // check for pending exceptions
     cmpptr(Address(r15_thread, Thread::pending_exception_offset()), NULL_WORD);
     Label ok;
     jcc(Assembler::equal, ok);

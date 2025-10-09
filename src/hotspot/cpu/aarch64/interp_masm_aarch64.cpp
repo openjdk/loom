@@ -1467,7 +1467,7 @@ void InterpreterMacroAssembler::call_VM_preemptable_helper(Register oop_result,
 
   bind(not_preempted);
   if (check_exceptions) {
-    // check for pending exceptions (java_thread is set upon return)
+    // check for pending exceptions
     ldr(rscratch1, Address(rthread, in_bytes(Thread::pending_exception_offset())));
     Label ok;
     cbz(rscratch1, ok);
