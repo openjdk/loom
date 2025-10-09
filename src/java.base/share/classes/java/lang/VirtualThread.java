@@ -63,17 +63,23 @@ final class VirtualThread extends BaseVirtualThread {
     private static final Unsafe U = Unsafe.getUnsafe();
     private static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
 
-    private static final BuiltinDefaultScheduler BUILTIN_DEFAULT_SCHEDULER;
+    private static final VirtualThreadScheduler BUILTIN_DEFAULT_SCHEDULER;
     private static final VirtualThreadScheduler DEFAULT_SCHEDULER;
     static {
-        BuiltinDefaultScheduler builtinDefaultScheduler = createBuiltinDefaultScheduler();
-        BUILTIN_DEFAULT_SCHEDULER = builtinDefaultScheduler;
         // experimental
         String propValue = System.getProperty("jdk.virtualThreadScheduler.implClass");
         if (propValue != null) {
-            DEFAULT_SCHEDULER = createDefaultScheduler(builtinDefaultScheduler, propValue);
+            var builtinScheduler = createBuiltinDefaultScheduler(true);
+            VirtualThreadScheduler defaultScheduler = builtinScheduler.externalView();
+            for (String cn: propValue.split(",")) {
+                defaultScheduler = loadCustomScheduler(defaultScheduler, cn);
+            }
+            BUILTIN_DEFAULT_SCHEDULER = builtinScheduler;
+            DEFAULT_SCHEDULER = defaultScheduler;
         } else {
-            DEFAULT_SCHEDULER = builtinDefaultScheduler;
+            var builtinScheduler = createBuiltinDefaultScheduler(false);
+            BUILTIN_DEFAULT_SCHEDULER = builtinScheduler;
+            DEFAULT_SCHEDULER = builtinScheduler;
         }
     }
 
@@ -341,9 +347,9 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Submits the runContinuation task to the scheduler. For the default scheduler,
-     * and calling it on a worker thread, the task will be pushed to the local queue,
-     * otherwise it will be pushed to an external submission queue.
+     * Submits the runContinuation task to the scheduler. For the built-in default
+     * scheduler, the task will be pushed to the local queue if possible, otherwise it
+     * will be pushed to an external submission queue.
      * @param retryOnOOME true to retry indefinitely if OutOfMemoryError is thrown
      * @throws RejectedExecutionException
      */
@@ -392,17 +398,16 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Lazy submit the runContinuation task if invoked on a carrier thread and its local
-     * queue is empty. If not empty, or invoked by another thread, then this method works
-     * like submitRunContinuation and just submits the task to the scheduler.
+     * Invoked from a carrier thread to lazy submit the runContinuation task to the
+     * carrier's local queue if the queue is empty. If not empty, or invoked by a thread
+     * for a custom scheduler, then it just submits the task to the scheduler.
      * If OutOfMemoryError is thrown then the submit will be retried until it succeeds.
      * @throws RejectedExecutionException
      * @see ForkJoinPool#lazySubmit(ForkJoinTask)
      */
     private void lazySubmitRunContinuation() {
-        if (scheduler == BUILTIN_DEFAULT_SCHEDULER
-                && currentCarrierThread() instanceof CarrierThread ct
-                && ct.getQueuedTaskCount() == 0) {
+        assert !currentThread().isVirtual();
+        if (currentThread() instanceof CarrierThread ct && ct.getQueuedTaskCount() == 0) {
             try {
                 ct.getPool().lazySubmit(ForkJoinTask.adapt(runContinuation));
             } catch (RejectedExecutionException ree) {
@@ -417,14 +422,16 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Submits the runContinuation task to the scheduler. For the default scheduler, and
-     * calling it a virtual thread that uses the default scheduler, the task will be
-     * pushed to an external submission queue.
+     * Invoked from a carrier thread to externally submit the runContinuation task to the
+     * scheduler. If invoked by a thread for a custom scheduler, then it just submits the
+     * task to the scheduler.
+     * If OutOfMemoryError is thrown then the submit will be retried until it succeeds.
      * @throws RejectedExecutionException
+     * @see ForkJoinPool#externalSubmit(ForkJoinTask)
      */
     private void externalSubmitRunContinuation() {
-        if (scheduler == BUILTIN_DEFAULT_SCHEDULER
-                && currentCarrierThread() instanceof CarrierThread ct) {
+        assert !currentThread().isVirtual();
+        if (currentThread() instanceof CarrierThread ct) {
             try {
                 ct.getPool().externalSubmit(ForkJoinTask.adapt(runContinuation));
             } catch (RejectedExecutionException ree) {
@@ -439,11 +446,14 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Submits the runContinuation task to the scheduler. For the default scheduler, and
-     * calling it a virtual thread that uses the default scheduler, the task will be
-     * pushed to an external submission queue. This method may throw OutOfMemoryError.
+     * Invoked from Thread.start to externally submit the runContinuation task to the
+     * scheduler. If this virtual thread is scheduled by the built-in default scheduler,
+     * and this method is called from a virtual thread scheduled by the built-in default
+     * scheduler, then it uses externalSubmit to ensure that the task is pushed to an
+     * external submission queue rather than the local queue.
      * @throws RejectedExecutionException
      * @throws OutOfMemoryError
+     * @see ForkJoinPool#externalSubmit(ForkJoinTask)
      */
     private void externalSubmitRunContinuationOrThrow() {
         if (scheduler == BUILTIN_DEFAULT_SCHEDULER
@@ -1449,18 +1459,20 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Loads a VirtualThreadScheduler with the given class name to use at the
-     * default scheduler. The class is public in an exported package, has a public
-     * one-arg or no-arg constructor, and is visible to the system class loader.
+     * Loads a VirtualThreadScheduler with the given class name. The class must be public
+     * in an exported package, with public one-arg or no-arg constructor, and be visible
+     * to the system class loader.
+     * @param delegate the scheduler that the custom scheduler may delegate to
+     * @param cn the class name of the custom scheduler
      */
-    private static VirtualThreadScheduler createDefaultScheduler(BuiltinDefaultScheduler builtin, String cn) {
+    private static VirtualThreadScheduler loadCustomScheduler(VirtualThreadScheduler delegate, String cn) {
         try {
             Class<?> clazz = Class.forName(cn, true, ClassLoader.getSystemClassLoader());
             VirtualThreadScheduler scheduler;
             try {
                 // 1-arg constructor
                 Constructor<?> ctor = clazz.getConstructor(VirtualThreadScheduler.class);
-                scheduler = (VirtualThreadScheduler) ctor.newInstance(builtin.externalView());
+                scheduler = (VirtualThreadScheduler) ctor.newInstance(delegate);
             } catch (NoSuchMethodException e) {
                 // 0-arg constructor
                 Constructor<?> ctor = clazz.getConstructor();
@@ -1476,8 +1488,9 @@ final class VirtualThread extends BaseVirtualThread {
 
     /**
      * Creates the built-in default ForkJoinPool scheduler.
+     * @param wrapped true if wrapped by a custom default scheduler
      */
-    private static BuiltinDefaultScheduler createBuiltinDefaultScheduler() {
+    private static BuiltinDefaultScheduler createBuiltinDefaultScheduler(boolean wrapped) {
         int parallelism, maxPoolSize, minRunnable;
         String parallelismValue = System.getProperty("jdk.virtualThreadScheduler.parallelism");
         String maxPoolSizeValue = System.getProperty("jdk.virtualThreadScheduler.maxPoolSize");
@@ -1498,7 +1511,7 @@ final class VirtualThread extends BaseVirtualThread {
         } else {
             minRunnable = Integer.max(parallelism / 2, 1);
         }
-        return new BuiltinDefaultScheduler(parallelism, maxPoolSize, minRunnable);
+        return new BuiltinDefaultScheduler(parallelism, maxPoolSize, minRunnable, wrapped);
     }
 
     /**
@@ -1509,8 +1522,10 @@ final class VirtualThread extends BaseVirtualThread {
 
         private static final StableValue<VirtualThreadScheduler> VIEW = StableValue.of();
 
-        BuiltinDefaultScheduler(int parallelism, int maxPoolSize, int minRunnable) {
-            ForkJoinWorkerThreadFactory factory = pool -> new CarrierThread(pool);
+        BuiltinDefaultScheduler(int parallelism, int maxPoolSize, int minRunnable, boolean wrapped) {
+            ForkJoinWorkerThreadFactory factory = wrapped
+                    ? ForkJoinPool.defaultForkJoinWorkerThreadFactory
+                    : CarrierThread::new;
             Thread.UncaughtExceptionHandler handler = (t, e) -> { };
             boolean asyncMode = true; // FIFO
             super(parallelism, factory, handler, asyncMode,
