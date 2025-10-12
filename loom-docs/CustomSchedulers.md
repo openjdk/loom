@@ -8,34 +8,37 @@ inform this project on whether to expose anything.
 
 The experimental support may change or be removed at any time.
 
-## Using a custom scheduler as the virtual thread scheduler
+## Prototype 1: Use a custom scheduler as the virtual thread scheduler
 
 The JDK's built-in virtual thread scheduler is a `ForkJoinPool` instance that is
 configured in FIFO mode.
 
-The virtual thread scheduler can be configured to be a custom scheduler by setting
-a system property on the command line:
-
+The prototype allows the virtual thread scheduler to be set different scheduler by
+setting a system property on the command line:
 
 ```
 -Djdk.virtualThreadScheduler.implClass=<scheduler-class>
 ```
 
 where `<scheduler-class>` is fully qualified name of a class that implements
-`java.lang.Thread.VirtualThreadScheduler`.
+`java.lang.Thread.VirtualThreadScheduler`. The interface defines a 2-arg `execute`
+method that the custom scheduler must implement. The `execute` method is called
+with a reference to a virtual `Thread`, and a `Runnable` task to execute, when the
+thread is started or the thread is continued after being parked/blocked.
 
-The custom scheduler may use its own pool of platform threads, may assign virtual threads
-to be carried by specific platform threads, or may delegate to the built-in virtual thread
-scheduler.
+The custom scheduler may use its own pool of platform threads to execute the tasks,
+may assign virtual threads to be carried by specific platform threads, or may delegate
+to the built-in virtual thread scheduler.
 
-The implementation class must be public, with a public no-arg or one-arg constructor, and
-deployed on the class path or in an exported package of a module on the module path. If the
-class has a one-arg constructor then the parameter is a `java.lang.Thread.VirtualThreadScheduler`
-that is a reference to the built-in scheduler (this allows the custom scheduler
-to delegate to the built-in scheduler if required).
+The `VirtualThreadScheduler` implementation class must be public, with a public no-arg
+or one-arg constructor, and deployed on the class path or in an exported package of a
+module on the module path. If the class has a one-arg constructor then the parameter is
+a `java.lang.Thread.VirtualThreadScheduler` that is a reference to the built-in default
+scheduler (this allows the custom scheduler to delegate to the built-in default
+scheduler if required).
 
 
-## API to select a custom scheduler when creating a virtual thread
+## Prototype 2: Use API to select a custom scheduler when creating a virtual thread
 
 The `Thread.Builder.OfVirtual.scheduler(Thread.VirtualThreadScheduler)` API can be used
 to set the scheduler when creating a virtual thread. The following example uses a thread
