@@ -23,7 +23,6 @@
 
 /*
  * @test id=default
- * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @requires vm.continuations
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
@@ -32,7 +31,6 @@
 
 /*
  * @test id=Xint
- * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @requires vm.continuations
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
@@ -41,7 +39,6 @@
 
 /*
  * @test id=Xcomp
- * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @requires vm.continuations
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
@@ -50,7 +47,6 @@
 
 /*
  * @test id=Xcomp-TieredStopAtLevel1
- * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @requires vm.continuations
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
@@ -59,7 +55,6 @@
 
 /*
  * @test id=Xcomp-noTieredCompilation
- * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @requires vm.continuations
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
@@ -68,7 +63,6 @@
 
 /*
  * @test id=gc
- * @modules java.base/java.lang:+open jdk.management
  * @library /test/lib
  * @requires vm.debug == true & vm.continuations
  * @requires os.arch=="amd64" | os.arch=="x86_64" | os.arch=="aarch64"
@@ -81,26 +75,25 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.locks.LockSupport;
-
 import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
-import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.Arguments;
+import static org.junit.jupiter.api.Assertions.*;
 
 class KlassInit {
-    static final int MAX_VTHREAD_COUNT = 8 * Runtime.getRuntime().availableProcessors();
-    static CountDownLatch finishInvokeStatic1 = new CountDownLatch(1);
-    static CountDownLatch finishInvokeStatic2 = new CountDownLatch(1);
-    static CountDownLatch finishInvokeStatic3 = new CountDownLatch(1);
-    static CountDownLatch finishNew = new CountDownLatch(1);
-    static CountDownLatch finishGetStatic = new CountDownLatch(1);
-    static CountDownLatch finishPutStatic = new CountDownLatch(1);
-    static CountDownLatch finishFailedInit = new CountDownLatch(1);
+    private static final int MAX_VTHREAD_COUNT = 8 * Runtime.getRuntime().availableProcessors();
+
+    private static final CountDownLatch finishInvokeStatic1 = new CountDownLatch(1);
+    private static final CountDownLatch finishInvokeStatic2 = new CountDownLatch(1);
+    private static final CountDownLatch finishInvokeStatic3 = new CountDownLatch(1);
+    private static final CountDownLatch finishNew = new CountDownLatch(1);
+    private static final CountDownLatch finishGetStatic = new CountDownLatch(1);
+    private static final CountDownLatch finishPutStatic = new CountDownLatch(1);
+    private static final CountDownLatch finishFailedInit = new CountDownLatch(1);
 
     /**
      * Test that threads blocked waiting for klass to be initialized
@@ -112,7 +105,7 @@ class KlassInit {
             static {
                 try {
                     finishInvokeStatic1.await();
-                } catch(InterruptedException e) {}
+                } catch (InterruptedException e) {}
             }
             static void m() {
             }
@@ -148,7 +141,7 @@ class KlassInit {
             static {
                 try {
                     finishInvokeStatic2.await();
-                } catch(InterruptedException e) {}
+                } catch (InterruptedException e) {}
             }
             static void m(ArrayList<String> list, int id) {
                 String str = list.get(0);
@@ -192,7 +185,7 @@ class KlassInit {
             static {
                 try {
                     finishInvokeStatic3.await();
-                } catch(InterruptedException e) {}
+                } catch (InterruptedException e) {}
             }
             static void m() {
             }
@@ -242,7 +235,7 @@ class KlassInit {
             static {
                 try {
                     finishNew.await();
-                } catch(InterruptedException e) {}
+                } catch (InterruptedException e) {}
             }
             void m() {
             }
@@ -280,7 +273,7 @@ class KlassInit {
             static {
                 try {
                     finishGetStatic.await();
-                } catch(InterruptedException e) {}
+                } catch (InterruptedException e) {}
             }
             public static int NUMBER = 150;
         }
@@ -319,7 +312,7 @@ class KlassInit {
             static {
                 try {
                     finishPutStatic.await();
-                } catch(InterruptedException e) {}
+                } catch (InterruptedException e) {}
             }
             public static int NUMBER;
         }
@@ -402,7 +395,7 @@ class KlassInit {
         static {
             try {
                 finishInterrupt0.await();
-            } catch(InterruptedException e) {}
+            } catch (InterruptedException e) {}
         }
         static void m() {}
     }
@@ -412,7 +405,7 @@ class KlassInit {
         static {
             try {
                 finishInterrupt30000.await();
-            } catch(InterruptedException e) {}
+            } catch (InterruptedException e) {}
         }
         static void m() {}
     }
@@ -422,7 +415,7 @@ class KlassInit {
         static {
             try {
                 finishInterruptMax.await();
-            } catch(InterruptedException e) {}
+            } catch (InterruptedException e) {}
         }
         static void m() {}
     }
@@ -447,7 +440,7 @@ class KlassInit {
                 try {
                     finishFailedInit.await();
                     a[3] = 4;
-                } catch(InterruptedException e) {}
+                } catch (InterruptedException e) {}
             }
             static void m() {
             }
