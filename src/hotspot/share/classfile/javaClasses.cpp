@@ -2142,7 +2142,7 @@ bool java_lang_VirtualThread::is_instance(oop obj) {
 }
 
 oop java_lang_VirtualThread::carrier_thread(oop vthread) {
-  oop thread = vthread->obj_field_acquire(_carrierThread_offset);
+  oop thread = vthread->obj_field(_carrierThread_offset);
   return thread;
 }
 

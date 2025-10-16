@@ -467,7 +467,6 @@ class java_lang_Thread : AllStatic {
 
   // Fill in current stack trace, can cause GC
   static oop async_get_stack_trace(jobject jthread, TRAPS);
-  static oop get_thread_snapshot(jobject jthread, TRAPS);
 
   JFR_ONLY(static u2 jfr_epoch(oop java_thread);)
   JFR_ONLY(static void set_jfr_epoch(oop java_thread, u2 epoch);)
