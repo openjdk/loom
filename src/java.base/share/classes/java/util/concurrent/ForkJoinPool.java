@@ -1257,6 +1257,7 @@ public class ForkJoinPool extends AbstractExecutorService
         final void push(ForkJoinTask<?> task, ForkJoinPool pool, boolean internal) {
             int s = top, b = base, m, cap, room; ForkJoinTask<?>[] a;
             if ((a = array) != null && (cap = a.length) > 0) { // else disabled
+                boolean resized = false;
                 if ((room = (m = cap - 1) - (s - b)) >= 0) {
                     top = s + 1;
                     long pos = slotOffset(m & s);
@@ -1264,8 +1265,10 @@ public class ForkJoinPool extends AbstractExecutorService
                         U.putReference(a, pos, task);       // inside lock
                     else
                         U.getAndSetReference(a, pos, task); // fully fenced
-                    if (room == 0 && (a = growArray(a, cap, s)) != null)
+                    if (room == 0 && (a = growArray(a, cap, s)) != null) {
                         m = a.length - 1;                   // resize
+                        resized = true;
+                    }
                 }
                 if (!internal)
                     unlockPhase();
@@ -1273,7 +1276,7 @@ public class ForkJoinPool extends AbstractExecutorService
                     throw new RejectedExecutionException("Queue capacity exceeded");
                 if (pool != null && a != null &&
                     U.getReferenceAcquire(a, slotOffset(m & (s - 1))) == null)
-                    pool.signalWork(a, m & s);   // may have appeared empty
+                    pool.signalWork(resized ? null : a, m & s);   // may have appeared empty
             }
         }
 
