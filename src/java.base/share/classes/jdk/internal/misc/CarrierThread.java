@@ -65,7 +65,6 @@ public class CarrierThread extends ForkJoinWorkerThread {
      */
     public boolean beginBlocking() {
         assert Thread.currentThread().isVirtual() && JLA.currentCarrierThread() == this;
-        assert compensating == NOT_COMPENSATING || compensating == COMPENSATING;
 
         if (compensating == NOT_COMPENSATING) {
             // don't preempt when attempting to compensate
