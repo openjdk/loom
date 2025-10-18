@@ -399,7 +399,7 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test join after join completed with a timeout.
+     * Test join after join interrupted.
      */
     @Test
     void testJoinAfterJoinInterrupted() throws Exception {
@@ -1415,7 +1415,7 @@ class StructuredTaskScopeTest {
     }
 
     /**
-     * Test Joiner.allSuccessfulOrThrow() with a timeout.
+     * Test Joiner.anySuccessfulOrThrow() with a timeout.
      */
     @Test
     void anySuccessfulOrThrow6() throws Exception {

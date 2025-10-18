@@ -21,7 +21,7 @@ of the loom repo:
   `Subtask<? extends T` to `Subtask<T>`.
 
 - `Joiner.allSuccessOrThrow` is changed to return a list of results instead of a stream of
-  subtasks.
+  subtasks. `Joiner.allUntil` is changed to return a list of subtasks.
 
 - `Joiner.anySuccessfulResultOrThrow` is renamed to `anySuccessfulOrThrow`.
 
