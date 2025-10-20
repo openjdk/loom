@@ -51,9 +51,9 @@ import jdk.internal.javac.PreviewFeature;
  * To ensure correct usage, the {@code fork}, {@code join} and {@code close} methods may
  * only be invoked by the <em>owner thread</em> (the thread that opened the {@code
  * StructuredTaskScope}), the {@code fork} method may not be called after {@code join},
- * the {@code join} method may only be invoked once to get the outcome, and the
- * {@code close} method throws an exception after closing if the owner did not invoke the
- * {@code join} method after forking subtasks.
+ * the {@code join} method must be invoked to get the outcome after forking subtasks, and
+ * the {@code close} method throws an exception after closing if the owner did not invoke
+ * the {@code join} method after forking subtasks.
  *
  * <p> As a first example, consider a task that splits into two subtasks to concurrently
  * fetch resources from two URL locations "left" and "right". Both subtasks may complete
@@ -453,9 +453,9 @@ public sealed interface StructuredTaskScope<T, R>
      * <p> Joiner defines static methods to create {@code Joiner} objects for common cases:
      * <ul>
      *   <li> {@link #allSuccessfulOrThrow() allSuccessfulOrThrow()} creates a {@code Joiner}
-     *   that yields a list of the completed subtasks for {@code join} to return when
-     *   all subtasks complete successfully. It cancels the scope and causes {@code join}
-     *   to throw if any subtask fails.
+     *   that yields a list of all results for {@code join} to return when all subtasks
+     *   complete successfully. It cancels the scope and causes {@code join} to throw if
+     *   any subtask fails.
      *   <li> {@link #anySuccessfulOrThrow() anySuccessfulOrThrow()} creates a {@code Joiner}
      *   that yields the result of the first subtask to succeed for {@code join} to return.
      *   It causes {@code join} to throw if all subtasks fail.

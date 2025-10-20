@@ -1342,10 +1342,32 @@ class StructuredTaskScopeTest {
     }
 
     /**
+     * Test Joiner.allSuccessfulOrThrow() yields an unmodifiable list.
+     */
+    @Test
+    void testAllSuccessfulOrThrow5() throws Exception {
+        // empty list
+        try (var scope = StructuredTaskScope.open(Joiner.<String>allSuccessfulOrThrow())) {
+            var results = scope.join();
+            assertEquals(0, results.size());
+            assertThrows(UnsupportedOperationException.class, () -> results.add("foo"));
+        }
+
+        // non-empty list
+        try (var scope = StructuredTaskScope.open(Joiner.<String>allSuccessfulOrThrow())) {
+            scope.fork(() -> "foo");
+            var results = scope.join();
+            assertEquals(1, results.size());
+            assertThrows(UnsupportedOperationException.class, () -> results.add("foo"));
+            assertThrows(UnsupportedOperationException.class, () -> results.add("bar"));
+        }
+    }
+
+    /**
      * Test Joiner.anySuccessfulOrThrow() with no subtasks.
      */
     @Test
-    void testanySuccessfulOrThrow1() throws Exception {
+    void testAnySuccessfulOrThrow1() throws Exception {
         try (var scope = StructuredTaskScope.open(Joiner.anySuccessfulOrThrow())) {
             try {
                 scope.join();
@@ -1360,7 +1382,7 @@ class StructuredTaskScopeTest {
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testanySuccessfulOrThrow2(ThreadFactory factory) throws Exception {
+    void testAnySuccessfulOrThrow2(ThreadFactory factory) throws Exception {
         try (var scope = StructuredTaskScope.open(Joiner.<String>anySuccessfulOrThrow(),
                 cf -> cf.withThreadFactory(factory))) {
             scope.fork(() -> "foo");
@@ -1375,7 +1397,7 @@ class StructuredTaskScopeTest {
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testanySuccessfulOrThrow3(ThreadFactory factory) throws Exception {
+    void testAnySuccessfulOrThrow3(ThreadFactory factory) throws Exception {
         try (var scope = StructuredTaskScope.open(Joiner.<String>anySuccessfulOrThrow(),
                 cf -> cf.withThreadFactory(factory))) {
             scope.fork(() -> null);
@@ -1390,7 +1412,7 @@ class StructuredTaskScopeTest {
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testanySuccessfulOrThrow4(ThreadFactory factory) throws Exception {
+    void testAnySuccessfulOrThrow4(ThreadFactory factory) throws Exception {
         try (var scope = StructuredTaskScope.open(Joiner.<String>anySuccessfulOrThrow(),
                 cf -> cf.withThreadFactory(factory))) {
             scope.fork(() -> "foo");
@@ -1405,7 +1427,7 @@ class StructuredTaskScopeTest {
      */
     @ParameterizedTest
     @MethodSource("factories")
-    void testanySuccessfulOrThrow5(ThreadFactory factory) throws Exception {
+    void testAnySuccessfulOrThrow5(ThreadFactory factory) throws Exception {
         try (var scope = StructuredTaskScope.open(Joiner.anySuccessfulOrThrow(),
                 cf -> cf.withThreadFactory(factory))) {
             scope.fork(() -> { throw new FooException(); });
@@ -1697,6 +1719,34 @@ class StructuredTaskScopeTest {
 
             // retry after join throws TimeoutException
             assertThrows(IllegalStateException.class, scope::join);
+        }
+    }
+
+    /**
+     * Test Joiner.allUntil(Predicate) yields an unmodifiable list.
+     */
+    @Test
+    void testAllUntil7() throws Exception {
+        Subtask<String> subtask1;
+        try (var scope = StructuredTaskScope.open(Joiner.<String>allUntil(s -> false))) {
+            subtask1 = scope.fork(() -> "?");
+            scope.join();
+        }
+
+        // empty list
+        try (var scope = StructuredTaskScope.open(Joiner.<String>allUntil(s -> false))) {
+            var subtasks = scope.join();
+            assertEquals(0, subtasks.size());
+            assertThrows(UnsupportedOperationException.class, () -> subtasks.add(subtask1));
+        }
+
+        // non-empty list
+        try (var scope = StructuredTaskScope.open(Joiner.<String>allUntil(s -> false))) {
+            var subtask2 = scope.fork(() -> "foo");
+            var subtasks = scope.join();
+            assertEquals(1, subtasks.size());
+            assertThrows(UnsupportedOperationException.class, () -> subtasks.add(subtask1));
+            assertThrows(UnsupportedOperationException.class, () -> subtasks.add(subtask2));
         }
     }
 
