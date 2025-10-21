@@ -66,13 +66,22 @@ class CustomDefaultScheduler {
             pool = Executors.newFixedThreadPool(1, factory);
         }
 
-        @Override
-        public void execute(Thread thread, Runnable task) {
+        void execute(Thread thread, Runnable task) {
             if (thread.isVirtual()) {
                 pool.execute(task);
             } else {
                 throw new UnsupportedOperationException();
             }
+        }
+
+        @Override
+        public void onStart(Thread thread, Runnable task) {
+            execute(thread, task);
+        }
+
+        @Override
+        public void onContinue(Thread thread, Runnable task) {
+            execute(thread, task);
         }
     }
 
@@ -94,9 +103,15 @@ class CustomDefaultScheduler {
         }
 
         @Override
-        public void execute(Thread vthread, Runnable task) {
+        public void onStart(Thread vthread, Runnable task) {
             executed.add(vthread);
-            builtinScheduler.execute(vthread, task);
+            builtinScheduler.onStart(vthread, task);
+        }
+
+        @Override
+        public void onContinue(Thread vthread, Runnable task) {
+            executed.add(vthread);
+            builtinScheduler.onContinue(vthread, task);
         }
 
         Set<Thread> threadsExecuted() {
@@ -173,11 +188,11 @@ class CustomDefaultScheduler {
 
         // platform thread
         Thread thread = Thread.ofPlatform().unstarted(() -> { });
-        assertThrows(UnsupportedOperationException.class, () -> scheduler.execute(thread, task));
+        assertThrows(UnsupportedOperationException.class, () -> scheduler.onContinue(thread, task));
 
         // nulls
-        assertThrows(NullPointerException.class, () -> scheduler.execute(null, task));
-        assertThrows(NullPointerException.class, () -> scheduler.execute(vthread, null));
+        assertThrows(NullPointerException.class, () -> scheduler.onContinue(null, task));
+        assertThrows(NullPointerException.class, () -> scheduler.onContinue(vthread, null));
     }
 
     /**
@@ -207,12 +222,12 @@ class CustomDefaultScheduler {
         Runnable task = () -> { };
 
         // builtin scheduler can execute tasks for itself or customScheduler2
-        builtinScheduler.execute(vthread0, task);
-        assertThrows(IllegalArgumentException.class, () -> builtinScheduler.execute(vthread1, task));
-        builtinScheduler.execute(vthread2, task);
+        builtinScheduler.onContinue(vthread0, task);
+        assertThrows(IllegalArgumentException.class, () -> builtinScheduler.onContinue(vthread1, task));
+        builtinScheduler.onContinue(vthread2, task);
 
-        assertThrows(IllegalArgumentException.class, () -> customScheduler2.execute(vthread1, task));
-        customScheduler2.execute(vthread2, task);
+        assertThrows(IllegalArgumentException.class, () -> customScheduler2.onContinue(vthread1, task));
+        customScheduler2.onContinue(vthread2, task);
     }
 
     /**

@@ -63,7 +63,7 @@ final class VirtualThread extends BaseVirtualThread {
     private static final Unsafe U = Unsafe.getUnsafe();
     private static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
 
-    private static final VirtualThreadScheduler BUILTIN_DEFAULT_SCHEDULER;
+    private static final ForkJoinPool BUILTIN_DEFAULT_SCHEDULER;
     private static final VirtualThreadScheduler DEFAULT_SCHEDULER;
     static {
         // experimental
@@ -365,12 +365,12 @@ final class VirtualThread extends BaseVirtualThread {
                 if (currentThread().isVirtual()) {
                     Continuation.pin();
                     try {
-                        scheduler.execute(this, runContinuation);
+                        scheduler.onContinue(this, runContinuation);
                     } finally {
                         Continuation.unpin();
                     }
                 } else {
-                    scheduler.execute(this, runContinuation);
+                    scheduler.onContinue(this, runContinuation);
                 }
                 done = true;
             } catch (RejectedExecutionException ree) {
@@ -456,16 +456,28 @@ final class VirtualThread extends BaseVirtualThread {
      * @see ForkJoinPool#externalSubmit(ForkJoinTask)
      */
     private void externalSubmitRunContinuationOrThrow() {
-        if (scheduler == BUILTIN_DEFAULT_SCHEDULER
-                && currentCarrierThread() instanceof CarrierThread ct) {
-            try {
-                ct.getPool().externalSubmit(ForkJoinTask.adapt(runContinuation));
-            } catch (RejectedExecutionException ree) {
-                submitFailed(ree);
-                throw ree;
+        try {
+            if (currentThread().isVirtual()) {
+                // Pin the continuation to prevent the virtual thread from unmounting
+                // when submitting a task. This avoids deadlock that could arise due to
+                // carriers and virtual threads contending for a lock.
+                Continuation.pin();
+                try {
+                    if (scheduler == BUILTIN_DEFAULT_SCHEDULER
+                            && currentCarrierThread() instanceof CarrierThread ct) {
+                        ct.getPool().externalSubmit(ForkJoinTask.adapt(runContinuation));
+                    } else {
+                        scheduler.onStart(this, runContinuation);
+                    }
+                } finally {
+                    Continuation.unpin();
+                }
+            } else {
+                scheduler.onStart(this, runContinuation);
             }
-        } else {
-            submitRunContinuation(false);
+        } catch (RejectedExecutionException ree) {
+            submitFailed(ree);
+            throw ree;
         }
     }
 
@@ -1532,31 +1544,47 @@ final class VirtualThread extends BaseVirtualThread {
                     0, maxPoolSize, minRunnable, pool -> true, 30, SECONDS);
         }
 
-        @Override
-        public void execute(Thread vthread, Runnable task) {
+        private void adaptAndExecute(Runnable task) {
             execute(ForkJoinTask.adapt(task));
+        }
+
+        @Override
+        public void onStart(Thread vthread, Runnable task) {
+            adaptAndExecute(task);
+        }
+
+        @Override
+        public void onContinue(Thread vthread, Runnable task) {
+            adaptAndExecute(task);
         }
 
         /**
          * Wraps the scheduler to avoid leaking a direct reference.
          */
         VirtualThreadScheduler externalView() {
-            VirtualThreadScheduler builtin = this;
+            BuiltinDefaultScheduler builtin = this;
             return VIEW.orElseSet(() -> {
                 return new VirtualThreadScheduler() {
-                    @Override
-                    public void execute(Thread thread, Runnable task) {
+                    private void execute(Thread thread, Runnable task) {
                         Objects.requireNonNull(thread);
                         if (thread instanceof VirtualThread vthread) {
                             VirtualThreadScheduler scheduler = vthread.scheduler;
                             if (scheduler == this || scheduler == DEFAULT_SCHEDULER) {
-                                builtin.execute(thread, task);
+                                builtin.adaptAndExecute(task);
                             } else {
                                 throw new IllegalArgumentException();
                             }
                         } else {
                             throw new UnsupportedOperationException();
                         }
+                    }
+                    @Override
+                    public void onStart(Thread thread, Runnable task) {
+                        execute(thread, task);
+                    }
+                    @Override
+                    public void onContinue(Thread thread, Runnable task) {
+                        execute(thread, task);
                     }
                 };
             });
