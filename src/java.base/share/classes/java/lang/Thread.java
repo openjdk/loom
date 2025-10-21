@@ -790,17 +790,29 @@ public class Thread implements Runnable {
      * @apiNote The following example creates a virtual thread scheduler that uses a small
      * set of platform threads.
      * {@snippet lang=java :
-     *     ExecutorService pool = Executors.newFixedThreadPool(4);
-     *     VirtualThreadScheduler scheduler = (vthread, task) -> {
-     *          pool.submit(() -> {
-     *              Thread carrier = Thread.currentThread();
-     *
-     *              // runs the virtual thread task
-     *              task.run();
-     *
-     *              assert Thread.currentThread() == carrier;
-     *         });
-     *     };
+     *     ExecutorService threadPool = Executors.newFixedThreadPool(4);
+     *     var scheduler = new VirtualThreadScheduler() {
+     *         private void submit(Thread vthread, Runnable task) {
+     *             Thread caller = Thread.currentThread();
+     *             threadPool.submit(() -> {
+     *                 Thread carrier = Thread.currentThread();
+     *                 try {
+     *                     task.run();
+     *                 } finally {
+     *                     assert Thread.currentThread() == carrier;
+     *                     boolean terminated = !vthread.isAlive();
+     *                 }
+     *             });
+     *         }
+     *         @Override
+     *         public void onStart(Thread vthread, Runnable task) {
+     *             submit(vthread, task);
+     *         }
+     *         @Override
+     *         public void onContinue(Thread vthread, Runnable task) {
+     *             submit(vthread, task);
+     *         }
+     *    };
      * }
      *
      * <p> Unless otherwise specified, passing a null argument to a method in
@@ -809,17 +821,36 @@ public class Thread implements Runnable {
      * @see Builder.OfVirtual#scheduler(VirtualThreadScheduler)
      * @since 99
      */
-    @FunctionalInterface
     public interface VirtualThreadScheduler {
         /**
-         * Continue execution of given virtual thread by executing the given task on
-         * a platform thread.
+         * Invoked by {@link Thread#start()} to start execution of the given virtual
+         * thread. The scheduler's implementation of this method must arrange to execute
+         * the given task on a platform thread.
+         *
+         * @implNote If invoked from a virtual thread, then the caller virtual thread is
+         * <em>pinned</em> to its carrier while executing the {@code onStart} method.
          *
          * @param vthread the virtual thread
          * @param task the task to execute
          * @throws RejectedExecutionException if the scheduler cannot accept the task
          */
-        void execute(Thread vthread, Runnable task);
+        void onStart(Thread vthread, Runnable task);
+
+        /**
+         * Invoked to continue execution of the given virtual thread. This method
+         * is invoked to continue execution after being parked, blocked, sleeping,
+         * or other reasons.
+         * The scheduler's implementation of this method must arrange to execute the
+         * given task on a platform thread.
+         *
+         * @implNote If invoked from a virtual thread, then the caller virtual thread is
+         * <em>pinned</em> to its carrier while executing the {@code onContinue} method.
+         *
+         * @param vthread the virtual thread
+         * @param task the task to execute
+         * @throws RejectedExecutionException if the scheduler cannot accept the task
+         */
+        void onContinue(Thread vthread, Runnable task);
 
         /**
          * {@return a virtual thread scheduler that delegates tasks to the given executor}
@@ -827,7 +858,16 @@ public class Thread implements Runnable {
          */
         static VirtualThreadScheduler adapt(Executor executor) {
             Objects.requireNonNull(executor);
-            return (_, task) -> executor.execute(task);
+            return new VirtualThreadScheduler() {
+                @Override
+                public void onStart(Thread vthread, Runnable task) {
+                    executor.execute(task);
+                }
+                @Override
+                public void onContinue(Thread vthread, Runnable task) {
+                    executor.execute(task);
+                }
+            };
         }
 
         /**
@@ -1111,11 +1151,12 @@ public class Thread implements Runnable {
              * Sets the scheduler.
              *
              * The thread will be scheduled by the Java virtual machine with the given
-             * scheduler. The scheduler's {@link VirtualThreadScheduler#execute(Thread, Runnable)}
-             * method may be invoked in the context of a virtual thread. The scheduler
-             * must arrange to execute the {@code Runnable}'s {@code run} method on a
-             * platform thread. Attempting to execute the run method in a virtual thread
-             * causes {@link WrongThreadException} to be thrown.
+             * scheduler. The scheduler's {@link VirtualThreadScheduler#onStart(Thread, Runnable)}
+             * and {@link VirtualThreadScheduler#onContinue(Thread, Runnable)} methods
+             * may be invoked in the context of a virtual thread. The scheduler must
+             * arrange to execute the {@code Runnable}'s {@code run} method on a platform
+             * thread. Attempting to execute the run method in a virtual thread causes
+             * {@link WrongThreadException} to be thrown.
              *
              * The {@code execute} method may be invoked at sensitive times (e.g. when
              * unparking a thread) so care should be taken to not directly execute the

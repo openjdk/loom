@@ -98,7 +98,7 @@ public class VThreadScheduler {
     }
 
     public static Thread.Builder.OfVirtual virtualThreadBuilder(Executor executor) {
-        Thread.VirtualThreadScheduler scheduler = (_, task) -> executor.execute(task);
+        var scheduler = Thread.VirtualThreadScheduler.adapt(executor);
         return virtualThreadBuilder(scheduler);
     }
 
