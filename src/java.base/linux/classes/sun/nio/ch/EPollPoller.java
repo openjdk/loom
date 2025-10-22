@@ -47,6 +47,7 @@ class EPollPoller extends Poller {
     private final Cleanable cleaner;
 
     EPollPoller(Poller.Mode mode, boolean subPoller, boolean read) throws IOException {
+        boolean wakeable = (mode == Mode.POLLER_PER_CARRIER) && subPoller;
         int maxEvents = (subPoller) ? 16 : 64;
 
         int epfd = EPoll.create();
@@ -55,8 +56,8 @@ class EPollPoller extends Poller {
         try {
             address = EPoll.allocatePollArray(maxEvents);
 
-            // register event with epoll to allow for wakeup
-            if (subPoller && (mode == Poller.Mode.POLLER_PER_CARRIER)) {
+            // register one end of the pipe with epoll to allow for wakeup
+            if (wakeable) {
                 eventfd = new EventFD();
                 IOUtil.configureBlocking(eventfd.efd(), false);
                 EPoll.ctl(epfd, EPOLL_CTL_ADD, eventfd.efd(), EPOLLIN);
@@ -74,9 +75,9 @@ class EPollPoller extends Poller {
         this.address = address;
         this.eventfd = eventfd;
 
-        // create action to close epoll instance, register cleaner if this is a subpoller
+        // create action to close epoll instance, register cleaner when wakeable
         this.closer = closer(epfd, address, eventfd);
-        if (subPoller) {
+        if (wakeable) {
             this.cleaner = CleanerFactory.cleaner().register(this, closer);
         } else {
             this.cleaner = null;
