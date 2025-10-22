@@ -1,6 +1,8 @@
 ####
 ## Filed bugs
 
+jdk/jshell/LocalStopExecutionTest.java 8370392 linux-aarch64
+
 ####
 # Incompatible tests.
 
