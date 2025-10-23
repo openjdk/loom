@@ -213,7 +213,7 @@ import jdk.internal.javac.PreviewFeature;
  * {@code StructuredTaskScope} that uses a different {@code ThreadFactory}, is named for
  * monitoring and management purposes, or has a timeout that cancels the scope if the
  * timeout expires before or while waiting for subtasks to complete. The {@code open}
- * method is called with a {@linkplain UnaryOperator operator} that is applied to the
+ * method is called with an {@linkplain UnaryOperator operator} that is applied to the
  * default configuration and returns a {@link Configuration Configuration} for the
  * {@code StructuredTaskScope} under construction.
  *
