@@ -1135,7 +1135,7 @@ void LinkResolver::resolve_static_call(CallInfo& result,
 }
 
 void LinkResolver::cds_resolve_static_call(CallInfo& result, const LinkInfo& link_info, TRAPS) {
-  resolve_static_call(result, link_info, /*initialize_class*/false, CHECK);
+  resolve_static_call(result, link_info, StaticMode::dont_initialize_klass, CHECK);
 }
 
 // throws linktime exceptions
