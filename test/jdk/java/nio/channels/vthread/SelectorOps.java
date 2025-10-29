@@ -266,7 +266,7 @@ class SelectorOps {
     }
 
     /**
-     * Test calling select with interrupt status set.
+     * Test calling select with interrupted status set.
      */
     @Test
     public void testInterruptBeforeSelect() throws Exception {
@@ -283,7 +283,7 @@ class SelectorOps {
     }
 
     /**
-     * Test calling select with interrupt status set and thread is pinned.
+     * Test calling select with interrupted status set and thread is pinned.
      */
     @Test
     public void testInterruptBeforeSelectWhenPinned() throws Exception {
