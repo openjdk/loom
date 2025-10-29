@@ -79,7 +79,7 @@ public class TestLookForUntestedEvents {
     );
     // These events are tested in test/jdk/java/lang/Thread/virtual/JfrEvents.java
     private static final Set<String> coveredVirtualThreadEvents = Set.of(
-        "VirtualThreadPinned", "VirtualThreadSubmitFailed");
+        "VirtualThreadPark", "VirtualThreadPinned", "VirtualThreadSubmitFailed");
 
     // This is a "known failure list" for this test.
     // NOTE: if the event is not covered, a bug should be open, and bug number

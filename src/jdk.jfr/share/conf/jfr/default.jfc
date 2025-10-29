@@ -63,6 +63,13 @@
       <setting name="threshold" control="locking-threshold">20 ms</setting>
     </event>
 
+    <event name="jdk.VirtualThreadPark">
+      <setting name="enabled">false</setting>
+      <setting name="stackTrace">true</setting>
+      <setting name="threshold">10 ms</setting>
+      <setting name="throttle">100/s</setting>
+    </event>
+
     <event name="jdk.VirtualThreadStart">
       <setting name="enabled">false</setting>
       <setting name="stackTrace">true</setting>
