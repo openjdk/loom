@@ -79,12 +79,3 @@ vmTestbase/nsk/jdi/ThreadReference/isSuspended/issuspended002/TestDescription.ja
 
 # Unknown reasons, should be investigated
 vmTestbase/gc/gctests/MemoryEaterMT/MemoryEaterMT.java 0000000 generic-all
-
-# java.lang.ClassNotFoundException: jdk.test.lib.process.ProcessTools
-runtime/cds/appcds/jigsaw/classpathtests/EmptyClassInBootClassPath.java 0000000 generic-all
-
-#  java.lang.ClassNotFoundException: / in ProcessTools.main
-runtime/cds/appcds/jigsaw/modulepath/OptimizeModuleHandlingTest.java 0000000 generic-all
-
-# too fragile when main thread is a virtual thread
-runtime/Thread/ThreadCountLimit.java#id0 0000000 generic-all
