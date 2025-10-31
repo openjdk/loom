@@ -2360,6 +2360,7 @@ public class Logger {
 
             // Remove ourself from any previous parent.
             LogManager.LoggerWeakRef ref = null;
+            Logger parent = this.parent;
             if (parent != null) {
                 // assert parent.kids != null;
                 for (Iterator<LogManager.LoggerWeakRef> iter = parent.kids.iterator(); iter.hasNext(); ) {
@@ -2376,7 +2377,7 @@ public class Logger {
             }
 
             // Set our new parent.
-            parent = newParent;
+            this.parent = parent = newParent;
             if (parent.kids == null) {
                 parent.kids = new ArrayList<>(2);
             }

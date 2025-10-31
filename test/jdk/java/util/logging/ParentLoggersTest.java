@@ -77,6 +77,8 @@ public class ParentLoggersTest {
                 initialLoggerNames.add(logger);
             }
         }
+        System.out.println("# default loggers are: " + defaultLoggers);
+        System.out.println("# initial loggers are: " + initialLoggerNames);
 
         String tstSrc = System.getProperty(TST_SRC_PROP);
         File   fname  = new File(tstSrc, LM_PROP_FNAME);
@@ -131,7 +133,10 @@ public class ParentLoggersTest {
             }
 
         }
-        System.out.println(returnedLoggerNames);
+        System.out.println("# Created loggers are: " +
+                createdLoggers.stream().map(Logger::getName).toList());
+        System.out.println("# Expected loggers are: " + expectedLoggerNames);
+        System.out.println("# Returned loggers are: " + returnedLoggerNames);
         return checkNames(expectedLoggerNames, returnedLoggerNames, failMsg);
     }
 
