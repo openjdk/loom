@@ -28,6 +28,7 @@
 #include "code/nmethod.inline.hpp"
 #include "code/vmreg.inline.hpp"
 #include "compiler/oopMap.inline.hpp"
+#include "cppstdlib/type_traits.hpp"
 #include "gc/shared/barrierSet.hpp"
 #include "gc/shared/continuationGCSupport.inline.hpp"
 #include "gc/shared/gc_globals.hpp"
@@ -84,8 +85,6 @@
 #ifdef COMPILER2
 #include "opto/runtime.hpp"
 #endif
-
-#include <type_traits>
 
 /*
  * This file contains the implementation of continuation freezing (yield) and thawing (run).
