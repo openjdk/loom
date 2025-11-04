@@ -83,6 +83,7 @@ compiler/c2/irTests/TestFloat16ScalarOperations.java 8367028 linux-aarch64
 
 serviceability/jvmti/NMethodRelocation/NMethodRelocationTest.java 8369150 generic-all
 
+serviceability/sa/TestJhsdbJstackMixedWithXComp.java 8371194 generic-all
 
 #############################################################################
 
