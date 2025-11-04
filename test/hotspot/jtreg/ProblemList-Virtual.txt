@@ -79,3 +79,6 @@ vmTestbase/nsk/jdi/ThreadReference/isSuspended/issuspended002/TestDescription.ja
 
 # Unknown reasons, should be investigated
 vmTestbase/gc/gctests/MemoryEaterMT/MemoryEaterMT.java 0000000 generic-all
+
+# thread_native_entry not found in output
+serviceability/sa/TestJhsdbJstackMixedWithXComp.java failing 8371194 generic-all
