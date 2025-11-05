@@ -767,6 +767,7 @@ jdk/jfr/jvm/TestWaste.java                                      8369949 generic-
 # jdk_foreign
 
 java/foreign/TestBufferStackStress.java                         8350455 macosx-all
+java/foreign/sharedclosejfr/TestSharedCloseJFR.java             8371315 generic-all
 
 ############################################################################
 # Client manual tests
