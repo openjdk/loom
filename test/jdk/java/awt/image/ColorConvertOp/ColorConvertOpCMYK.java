@@ -4,9 +4,7 @@
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Oracle designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
+ * published by the Free Software Foundation.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -22,20 +20,32 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
+import java.io.File;
 
-package jdk.internal.vm;
+import java.awt.color.ColorSpace;
+import java.awt.image.BufferedImage;
+import java.awt.image.ColorConvertOp;
+import java.awt.image.ColorModel;
 
-/**
- * Internal exception used only by the VM.
+import javax.imageio.ImageIO;
+
+/*
+ * @test
+ * @bug 8364583
+ * @summary Verify CMYK images work with ColorConvertOp
  */
-public class PreemptedException extends RuntimeException {
-    @java.io.Serial
-    private static final long serialVersionUID = 6700691236100628123L;
 
-    /**
-     * Constructs an {@code PreemptedException} with no detail  message.
-     */
-    public PreemptedException() {
-        super();
+public class ColorConvertOpCMYK {
+
+    public static void main(String[] args) throws Exception {
+        String sep = System.getProperty("file.separator");
+        String dir = System.getProperty("test.src", ".");
+        String prefix = dir + sep;
+        File file = new File(prefix + "black_cmyk.jpg");
+        BufferedImage source = ImageIO.read(file);
+        ColorModel sourceModel = source.getColorModel();
+        ColorSpace cs = ColorSpace.getInstance(ColorSpace.CS_sRGB);
+        ColorConvertOp convertOp = new ColorConvertOp(cs, null);
+        BufferedImage rgb = convertOp.filter(source, null);
     }
 }

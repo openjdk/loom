@@ -23,19 +23,29 @@
  * questions.
  */
 
-package jdk.internal.vm;
-
-/**
- * Internal exception used only by the VM.
- */
-public class PreemptedException extends RuntimeException {
-    @java.io.Serial
-    private static final long serialVersionUID = 6700691236100628123L;
-
-    /**
-     * Constructs an {@code PreemptedException} with no detail  message.
-     */
-    public PreemptedException() {
-        super();
+public class ProcessExamples {
+    // @start region=example
+    void main() {
+        try (Process p = new ProcessBuilder("cat").start();
+             var writer = p.outputWriter();
+             var reader = p.inputReader()) {
+            writer.write(haiku);
+            writer.close();
+            // Read all lines and print each
+            reader.readAllLines()
+                    .forEach(IO::println);
+            var status = p.waitFor();
+            if (status != 0)
+                throw new RuntimeException("unexpected process status: " + status);
+        } catch (Exception e) {
+            System.out.println("Process failed: " + e);
+        }
     }
+
+    static final String haiku = """
+                Oh, the sunrise glow;
+                Paddling with the river flow;
+                Chilling still, go slow.
+                """;
+    // @end region=example
 }

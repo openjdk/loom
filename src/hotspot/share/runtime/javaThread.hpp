@@ -485,7 +485,7 @@ class JavaThread: public Thread {
   // For Object.wait() we set this field to know if we need to
   // throw IE at the end of thawing before returning to Java.
   bool _pending_interrupted_exception;
-  // We allow preemption on some klass initializion calls.
+  // We allow preemption on some klass initialization calls.
   // We use this boolean to mark such calls.
   bool _at_preemptable_init;
 
@@ -499,7 +499,7 @@ class JavaThread: public Thread {
   bool preempting()                              { return _preempt_alternate_return != nullptr; }
   void set_preempt_alternate_return(address val) { _preempt_alternate_return = val; }
 
-  bool at_preemptable_init() { return _at_preemptable_init; }
+  bool at_preemptable_init()           { return _at_preemptable_init; }
   void set_at_preemptable_init(bool b) { _at_preemptable_init = b; }
 
 #ifdef ASSERT
@@ -512,19 +512,28 @@ class JavaThread: public Thread {
   int _interp_at_preemptable_vmcall_cnt;
   int interp_at_preemptable_vmcall_cnt() { return _interp_at_preemptable_vmcall_cnt; }
 
+  bool _interp_redoing_vm_call;
+  bool interp_redoing_vm_call() const { return _interp_redoing_vm_call; };
+
   class AtRedoVMCall : public StackObj {
     JavaThread* _thread;
    public:
-    AtRedoVMCall(JavaThread *t) : _thread(t) {
+    AtRedoVMCall(JavaThread* t) : _thread(t) {
+      assert(!_thread->_interp_redoing_vm_call, "");
+      _thread->_interp_redoing_vm_call = true;
       _thread->_interp_at_preemptable_vmcall_cnt++;
-      assert(_thread->_interp_at_preemptable_vmcall_cnt > 0, "");
+      assert(_thread->_interp_at_preemptable_vmcall_cnt > 0, "Unexpected count: %d",
+             _thread->_interp_at_preemptable_vmcall_cnt);
     }
     ~AtRedoVMCall() {
+      assert(_thread->_interp_redoing_vm_call, "");
+      _thread->_interp_redoing_vm_call = false;
       _thread->_interp_at_preemptable_vmcall_cnt--;
-      assert(_thread->_interp_at_preemptable_vmcall_cnt >= 0, "");
+      assert(_thread->_interp_at_preemptable_vmcall_cnt >= 0, "Unexpected count: %d",
+             _thread->_interp_at_preemptable_vmcall_cnt);
     }
   };
-#endif
+#endif // ASSERT
 
 private:
   friend class VMThread;
@@ -1356,23 +1365,6 @@ class JNIHandleMark : public StackObj {
   ~JNIHandleMark() { _thread->pop_jni_handle_block(); }
 };
 
-class PreemptableInitCall {
-  JavaThread* _thread;
-  bool _previous;
-  DEBUG_ONLY(InstanceKlass* _previous_klass;)
- public:
-  PreemptableInitCall(JavaThread* thread, InstanceKlass* ik) : _thread(thread) {
-    _previous = thread->at_preemptable_init();
-    _thread->set_at_preemptable_init(true);
-    DEBUG_ONLY(_previous_klass = _thread->preempt_init_klass();)
-    DEBUG_ONLY(_thread->set_preempt_init_klass(ik));
-  }
-  ~PreemptableInitCall() {
-    _thread->set_at_preemptable_init(_previous);
-    DEBUG_ONLY(_thread->set_preempt_init_klass(_previous_klass));
-  }
-};
-
 class NoPreemptMark {
   ContinuationEntry* _ce;
   bool _unpin;
@@ -1416,17 +1408,6 @@ public:
   }
   ~ThrowingUnsafeAccessError() {
     _thread->set_throwing_unsafe_access_error(_prev);
-  }
-};
-
-class ThreadWaitingForClassInit : public StackObj {
-  JavaThread* _thread;
- public:
-  ThreadWaitingForClassInit(JavaThread* thread, InstanceKlass* ik) : _thread(thread) {
-    _thread->set_class_to_be_initialized(ik);
-  }
-  ~ThreadWaitingForClassInit() {
-    _thread->set_class_to_be_initialized(nullptr);
   }
 };
 

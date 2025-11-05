@@ -94,7 +94,7 @@ class InterpreterRuntime: AllStatic {
 
   // Used by AOTConstantPoolResolver
   static void resolve_get_put(Bytecodes::Code bytecode, int field_index,
-                              methodHandle& m, constantPoolHandle& pool, StaticMode static_mode, TRAPS);
+                              methodHandle& m, constantPoolHandle& pool, ClassInitMode init_mode, TRAPS);
   static void cds_resolve_invoke(Bytecodes::Code bytecode, int method_index,
                                  constantPoolHandle& pool, TRAPS);
   static void cds_resolve_invokehandle(int raw_index,
@@ -103,12 +103,12 @@ class InterpreterRuntime: AllStatic {
                                         constantPoolHandle& pool, TRAPS);
 private:
   // Statics & fields
-  static void resolve_get_put(JavaThread* current, Bytecodes::Code bytecode);
+  static void resolve_get_put(Bytecodes::Code bytecode, TRAPS);
 
   // Calls
-  static void resolve_invoke(JavaThread* current, Bytecodes::Code bytecode);
-  static void resolve_invokehandle (JavaThread* current);
-  static void resolve_invokedynamic(JavaThread* current);
+  static void resolve_invoke(Bytecodes::Code bytecode, TRAPS);
+  static void resolve_invokehandle (TRAPS);
+  static void resolve_invokedynamic(TRAPS);
 
   static void update_invoke_cp_cache_entry(CallInfo& info, Bytecodes::Code bytecode,
                                            methodHandle& resolved_method,
