@@ -32,6 +32,7 @@
  */
 
 import java.lang.Thread.VirtualThreadScheduler;
+import java.lang.Thread.VirtualThreadTask;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -66,22 +67,14 @@ class CustomDefaultScheduler {
             pool = Executors.newFixedThreadPool(1, factory);
         }
 
-        void execute(Thread thread, Runnable task) {
-            if (thread.isVirtual()) {
-                pool.execute(task);
-            } else {
-                throw new UnsupportedOperationException();
-            }
+        @Override
+        public void onStart(VirtualThreadTask task) {
+            pool.execute(task);
         }
 
         @Override
-        public void onStart(Thread thread, Runnable task) {
-            execute(thread, task);
-        }
-
-        @Override
-        public void onContinue(Thread thread, Runnable task) {
-            execute(thread, task);
+        public void onContinue(VirtualThreadTask task) {
+            pool.execute(task);
         }
     }
 
@@ -103,15 +96,15 @@ class CustomDefaultScheduler {
         }
 
         @Override
-        public void onStart(Thread vthread, Runnable task) {
-            executed.add(vthread);
-            builtinScheduler.onStart(vthread, task);
+        public void onStart(VirtualThreadTask task) {
+            executed.add(task.thread());
+            builtinScheduler.onStart(task);
         }
 
         @Override
-        public void onContinue(Thread vthread, Runnable task) {
-            executed.add(vthread);
-            builtinScheduler.onContinue(vthread, task);
+        public void onContinue(VirtualThreadTask task) {
+            executed.add(task.thread());
+            builtinScheduler.onContinue(task);
         }
 
         Set<Thread> threadsExecuted() {
@@ -173,69 +166,11 @@ class CustomDefaultScheduler {
     }
 
     /**
-     * Test custom default scheduler execute method with bad parameters.
-     */
-    @Test
-    void testExecuteThrows() throws Exception {
-        var ref = new AtomicReference<VirtualThreadScheduler>();
-        Thread vthread = Thread.startVirtualThread(() -> {
-            ref.set(VirtualThreadScheduler.current());
-        });
-        vthread.join();
-        VirtualThreadScheduler scheduler = ref.get();
-
-        Runnable task = () -> { };
-
-        // platform thread
-        Thread thread = Thread.ofPlatform().unstarted(() -> { });
-        assertThrows(UnsupportedOperationException.class, () -> scheduler.onContinue(thread, task));
-
-        // nulls
-        assertThrows(NullPointerException.class, () -> scheduler.onContinue(null, task));
-        assertThrows(NullPointerException.class, () -> scheduler.onContinue(vthread, null));
-    }
-
-    /**
-     * Test custom default scheduler delegating to builtin default scheduler.
-     */
-    @Test
-    void testDelegatingToBuiltin1() throws Exception {
-        assumeTrue(schedulerClassName.equals("CustomDefaultScheduler$CustomScheduler2"));
-
-        var ref = new AtomicReference<VirtualThreadScheduler>();
-        Thread vthread = Thread.startVirtualThread(() -> {
-            ref.set(VirtualThreadScheduler.current());
-        });
-        vthread.join();
-
-        var customScheduler1 = new CustomScheduler1();
-        var customScheduler2 = (CustomScheduler2) ref.get();
-        var builtinScheduler = customScheduler2.builtinScheduler();
-
-        // ensure builtin default scheduler can't be shutdown
-        assertThrows(ClassCastException.class, () -> { var e = (AutoCloseable) builtinScheduler; });
-
-        var vthread0 = Thread.ofVirtual().scheduler(builtinScheduler).unstarted(() -> { });
-        var vthread1 = Thread.ofVirtual().scheduler(customScheduler1).unstarted(() -> { });
-        var vthread2 = Thread.ofVirtual().scheduler(customScheduler2).unstarted(() -> { });
-
-        Runnable task = () -> { };
-
-        // builtin scheduler can execute tasks for itself or customScheduler2
-        builtinScheduler.onContinue(vthread0, task);
-        assertThrows(IllegalArgumentException.class, () -> builtinScheduler.onContinue(vthread1, task));
-        builtinScheduler.onContinue(vthread2, task);
-
-        assertThrows(IllegalArgumentException.class, () -> customScheduler2.onContinue(vthread1, task));
-        customScheduler2.onContinue(vthread2, task);
-    }
-
-    /**
      * Test one virtual thread starting a second virtual thread when both are scheduled
      * by a custom default scheduler delegating to builtin default scheduler.
      */
     @Test
-    void testDelegatingToBuiltin2() throws Exception {
+    void testDelegatingToBuiltin() throws Exception {
         assumeTrue(schedulerClassName.equals("CustomDefaultScheduler$CustomScheduler2"));
 
         var schedulerRef = new AtomicReference<VirtualThreadScheduler>();

@@ -25,6 +25,7 @@
 package java.lang;
 
 import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.reflect.Constructor;
 import java.util.Locale;
 import java.util.Objects;
@@ -41,6 +42,7 @@ import jdk.internal.event.VirtualThreadEndEvent;
 import jdk.internal.event.VirtualThreadParkEvent;
 import jdk.internal.event.VirtualThreadStartEvent;
 import jdk.internal.event.VirtualThreadSubmitFailedEvent;
+import jdk.internal.invoke.MhUtil;
 import jdk.internal.misc.CarrierThread;
 import jdk.internal.misc.InnocuousThread;
 import jdk.internal.misc.Unsafe;
@@ -65,7 +67,7 @@ final class VirtualThread extends BaseVirtualThread {
     private static final Unsafe U = Unsafe.getUnsafe();
     private static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
 
-    private static final ForkJoinPool BUILTIN_DEFAULT_SCHEDULER;
+    private static final ForkJoinPool BUILTIN_SCHEDULER;
     private static final VirtualThreadScheduler DEFAULT_SCHEDULER;
     static {
         // experimental
@@ -76,11 +78,11 @@ final class VirtualThread extends BaseVirtualThread {
             for (String cn: propValue.split(",")) {
                 defaultScheduler = loadCustomScheduler(defaultScheduler, cn);
             }
-            BUILTIN_DEFAULT_SCHEDULER = builtinScheduler;
+            BUILTIN_SCHEDULER = builtinScheduler;
             DEFAULT_SCHEDULER = defaultScheduler;
         } else {
             var builtinScheduler = createBuiltinDefaultScheduler(false);
-            BUILTIN_DEFAULT_SCHEDULER = builtinScheduler;
+            BUILTIN_SCHEDULER = builtinScheduler;
             DEFAULT_SCHEDULER = builtinScheduler;
         }
     }
@@ -94,7 +96,7 @@ final class VirtualThread extends BaseVirtualThread {
     // scheduler and continuation
     private final VirtualThreadScheduler scheduler;
     private final Continuation cont;
-    private final Runnable runContinuation;
+    private final VirtualThreadTask runContinuation;
 
     // virtual thread state, accessed by VM
     private volatile int state;
@@ -217,7 +219,7 @@ final class VirtualThread extends BaseVirtualThread {
      * Returns true if using a custom default scheduler.
      */
     static boolean isCustomDefaultScheduler() {
-        return DEFAULT_SCHEDULER != BUILTIN_DEFAULT_SCHEDULER;
+        return DEFAULT_SCHEDULER != BUILTIN_SCHEDULER;
     }
 
     /**
@@ -229,7 +231,7 @@ final class VirtualThread extends BaseVirtualThread {
 
     /**
      * Return the scheduler for this thread.
-     * @param revealBuiltin true to reveal the built-in default scheduler, false to hide
+     * @param revealBuiltin true to reveal the built-in scheduler, false to hide
      */
     VirtualThreadScheduler scheduler(boolean revealBuiltin) {
         if (scheduler instanceof BuiltinDefaultScheduler builtin && !revealBuiltin) {
@@ -261,7 +263,67 @@ final class VirtualThread extends BaseVirtualThread {
 
         this.scheduler = scheduler;
         this.cont = new VThreadContinuation(this, task);
-        this.runContinuation = this::runContinuation;
+
+        if (scheduler == BUILTIN_SCHEDULER) {
+            this.runContinuation = new BuiltinSchedulerTask(this);
+        } else {
+            this.runContinuation = new CustomSchedulerTask(this);
+        }
+    }
+
+    /**
+     * The task to execute when using the built-in scheduler.
+     */
+    static final class BuiltinSchedulerTask implements VirtualThreadTask {
+        private final VirtualThread vthread;
+        BuiltinSchedulerTask(VirtualThread vthread) {
+            this.vthread = vthread;
+        }
+        @Override
+        public Object attach(Object att) {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Object attachment() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Thread thread() {
+            return vthread;
+        }
+        @Override
+        public void run() {
+            vthread.runContinuation();;
+        }
+    }
+
+    /**
+     * The task to execute when using a custom scheduler.
+     */
+    static final class CustomSchedulerTask implements VirtualThreadTask {
+        private static final VarHandle ATT =
+                MhUtil.findVarHandle(MethodHandles.lookup(), "att", Object.class);
+        private final VirtualThread vthread;
+        private volatile Object att;
+        CustomSchedulerTask(VirtualThread vthread) {
+            this.vthread = vthread;
+        }
+        @Override
+        public Object attach(Object att) {
+            return ATT.getAndSet(this, att);
+        }
+        @Override
+        public Object attachment() {
+            return att;
+        }
+        @Override
+        public Thread thread() {
+            return vthread;
+        }
+        @Override
+        public void run() {
+            vthread.runContinuation();;
+        }
     }
 
     /**
@@ -349,9 +411,9 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Submits the runContinuation task to the scheduler. For the built-in default
-     * scheduler, the task will be pushed to the local queue if possible, otherwise it
-     * will be pushed to an external submission queue.
+     * Submits the runContinuation task to the scheduler. For the built-in scheduler,
+     * the task will be pushed to the local queue if possible, otherwise it will be
+     * pushed to an external submission queue.
      * @param retryOnOOME true to retry indefinitely if OutOfMemoryError is thrown
      * @throws RejectedExecutionException
      */
@@ -367,12 +429,12 @@ final class VirtualThread extends BaseVirtualThread {
                 if (currentThread().isVirtual()) {
                     Continuation.pin();
                     try {
-                        scheduler.onContinue(this, runContinuation);
+                        scheduler.onContinue(runContinuation);
                     } finally {
                         Continuation.unpin();
                     }
                 } else {
-                    scheduler.onContinue(this, runContinuation);
+                    scheduler.onContinue(runContinuation);
                 }
                 done = true;
             } catch (RejectedExecutionException ree) {
@@ -449,8 +511,8 @@ final class VirtualThread extends BaseVirtualThread {
 
     /**
      * Invoked from Thread.start to externally submit the runContinuation task to the
-     * scheduler. If this virtual thread is scheduled by the built-in default scheduler,
-     * and this method is called from a virtual thread scheduled by the built-in default
+     * scheduler. If this virtual thread is scheduled by the built-in scheduler,
+     * and this method is called from a virtual thread scheduled by the built-in
      * scheduler, then it uses externalSubmit to ensure that the task is pushed to an
      * external submission queue rather than the local queue.
      * @throws RejectedExecutionException
@@ -465,17 +527,17 @@ final class VirtualThread extends BaseVirtualThread {
                 // carriers and virtual threads contending for a lock.
                 Continuation.pin();
                 try {
-                    if (scheduler == BUILTIN_DEFAULT_SCHEDULER
+                    if (scheduler == BUILTIN_SCHEDULER
                             && currentCarrierThread() instanceof CarrierThread ct) {
                         ct.getPool().externalSubmit(ForkJoinTask.adapt(runContinuation));
                     } else {
-                        scheduler.onStart(this, runContinuation);
+                        scheduler.onStart(runContinuation);
                     }
                 } finally {
                     Continuation.unpin();
                 }
             } else {
-                scheduler.onStart(this, runContinuation);
+                scheduler.onStart(runContinuation);
             }
         } catch (RejectedExecutionException ree) {
             submitFailed(ree);
@@ -1514,7 +1576,7 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Creates the built-in default ForkJoinPool scheduler.
+     * Creates the built-in ForkJoinPool scheduler.
      * @param wrapped true if wrapped by a custom default scheduler
      */
     private static BuiltinDefaultScheduler createBuiltinDefaultScheduler(boolean wrapped) {
@@ -1542,7 +1604,7 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * The built-in default ForkJoinPool scheduler.
+     * The built-in ForkJoinPool scheduler.
      */
     private static class BuiltinDefaultScheduler
             extends ForkJoinPool implements VirtualThreadScheduler {
@@ -1564,12 +1626,12 @@ final class VirtualThread extends BaseVirtualThread {
         }
 
         @Override
-        public void onStart(Thread vthread, Runnable task) {
+        public void onStart(VirtualThreadTask task) {
             adaptAndExecute(task);
         }
 
         @Override
-        public void onContinue(Thread vthread, Runnable task) {
+        public void onContinue(VirtualThreadTask task) {
             adaptAndExecute(task);
         }
 
@@ -1580,26 +1642,22 @@ final class VirtualThread extends BaseVirtualThread {
             BuiltinDefaultScheduler builtin = this;
             return VIEW.orElseSet(() -> {
                 return new VirtualThreadScheduler() {
-                    private void execute(Thread thread, Runnable task) {
-                        Objects.requireNonNull(thread);
-                        if (thread instanceof VirtualThread vthread) {
-                            VirtualThreadScheduler scheduler = vthread.scheduler;
-                            if (scheduler == this || scheduler == DEFAULT_SCHEDULER) {
-                                builtin.adaptAndExecute(task);
-                            } else {
-                                throw new IllegalArgumentException();
-                            }
+                    private void execute(VirtualThreadTask task) {
+                        var vthread = (VirtualThread) task.thread();
+                        VirtualThreadScheduler scheduler = vthread.scheduler;
+                        if (scheduler == this || scheduler == DEFAULT_SCHEDULER) {
+                            builtin.adaptAndExecute(task);
                         } else {
-                            throw new UnsupportedOperationException();
+                            throw new IllegalArgumentException();
                         }
                     }
                     @Override
-                    public void onStart(Thread thread, Runnable task) {
-                        execute(thread, task);
+                    public void onStart(VirtualThreadTask task) {
+                        execute(task);
                     }
                     @Override
-                    public void onContinue(Thread thread, Runnable task) {
-                        execute(thread, task);
+                    public void onContinue(VirtualThreadTask task) {
+                        execute(task);
                     }
                 };
             });
