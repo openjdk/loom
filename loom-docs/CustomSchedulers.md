@@ -21,12 +21,11 @@ setting a system property on the command line:
 ```
 
 where `<scheduler-class>` is fully qualified name of a class that implements
-`java.lang.Thread.VirtualThreadScheduler`. The interface defines 2-arg `onStart` and
+`java.lang.Thread.VirtualThreadScheduler`. The interface defines the `onStart` and
 `onContinue` methods that the custom scheduler must implement. The `onStart` method is
 invoked when `Thread::start` is used to start a virtual thread. The `onContinue` method
 is invoked when a virtual thread is scheduled to continue after being parked or blocked.
-The two methods are called with a reference to the virtual `Thread`, and a `Runnable`
-task to execute.
+The two methods are called with the task to execute.
 
 The custom scheduler may use its own pool of platform threads to execute the tasks,
 may assign virtual threads to be carried by specific platform threads, or may delegate

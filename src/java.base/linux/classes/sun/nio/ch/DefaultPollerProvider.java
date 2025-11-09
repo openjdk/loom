@@ -25,12 +25,16 @@
 package sun.nio.ch;
 
 import java.io.IOException;
+import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.SharedSecrets;
 import jdk.internal.vm.ContinuationSupport;
 
 /**
  * Default PollerProvider for Linux.
  */
 class DefaultPollerProvider extends PollerProvider {
+    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
+
     private static final boolean USE_IOURING;
     private static final boolean USE_IORING_OP_READ;
     private static final boolean USE_IORING_OP_WRITE;
@@ -54,7 +58,7 @@ class DefaultPollerProvider extends PollerProvider {
     }
 
     DefaultPollerProvider() {
-        this(ContinuationSupport.isSupported()
+        this(ContinuationSupport.isSupported() && !JLA.isCustomDefaultVirtualThreadScheduler()
                 ? Poller.Mode.VTHREAD_POLLERS
                 : Poller.Mode.SYSTEM_THREADS);
     }

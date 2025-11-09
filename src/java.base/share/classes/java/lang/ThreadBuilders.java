@@ -267,11 +267,11 @@ class ThreadBuilders {
         @CallerSensitive
         @Override
         public OfVirtual scheduler(Thread.VirtualThreadScheduler scheduler) {
-            Class<?> caller = Reflection.getCallerClass();
-            caller.getModule().ensureNativeAccess(OfVirtual.class, "scheduler", caller, false);
-            if (!ContinuationSupport.isSupported()) {
+            if (VirtualThread.isCustomDefaultScheduler() || !ContinuationSupport.isSupported()) {
                 throw new UnsupportedOperationException();
             }
+            Class<?> caller = Reflection.getCallerClass();
+            caller.getModule().ensureNativeAccess(OfVirtual.class, "scheduler", caller, false);
             this.scheduler = Objects.requireNonNull(scheduler);
             return this;
         }

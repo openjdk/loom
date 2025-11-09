@@ -785,6 +785,57 @@ public class Thread implements Runnable {
     }
 
     /**
+     * The task that a {@linkplain VirtualThreadScheduler virtual thread scheduler}
+     * executes on a platform thread to
+     * {@linkplain VirtualThreadScheduler#onStart(VirtualThreadTask) start}
+     * or {@linkplain VirtualThreadScheduler#onContinue(VirtualThreadTask) continue}
+     * execution of a virtual thread. While executing the task, the platform thread is
+     * the virtual thread's <em>carrier</em>.
+     *
+     * <p> There is a {@code VirtualThreadTask} object for each virtual thread. The
+     * scheduler arranges to execute its {@link #run()} method when called to start or
+     * continue the virtual thread. A scheduler may attach an object to the task.
+     *
+     * @since 99
+     */
+    public sealed interface VirtualThreadTask extends Runnable permits
+            VirtualThread.BuiltinSchedulerTask, VirtualThread.CustomSchedulerTask {
+
+        /**
+         * {@return the virtual thread that this task starts or continues}
+         */
+        Thread thread();
+
+        /**
+         * Runs the task on the current thread as the carrier thread.
+         *
+         * <p> Invoking this method with the interrupted status set will first
+         * clear the interrupt status. Interrupting the carrier thread while
+         * running the task leads to unspecified behavior.
+         *
+         * @throws IllegalStateException if the virtual thread is not in a state to
+         * run on the current thread
+         * @throws IllegalCallerException if the current thread is a virtual thread
+         */
+        @Override
+        void run();
+
+        /**
+         * Attaches the given object to this task.
+         * @param att the object to attach
+         * @return the previously-attached object, if any, otherwise {@code null}
+         */
+        Object attach(Object att);
+
+        /**
+         * Retrieves the current attachment.
+         * @return the object currently attached to this task or {@code null} if
+         * there is no attachment
+         */
+        Object attachment();
+    }
+
+    /**
      * Virtual thread scheduler.
      *
      * @apiNote The following example creates a virtual thread scheduler that uses a small
@@ -792,9 +843,10 @@ public class Thread implements Runnable {
      * {@snippet lang=java :
      *     ExecutorService threadPool = Executors.newFixedThreadPool(4);
      *     var scheduler = new VirtualThreadScheduler() {
-     *         private void submit(Thread vthread, Runnable task) {
+     *         private void submit(VirtualThreadTask task) {
      *             Thread caller = Thread.currentThread();
      *             threadPool.submit(() -> {
+     *                 Thread vthread = task.thread();
      *                 Thread carrier = Thread.currentThread();
      *                 try {
      *                     task.run();
@@ -805,12 +857,12 @@ public class Thread implements Runnable {
      *             });
      *         }
      *         @Override
-     *         public void onStart(Thread vthread, Runnable task) {
-     *             submit(vthread, task);
+     *         public void onStart(VirtualThreadTask task) {
+     *             submit(task);
      *         }
      *         @Override
-     *         public void onContinue(Thread vthread, Runnable task) {
-     *             submit(vthread, task);
+     *         public void onContinue(VirtualThreadTask task) {
+     *             submit(task);
      *         }
      *    };
      * }
@@ -820,37 +872,36 @@ public class Thread implements Runnable {
      *
      * @see Builder.OfVirtual#scheduler(VirtualThreadScheduler)
      * @since 99
+     * @see VirtualThreadScheduler
      */
     public interface VirtualThreadScheduler {
         /**
-         * Invoked by {@link Thread#start()} to start execution of the given virtual
-         * thread. The scheduler's implementation of this method must arrange to execute
-         * the given task on a platform thread.
+         * Invoked by {@link Thread#start()} to start execution of a {@linkplain
+         * VirtualThreadTask#thread() virtual thread}.
+         * The scheduler's implementation of this method must arrange to execute the
+         * given task's {@link VirtualThreadTask#run() run()} method on a platform thread.
          *
          * @implNote If invoked from a virtual thread, then the caller virtual thread is
          * <em>pinned</em> to its carrier while executing the {@code onStart} method.
          *
-         * @param vthread the virtual thread
          * @param task the task to execute
          * @throws RejectedExecutionException if the scheduler cannot accept the task
          */
-        void onStart(Thread vthread, Runnable task);
+        void onStart(VirtualThreadTask task);
 
         /**
-         * Invoked to continue execution of the given virtual thread. This method
-         * is invoked to continue execution after being parked, blocked, sleeping,
-         * or other reasons.
+         * Invoked to continue execution of a {@linkplain VirtualThreadTask#thread()
+         * virtual thread}.
          * The scheduler's implementation of this method must arrange to execute the
-         * given task on a platform thread.
+         * given task's {@link VirtualThreadTask#run() run()} method on a platform thread.
          *
          * @implNote If invoked from a virtual thread, then the caller virtual thread is
          * <em>pinned</em> to its carrier while executing the {@code onContinue} method.
          *
-         * @param vthread the virtual thread
          * @param task the task to execute
          * @throws RejectedExecutionException if the scheduler cannot accept the task
          */
-        void onContinue(Thread vthread, Runnable task);
+        void onContinue(VirtualThreadTask task);
 
         /**
          * {@return a virtual thread scheduler that delegates tasks to the given executor}
@@ -860,11 +911,11 @@ public class Thread implements Runnable {
             Objects.requireNonNull(executor);
             return new VirtualThreadScheduler() {
                 @Override
-                public void onStart(Thread vthread, Runnable task) {
+                public void onStart(VirtualThreadTask task) {
                     executor.execute(task);
                 }
                 @Override
-                public void onContinue(Thread vthread, Runnable task) {
+                public void onContinue(VirtualThreadTask task) {
                     executor.execute(task);
                 }
             };
@@ -1150,17 +1201,17 @@ public class Thread implements Runnable {
             /**
              * Sets the scheduler.
              *
-             * The thread will be scheduled by the Java virtual machine with the given
-             * scheduler. The scheduler's {@link VirtualThreadScheduler#onStart(Thread, Runnable)}
-             * and {@link VirtualThreadScheduler#onContinue(Thread, Runnable)} methods
-             * may be invoked in the context of a virtual thread. The scheduler must
-             * arrange to execute the {@code Runnable}'s {@code run} method on a platform
-             * thread. Attempting to execute the run method in a virtual thread causes
-             * {@link WrongThreadException} to be thrown.
-             *
-             * The {@code execute} method may be invoked at sensitive times (e.g. when
-             * unparking a thread) so care should be taken to not directly execute the
-             * task on the <em>current thread</em>.
+             * <p> The virtual thread will be scheduled by the Java virtual machine with
+             * the given scheduler. The scheduler's {@link
+             * VirtualThreadScheduler#onStart(VirtualThreadTask) onStart} and
+             * {@link VirtualThreadScheduler#onContinue(VirtualThreadTask) onContinue}
+             * methods may be invoked in the context of a virtual thread. The scheduler
+             * must arrange to execute the {@link VirtualThreadTask}'s
+             * {@code run} method on a platform thread. Attempting to execute the run
+             * method in a virtual thread causes {@link WrongThreadException} to be thrown.
+             * The {@code onStart} and {@code onContinue }methods may be invoked at
+             * sensitive times (e.g. when unparking a thread) so care should be taken to
+             * not directly execute the task on the <em>current thread</em>.
              *
              * @param scheduler the scheduler
              * @return this builder
