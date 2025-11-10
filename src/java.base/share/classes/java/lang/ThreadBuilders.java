@@ -267,7 +267,12 @@ class ThreadBuilders {
         @CallerSensitive
         @Override
         public OfVirtual scheduler(Thread.VirtualThreadScheduler scheduler) {
-            if (VirtualThread.isCustomDefaultScheduler() || !ContinuationSupport.isSupported()) {
+            if (!ContinuationSupport.isSupported()) {
+                throw new UnsupportedOperationException();
+            }
+            // can't mix custom default scheduler and API prototypes at this time
+            if (VirtualThread.isCustomDefaultScheduler()
+                    && scheduler != VirtualThread.defaultScheduler()) {
                 throw new UnsupportedOperationException();
             }
             Class<?> caller = Reflection.getCallerClass();
