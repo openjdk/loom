@@ -35,6 +35,7 @@
 /*
  * @test id=poller-modes
  * @requires vm.continuations
+ * @requires (os.family == "linux") | (os.family == "mac")
  * @library /test/lib
  * @run junit/othervm -Djdk.pollerMode=3
  *     -Djdk.virtualThreadScheduler.implClass=CustomDefaultScheduler$CustomScheduler1
