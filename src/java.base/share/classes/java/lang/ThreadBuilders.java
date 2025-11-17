@@ -31,7 +31,6 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.invoke.MhUtil;
@@ -204,7 +203,6 @@ class ThreadBuilders {
             return new PlatformThreadFactory(group, name(), counter(), characteristics(),
                     daemonChanged, daemon, priority, stackSize, uncaughtExceptionHandler());
         }
-
     }
 
     /**
@@ -213,6 +211,7 @@ class ThreadBuilders {
     static final class VirtualThreadBuilder
             extends BaseThreadBuilder implements OfVirtual {
         private Thread.VirtualThreadScheduler scheduler;
+        private Object att;
 
         VirtualThreadBuilder() {
         }
@@ -244,7 +243,7 @@ class ThreadBuilders {
         @Override
         public Thread unstarted(Runnable task) {
             Objects.requireNonNull(task);
-            var thread = newVirtualThread(scheduler, nextThreadName(), characteristics(), task);
+            var thread = newVirtualThread(scheduler, nextThreadName(), characteristics(), task, att);
             UncaughtExceptionHandler uhe = uncaughtExceptionHandler();
             if (uhe != null)
                 thread.uncaughtExceptionHandler(uhe);
@@ -261,7 +260,7 @@ class ThreadBuilders {
         @Override
         public ThreadFactory factory() {
             return new VirtualThreadFactory(scheduler, name(), counter(), characteristics(),
-                    uncaughtExceptionHandler());
+                    uncaughtExceptionHandler(), att);
         }
 
         @CallerSensitive
@@ -278,6 +277,12 @@ class ThreadBuilders {
             Class<?> caller = Reflection.getCallerClass();
             caller.getModule().ensureNativeAccess(OfVirtual.class, "scheduler", caller, false);
             this.scheduler = Objects.requireNonNull(scheduler);
+            return this;
+        }
+
+        @Override
+        public OfVirtual attach(Object att) {
+            this.att = Objects.requireNonNull(att);
             return this;
         }
     }
@@ -382,21 +387,24 @@ class ThreadBuilders {
      */
     private static class VirtualThreadFactory extends BaseThreadFactory {
         private final Thread.VirtualThreadScheduler scheduler;
+        private final Object att;
 
         VirtualThreadFactory(Thread.VirtualThreadScheduler scheduler,
                              String name,
                              long start,
                              int characteristics,
-                             UncaughtExceptionHandler uhe) {
+                             UncaughtExceptionHandler uhe,
+                             Object att) {
             super(name, start, characteristics, uhe);
             this.scheduler = scheduler;
+            this.att = att;
         }
 
         @Override
         public Thread newThread(Runnable task) {
             Objects.requireNonNull(task);
             String name = nextThreadName();
-            Thread thread = newVirtualThread(scheduler, name, characteristics(), task);
+            Thread thread = newVirtualThread(scheduler, name, characteristics(), task, att);
             UncaughtExceptionHandler uhe = uncaughtExceptionHandler();
             if (uhe != null)
                 thread.uncaughtExceptionHandler(uhe);
@@ -410,9 +418,10 @@ class ThreadBuilders {
     static Thread newVirtualThread(Thread.VirtualThreadScheduler scheduler,
                                    String name,
                                    int characteristics,
-                                   Runnable task) {
+                                   Runnable task,
+                                   Object att) {
         if (ContinuationSupport.isSupported()) {
-            return new VirtualThread(scheduler, name, characteristics, task);
+            return new VirtualThread(scheduler, name, characteristics, task, att);
         } else {
             if (scheduler != null)
                 throw new UnsupportedOperationException();

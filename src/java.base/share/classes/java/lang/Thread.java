@@ -1265,6 +1265,15 @@ public class Thread implements Runnable {
             @CallerSensitive
             @Restricted
             OfVirtual scheduler(VirtualThreadScheduler scheduler);
+
+            /**
+             * Sets the object to attach to the virtual thread's {@link VirtualThreadTask}.
+             * @param att the object to attach
+             * @return this builder
+             * @since 99
+             * @see VirtualThreadTask#attachment()
+             */
+            OfVirtual attach(Object att);
         }
     }
 
@@ -1627,7 +1636,7 @@ public class Thread implements Runnable {
      */
     public static Thread startVirtualThread(Runnable task) {
         Objects.requireNonNull(task);
-        var thread = ThreadBuilders.newVirtualThread(null, null, 0, task);
+        var thread = ThreadBuilders.newVirtualThread(null, null, 0, task, null);
         thread.start();
         return thread;
     }

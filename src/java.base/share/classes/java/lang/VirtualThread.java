@@ -252,7 +252,8 @@ final class VirtualThread extends BaseVirtualThread {
     VirtualThread(VirtualThreadScheduler scheduler,
                   String name,
                   int characteristics,
-                  Runnable task) {
+                  Runnable task,
+                  Object att) {
         super(name, characteristics, /*bound*/ false);
         Objects.requireNonNull(task);
 
@@ -267,7 +268,7 @@ final class VirtualThread extends BaseVirtualThread {
         if (scheduler == BUILTIN_SCHEDULER) {
             this.runContinuation = new BuiltinSchedulerTask(this);
         } else {
-            this.runContinuation = new CustomSchedulerTask(this);
+            this.runContinuation = new CustomSchedulerTask(this, att);
         }
     }
 
@@ -305,8 +306,9 @@ final class VirtualThread extends BaseVirtualThread {
                 MhUtil.findVarHandle(MethodHandles.lookup(), "att", Object.class);
         private final VirtualThread vthread;
         private volatile Object att;
-        CustomSchedulerTask(VirtualThread vthread) {
+        CustomSchedulerTask(VirtualThread vthread, Object att) {
             this.vthread = vthread;
+            this.att = att;
         }
         @Override
         public Object attach(Object att) {
