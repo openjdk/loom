@@ -2322,12 +2322,12 @@ public final class System {
                 }
             }
 
-            public Thread.VirtualThreadScheduler defaultVirtualThreadScheduler() {
-                return VirtualThread.defaultScheduler();
+            public Thread.VirtualThreadScheduler builtinVirtualThreadScheduler() {
+                return VirtualThread.builtinScheduler();
             }
 
-            public boolean isCustomDefaultVirtualThreadScheduler() {
-                return VirtualThread.isCustomDefaultScheduler();
+            public Thread.VirtualThreadScheduler defaultVirtualThreadScheduler() {
+                return VirtualThread.defaultScheduler();
             }
 
             public Thread.VirtualThreadScheduler virtualThreadScheduler(Thread thread) {

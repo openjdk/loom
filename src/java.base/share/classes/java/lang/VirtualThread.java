@@ -75,13 +75,11 @@ final class VirtualThread extends BaseVirtualThread {
         String propValue = System.getProperty("jdk.virtualThreadScheduler.implClass");
         if (propValue != null) {
             BuiltinScheduler builtinScheduler = createBuiltinScheduler(true);
-            VirtualThreadScheduler defaultScheduler = builtinScheduler.createExternalView();
-            for (String cn: propValue.split(",")) {
-                defaultScheduler = loadCustomScheduler(defaultScheduler, cn);
-            }
+            VirtualThreadScheduler externalView = builtinScheduler.createExternalView();
+            VirtualThreadScheduler defaultScheduler = loadCustomScheduler(externalView, propValue);
             BUILTIN_SCHEDULER = builtinScheduler;
             DEFAULT_SCHEDULER = defaultScheduler;
-            EXTERNAL_VIEW = null;
+            EXTERNAL_VIEW = externalView;
         } else {
             var builtinScheduler = createBuiltinScheduler(false);
             BUILTIN_SCHEDULER = builtinScheduler;
@@ -212,17 +210,17 @@ final class VirtualThread extends BaseVirtualThread {
     private volatile CountDownLatch termination;
 
     /**
-     * Returns the default scheduler.
+     * Return the built-in scheduler.
      */
-    static VirtualThreadScheduler defaultScheduler() {
-        return DEFAULT_SCHEDULER;
+    static VirtualThreadScheduler builtinScheduler() {
+        return BUILTIN_SCHEDULER;
     }
 
     /**
-     * Returns true if using a custom default scheduler.
+     * Returns the default scheduler, usually the same as the built-in scheduler.
      */
-    static boolean isCustomDefaultScheduler() {
-        return DEFAULT_SCHEDULER != BUILTIN_SCHEDULER;
+    static VirtualThreadScheduler defaultScheduler() {
+        return DEFAULT_SCHEDULER;
     }
 
     /**
@@ -263,6 +261,8 @@ final class VirtualThread extends BaseVirtualThread {
         // use default scheduler if not provided
         if (scheduler == null) {
             scheduler = DEFAULT_SCHEDULER;
+        } else if (scheduler == EXTERNAL_VIEW) {
+            throw new UnsupportedOperationException();
         }
         this.scheduler = scheduler;
         this.cont = new VThreadContinuation(this, task);
@@ -310,7 +310,9 @@ final class VirtualThread extends BaseVirtualThread {
         private volatile Object att;
         CustomSchedulerTask(VirtualThread vthread, Object att) {
             this.vthread = vthread;
-            this.att = att;
+            if (att != null) {
+                this.att = att;
+            }
         }
         @Override
         public Object attach(Object att) {
@@ -1559,24 +1561,23 @@ final class VirtualThread extends BaseVirtualThread {
      * @param cn the class name of the custom scheduler
      */
     private static VirtualThreadScheduler loadCustomScheduler(VirtualThreadScheduler delegate, String cn) {
+        VirtualThreadScheduler scheduler;
         try {
             Class<?> clazz = Class.forName(cn, true, ClassLoader.getSystemClassLoader());
-            VirtualThreadScheduler scheduler;
+            // 1-arg constructor
             try {
-                // 1-arg constructor
                 Constructor<?> ctor = clazz.getConstructor(VirtualThreadScheduler.class);
-                scheduler = (VirtualThreadScheduler) ctor.newInstance(delegate);
+                return (VirtualThreadScheduler) ctor.newInstance(delegate);
             } catch (NoSuchMethodException e) {
                 // 0-arg constructor
                 Constructor<?> ctor = clazz.getConstructor();
                 scheduler = (VirtualThreadScheduler) ctor.newInstance();
             }
-            System.err.println("""
-                WARNING: Using custom default scheduler, this is an experimental feature!""");
-            return scheduler;
         } catch (Exception ex) {
             throw new Error(ex);
         }
+        System.err.println("WARNING: Using custom default scheduler, this is an experimental feature!");
+        return scheduler;
     }
 
     /**
