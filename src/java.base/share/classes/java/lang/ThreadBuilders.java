@@ -211,7 +211,6 @@ class ThreadBuilders {
     static final class VirtualThreadBuilder
             extends BaseThreadBuilder implements OfVirtual {
         private Thread.VirtualThreadScheduler scheduler;
-        private Object att;
 
         VirtualThreadBuilder() {
         }
@@ -243,7 +242,7 @@ class ThreadBuilders {
         @Override
         public Thread unstarted(Runnable task) {
             Objects.requireNonNull(task);
-            var thread = newVirtualThread(scheduler, nextThreadName(), characteristics(), task, att);
+            var thread = newVirtualThread(scheduler, nextThreadName(), characteristics(), task, null);
             UncaughtExceptionHandler uhe = uncaughtExceptionHandler();
             if (uhe != null)
                 thread.uncaughtExceptionHandler(uhe);
@@ -260,7 +259,7 @@ class ThreadBuilders {
         @Override
         public ThreadFactory factory() {
             return new VirtualThreadFactory(scheduler, name(), counter(), characteristics(),
-                    uncaughtExceptionHandler(), att);
+                    uncaughtExceptionHandler());
         }
 
         @CallerSensitive
@@ -270,19 +269,13 @@ class ThreadBuilders {
                 throw new UnsupportedOperationException();
             }
             // can't mix custom default scheduler and API prototypes at this time
-            if (VirtualThread.isCustomDefaultScheduler()
-                    && scheduler != VirtualThread.defaultScheduler()) {
+            if (scheduler != VirtualThread.defaultScheduler()
+                    && VirtualThread.defaultScheduler() != VirtualThread.builtinScheduler()) {
                 throw new UnsupportedOperationException();
             }
             Class<?> caller = Reflection.getCallerClass();
             caller.getModule().ensureNativeAccess(OfVirtual.class, "scheduler", caller, false);
             this.scheduler = Objects.requireNonNull(scheduler);
-            return this;
-        }
-
-        @Override
-        public OfVirtual attach(Object att) {
-            this.att = Objects.requireNonNull(att);
             return this;
         }
     }
@@ -387,24 +380,21 @@ class ThreadBuilders {
      */
     private static class VirtualThreadFactory extends BaseThreadFactory {
         private final Thread.VirtualThreadScheduler scheduler;
-        private final Object att;
 
         VirtualThreadFactory(Thread.VirtualThreadScheduler scheduler,
                              String name,
                              long start,
                              int characteristics,
-                             UncaughtExceptionHandler uhe,
-                             Object att) {
+                             UncaughtExceptionHandler uhe) {
             super(name, start, characteristics, uhe);
             this.scheduler = scheduler;
-            this.att = att;
         }
 
         @Override
         public Thread newThread(Runnable task) {
             Objects.requireNonNull(task);
             String name = nextThreadName();
-            Thread thread = newVirtualThread(scheduler, name, characteristics(), task, att);
+            Thread thread = newVirtualThread(scheduler, name, characteristics(), task, null);
             UncaughtExceptionHandler uhe = uncaughtExceptionHandler();
             if (uhe != null)
                 thread.uncaughtExceptionHandler(uhe);

@@ -220,8 +220,8 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * or method in this class will cause a {@link NullPointerException} to be thrown.
  *
  * @implNote
- * In the JDK Reference Implementation, the following system properties may be used to
- * configure the built-in default virtual thread scheduler:
+ * In the JDK Reference Implementation, the built-in default virtual thread scheduler
+ * may be configured with the following system properties:
  * <table class="striped">
  * <caption style="display:none">System properties</caption>
  *   <thead>
@@ -243,7 +243,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  *     <th scope="row">
  *       {@systemProperty jdk.virtualThreadScheduler.maxPoolSize}
  *     </th>
- *     <td> The maximum number of platform threads available to the default scheduler.
+ *     <td> The maximum number of platform threads available to the scheduler.
  *       It defaults to 256. </td>
  *   </tr>
  *   </tbody>
@@ -946,6 +946,21 @@ public class Thread implements Runnable {
         void onContinue(VirtualThreadTask task);
 
         /**
+         * Creates a new unstarted virtual {@code Thread} to run the given runnable.
+         * The virtual thread will be scheduled by this scheduler. {@code att} parameter
+         * is the object to attach to the {@link VirtualThreadTask} for the thread.
+         * @param task the object to run when the thread executes
+         * @param att the object to attach, can be {@code null}
+         * @return a new started Thread
+         * @throws UnsupportedOperationException if this is the built-in scheduler
+         */
+        default Thread newThread(Runnable task, Object att) {
+            return ThreadBuilders.newVirtualThread(this, null, 0, task, att);
+        }
+
+        // -- prototype 2 --
+
+        /**
          * {@return a virtual thread scheduler that delegates tasks to the given executor}
          * @param executor the executor
          */
@@ -1240,6 +1255,8 @@ public class Thread implements Runnable {
             @Override OfVirtual inheritInheritableThreadLocals(boolean inherit);
             @Override OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
 
+            // -- prototype 2 --
+
             /**
              * Sets the scheduler.
              *
@@ -1265,15 +1282,6 @@ public class Thread implements Runnable {
             @CallerSensitive
             @Restricted
             OfVirtual scheduler(VirtualThreadScheduler scheduler);
-
-            /**
-             * Sets the object to attach to the virtual thread's {@link VirtualThreadTask}.
-             * @param att the object to attach
-             * @return this builder
-             * @since 99
-             * @see VirtualThreadTask#attachment()
-             */
-            OfVirtual attach(Object att);
         }
     }
 

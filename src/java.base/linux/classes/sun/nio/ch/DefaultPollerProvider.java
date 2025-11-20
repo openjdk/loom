@@ -58,9 +58,9 @@ class DefaultPollerProvider extends PollerProvider {
     }
 
     DefaultPollerProvider() {
-        this(ContinuationSupport.isSupported() && !JLA.isCustomDefaultVirtualThreadScheduler()
-                ? Poller.Mode.VTHREAD_POLLERS
-                : Poller.Mode.SYSTEM_THREADS);
+        boolean usingBuiltinScheduler = ContinuationSupport.isSupported()
+                && (JLA.defaultVirtualThreadScheduler() == JLA.builtinVirtualThreadScheduler());
+        this(usingBuiltinScheduler ? Poller.Mode.VTHREAD_POLLERS : Poller.Mode.SYSTEM_THREADS);
     }
 
     @Override

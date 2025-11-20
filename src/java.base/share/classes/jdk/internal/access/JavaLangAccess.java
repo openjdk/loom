@@ -628,14 +628,14 @@ public interface JavaLangAccess {
     void unparkVirtualThread(Thread thread);
 
     /**
+     * Returns the builtin virtual thread scheduler.
+     */
+    Thread.VirtualThreadScheduler builtinVirtualThreadScheduler();
+
+    /**
      * Returns the default virtual thread scheduler.
      */
     Thread.VirtualThreadScheduler defaultVirtualThreadScheduler();
-
-    /**
-     * Returns true if using a custom default virtual thread scheduler.
-     */
-    boolean isCustomDefaultVirtualThreadScheduler();
 
     /**
      * Returns the scheduler for the given virtual thread.
