@@ -947,15 +947,15 @@ public class Thread implements Runnable {
 
         /**
          * Creates a new unstarted virtual {@code Thread} to run the given runnable.
-         * The virtual thread will be scheduled by this scheduler. {@code att} parameter
-         * is the object to attach to the {@link VirtualThreadTask} for the thread.
-         * @param task the object to run when the thread executes
+         * The thread will be scheduled by the default virtual thread scheduler.
+         * The {@code att} parameter is the object to attach to the {@link VirtualThreadTask}
+         * for the thread.
+         * @param runnable the object to run when the thread executes
          * @param att the object to attach, can be {@code null}
-         * @return a new started Thread
-         * @throws UnsupportedOperationException if this is the built-in scheduler
+         * @return a new unstarted Thread
          */
-        default Thread newThread(Runnable task, Object att) {
-            return ThreadBuilders.newVirtualThread(this, null, 0, task, att);
+        static Thread newThread(Runnable runnable, Object att) {
+            return ThreadBuilders.newVirtualThread(null, null, 0, runnable, att);
         }
 
         // -- prototype 2 --
