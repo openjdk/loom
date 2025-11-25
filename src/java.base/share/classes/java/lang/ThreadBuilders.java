@@ -319,7 +319,7 @@ class ThreadBuilders {
 
         String nextThreadName() {
             if (hasCounter) {
-                return name + (long) COUNT.getAndAdd(this, 1);
+                return name + (long) COUNT.getAndAdd(this, 1L);
             } else {
                 return name;
             }
