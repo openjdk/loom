@@ -246,31 +246,31 @@ class VirtualThreadSchedulerMXBeanTest {
      * Waits for pool size >= target to be true.
      */
     void awaitPoolSizeGte(VirtualThreadSchedulerMXBean bean, int target) throws InterruptedException {
-        awaitPoolSize(bean, ps -> ps >= target, ">= " + target);
+        awaitPoolSize(bean, ps -> ps >= target, "poolSize >= " + target);
     }
 
     /**
      * Waits for the mounted virtual thread count >= target to be true.
      */
     void awaitMountedVirtualThreadCountGte(VirtualThreadSchedulerMXBean bean,
-                                           long target) throws InterruptedException {
-        awaitMountedVirtualThreadCount(bean, c -> c >= target, ">= " + target);
+                                           int target) throws InterruptedException {
+        awaitMountedVirtualThreadCount(bean, c -> c >= target, "mountedVirtualThreadCount >= " + target);
     }
 
     /**
      * Waits for the mounted virtual thread count <= target to be true.
      */
     void awaitMountedVirtualThreadCountLte(VirtualThreadSchedulerMXBean bean,
-                                           long target) throws InterruptedException {
-        awaitMountedVirtualThreadCount(bean, c -> c <= target, "<= " + target);
+                                           int target) throws InterruptedException {
+        awaitMountedVirtualThreadCount(bean, c -> c <= target, "mountedVirtualThreadCount <= " + target);
     }
 
     /**
      * Waits for the mounted virtual thread count == target to be true.
      */
     void awaitMountedVirtualThreadCountEq(VirtualThreadSchedulerMXBean bean,
-                                          long target) throws InterruptedException {
-        awaitMountedVirtualThreadCount(bean, c -> c == target, "== " + target);
+                                          int target) throws InterruptedException {
+        awaitMountedVirtualThreadCount(bean, c -> c == target, "mountedVirtualThreadCount == " + target);
     }
 
     /**
@@ -291,12 +291,12 @@ class VirtualThreadSchedulerMXBeanTest {
     }
 
     /**
-     * Waits until evaluating the given predicte on the mounted thread count is true.
+     * Waits until evaluating the given predicte on the mounted virtual thread count is true.
      */
     void awaitMountedVirtualThreadCount(VirtualThreadSchedulerMXBean bean,
-                                        LongPredicate predicate,
+                                        IntPredicate predicate,
                                         String reason) throws InterruptedException {
-        long count = bean.getMountedVirtualThreadCount();
+        int count = bean.getMountedVirtualThreadCount();
         if (!predicate.test(count)) {
             System.err.format("mountedVirtualThreadCount = %d, await %s ...%n", count, reason);
             while (!predicate.test(count)) {
@@ -305,5 +305,31 @@ class VirtualThreadSchedulerMXBeanTest {
             }
             System.err.format("mountedVirtualThreadCount = %d%n", count);
         }
+    }
+
+    /**
+     * Waits until evaluating the given predicte on the queue virtual thread count is true.
+     */
+    void awaitQueuedVirtualThreadCount(VirtualThreadSchedulerMXBean bean,
+                                        LongPredicate predicate,
+                                        String reason) throws InterruptedException {
+        long count = bean.getQueuedVirtualThreadCount();
+        if (!predicate.test(count)) {
+            System.err.format("queuedVirtualThreadCount = %d, await %s ...%n", count, reason);
+            while (!predicate.test(count)) {
+                Thread.sleep(10);
+                count = bean.getQueuedVirtualThreadCount();
+            }
+            System.err.format("queuedVirtualThreadCount = %d%n", count);
+        }
+    }
+
+    /**
+     * Waits until there are no mounted virtual threads and no virtual threads queued to
+     * the scheduler.
+     */
+    void awaitQuiescence(VirtualThreadSchedulerMXBean bean) throws InterruptedException {
+        awaitQueuedVirtualThreadCount(bean, c -> c == 0, "queuedVirtualThreadCount == 0");
+        awaitMountedVirtualThreadCount(bean, c -> c == 0L, "mountedVirtualThreadCount == 0");
     }
 }
