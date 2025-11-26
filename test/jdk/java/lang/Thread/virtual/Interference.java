@@ -24,6 +24,7 @@
 /*
  * @test
  * @requires vm.continuations
+ * @requires test.thread.factory == null
  * @run main/othervm Interference
  */
 
