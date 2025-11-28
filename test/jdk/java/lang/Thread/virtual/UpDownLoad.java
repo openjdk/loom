@@ -23,9 +23,11 @@
 
 /*
  * @test
+ * @summary Test ForkJoinPool  signalling with a virtual thread workload that oscillates
+ *     between busy and idle
  * @requires vm.continuations
  * @requires test.thread.factory == null
- * @run main/othervm Interference
+ * @run main/othervm ${test.main.class}
  */
 
 import java.lang.management.ManagementFactory;
@@ -35,7 +37,7 @@ import java.util.function.IntPredicate;
 import java.util.stream.IntStream;
 import jdk.management.VirtualThreadSchedulerMXBean;
 
-public class Interference {
+public class UpDownLoad {
 
     private enum Mode { SLEEP, SPIN };
     private static volatile boolean done;

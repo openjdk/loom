@@ -664,7 +664,7 @@ class BlockingChannelOps {
     @ParameterizedTest
     @MethodSource("threadBuilders")
     void testDatagramSocketAdaptorReceiveAsyncClose2(Thread.Builder.OfVirtual builder) throws Exception {
-        testDatagramSocketAdaptorReceiveAsyncClose(builder, 60_1000);
+        testDatagramSocketAdaptorReceiveAsyncClose(builder, 60_000);
     }
 
     private void testDatagramSocketAdaptorReceiveAsyncClose(Thread.Builder.OfVirtual builder,
@@ -703,7 +703,7 @@ class BlockingChannelOps {
     @ParameterizedTest
     @MethodSource("threadBuilders")
     void testDatagramSocketAdaptorReceiveInterrupt2(Thread.Builder.OfVirtual builder) throws Exception {
-        testDatagramSocketAdaptorReceiveInterrupt(builder, 60_1000);
+        testDatagramSocketAdaptorReceiveInterrupt(builder, 60_000);
     }
 
     private void testDatagramSocketAdaptorReceiveInterrupt(Thread.Builder.OfVirtual builder,
