@@ -249,7 +249,9 @@ class BlockingSocketOps {
                 try {
                     int n = s.getInputStream().read();
                     fail("read " + n);
-                } catch (SocketException expected) { }
+                } catch (SocketException expected) {
+                    log(expected);
+                }
             }
         });
     }
@@ -275,19 +277,20 @@ class BlockingSocketOps {
             try (var connection = new Connection()) {
                 Socket s = connection.socket1();
 
-                // delayed shutdown of s
+                // delayed shutdown of input stream
+                InputStream in = s.getInputStream();
                 runAfterParkedAsync(s::shutdownInput);
 
-                // read from s should block, then throw
+                // read should throw or return -1
                 if (timeout > 0) {
                     s.setSoTimeout(timeout);
                 }
-
-                // -1 or SocketException
                 try {
-                    int n = s.getInputStream().read();
+                    int n = in.read();
                     assertEquals(-1, n);
-                } catch (SocketException e) { }
+                } catch (SocketException e) {
+                    log(e);
+                }
                 assertFalse(s.isClosed());
             }
         });
@@ -327,6 +330,7 @@ class BlockingSocketOps {
                     int n = s.getInputStream().read();
                     fail("read " + n);
                 } catch (SocketException expected) {
+                    log(expected);
                     assertTrue(Thread.interrupted());
                     assertTrue(s.isClosed());
                 }
@@ -353,7 +357,9 @@ class BlockingSocketOps {
                     for (;;) {
                         out.write(ba);
                     }
-                } catch (SocketException expected) { }
+                } catch (SocketException expected) {
+                    log(expected);
+                }
             }
         });
     }
@@ -367,17 +373,19 @@ class BlockingSocketOps {
             try (var connection = new Connection()) {
                 Socket s = connection.socket1();
 
-                // delayed shutdown of s
+                // delayed shutdown of output stream
+                OutputStream out = s.getOutputStream();
                 runAfterParkedAsync(s::shutdownOutput);
 
                 // write to s should block, then throw
                 try {
                     byte[] ba = new byte[100*1024];
-                    OutputStream out = s.getOutputStream();
                     for (;;) {
                         out.write(ba);
                     }
-                } catch (SocketException expected) { }
+                } catch (SocketException expected) {
+                    log(expected);
+                }
                 assertFalse(s.isClosed());
             }
         });
@@ -404,6 +412,7 @@ class BlockingSocketOps {
                         out.write(ba);
                     }
                 } catch (SocketException expected) {
+                    log(expected);
                     assertTrue(Thread.interrupted());
                     assertTrue(s.isClosed());
                 }
@@ -438,7 +447,9 @@ class BlockingSocketOps {
                 try {
                     s1.getInputStream().read(ba);
                     fail();
-                } catch (SocketTimeoutException expected) { }
+                } catch (SocketTimeoutException expected) {
+                    log(expected);
+                }
             }
         });
     }
@@ -534,7 +545,9 @@ class BlockingSocketOps {
                 try {
                     listener.accept().close();
                     fail("connection accepted???");
-                } catch (SocketException expected) { }
+                } catch (SocketException expected) {
+                    log(expected);
+                }
             }
         });
     }
@@ -573,6 +586,7 @@ class BlockingSocketOps {
                     listener.accept().close();
                     fail("connection accepted???");
                 } catch (SocketException expected) {
+                    log(expected);
                     assertTrue(Thread.interrupted());
                     assertTrue(listener.isClosed());
                 }
@@ -668,7 +682,9 @@ class BlockingSocketOps {
                 try {
                     s.receive(p);
                     fail();
-                } catch (SocketTimeoutException expected) { }
+                } catch (SocketTimeoutException expected) {
+                    log(expected);
+                }
             }
         });
     }
@@ -707,7 +723,9 @@ class BlockingSocketOps {
                     DatagramPacket p = new DatagramPacket(ba, ba.length);
                     s.receive(p);
                     fail();
-                } catch (SocketException expected) { }
+                } catch (SocketException expected) {
+                    log(expected);
+                }
             }
         });
     }
@@ -748,6 +766,7 @@ class BlockingSocketOps {
                     s.receive(p);
                     fail();
                 } catch (SocketException expected) {
+                    log(expected);
                     assertTrue(Thread.interrupted());
                     assertTrue(s.isClosed());
                 }
@@ -819,5 +838,12 @@ class BlockingSocketOps {
                 e.printStackTrace();
             }
         });
+    }
+
+    /**
+     * Log to System.err to inline with the JUnit messages.
+     */
+    static void log(Throwable e) {
+        System.err.println(e);
     }
 }
