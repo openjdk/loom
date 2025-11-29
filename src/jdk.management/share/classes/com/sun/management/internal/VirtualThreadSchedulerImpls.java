@@ -142,8 +142,8 @@ public class VirtualThreadSchedulerImpls {
     }
 
     /**
-     * Implementation of VirtualThreadSchedulerMXBean then a custom virtual thread is
-     * configured without a VirtualThreadSchedulerMXBean implementation.
+     * Implementation of VirtualThreadSchedulerMXBean then a custom virtual thread scheduler
+     * is configured without a VirtualThreadSchedulerMXBean implementation.
      */
     private static final class CustomVirtualThreadSchedulerImpl
             extends BaseVirtualThreadSchedulerImpl {
