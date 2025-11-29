@@ -13,7 +13,7 @@ The experimental support may change or be removed at any time.
 The JDK's built-in virtual thread scheduler is a `ForkJoinPool` instance that is
 configured in FIFO mode.
 
-The prototype allows the virtual thread scheduler to be set different scheduler by
+This prototype allows the virtual thread scheduler to be set to different scheduler by
 setting a system property on the command line:
 
 ```
@@ -38,6 +38,10 @@ a `java.lang.Thread.VirtualThreadScheduler` that is a reference to the built-in 
 scheduler (this allows the custom scheduler to delegate to the built-in default
 scheduler if required).
 
+If the custom scheduler provides a management interface then it will be registered
+with the platform `MBeanServer` if system property
+`-Djdk.virtualThreadSchedulerMXBean.implClass` is set to the fully qualified name of a
+class that implements `jdk.management.VirtualThreadSchedulerMXBean`.
 
 ## Prototype 2: Use API to select a custom scheduler when creating a virtual thread
 
@@ -63,6 +67,12 @@ Custom schedulers are _not closable_. They are managed by the garbage collector 
 a custom scheduler can be collected when all virtual thread assigned to the scheduler
 have terminated and the scheduler is otherwise unreachable. The lifecycle of carrier
 threads is managed by the scheduler.
+
+## Time Sharing
+
+Early prototype support for <em>forced preemption</em>, based on thread local handshakes,
+exists in a branch in the loom repo. The prototypes in the `fibers` branch for custom
+schedulers do not support forced preemption at this time.
 
 ## Poller modes
 
