@@ -24,27 +24,50 @@
  */
 package com.sun.management.internal;
 
+import java.lang.reflect.Constructor;
 import java.util.concurrent.ForkJoinPool;
 import javax.management.ObjectName;
 import jdk.management.VirtualThreadSchedulerMXBean;
+import jdk.internal.access.JavaLangAccess;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.vm.ContinuationSupport;
 import sun.management.Util;
 
 /**
- * Provides the implementation of the management interface for the JDK's default virtual
- * thread scheduler.
+ * Provides the implementation of the management interface for the JDK's virtual thread scheduler.
  */
 public class VirtualThreadSchedulerImpls {
     private VirtualThreadSchedulerImpls() {
     }
 
+    /**
+     * Creates the VirtualThreadSchedulerMXBean.
+     */
     public static VirtualThreadSchedulerMXBean create() {
-        if (ContinuationSupport.isSupported()) {
-            return new VirtualThreadSchedulerImpl();
-        } else {
+        // -XX:-VMContinuations
+        if (!ContinuationSupport.isSupported()) {
             return new BoundVirtualThreadSchedulerImpl();
         }
+
+        // built-in ForkJoinPool scheduler
+        if (System.getProperty("jdk.virtualThreadScheduler.implClass") == null) {
+            return new BuiltinVirtualThreadSchedulerImpl();
+        }
+
+        // custom scheduler with VirtualThreadSchedulerMXBean implementation
+        String cn = System.getProperty("jdk.virtualThreadSchedulerMXBean.implClass");
+        if (cn != null) {
+            try {
+                Class<?> clazz = Class.forName(cn, true, ClassLoader.getSystemClassLoader());
+                Constructor<?> ctor = clazz.getConstructor();
+                return (VirtualThreadSchedulerMXBean) ctor.newInstance();
+            } catch (Exception ex) {
+                throw new Error(ex);
+            }
+        }
+
+        // custom scheduler without VirtualThreadSchedulerMXBean implementation
+        return new CustomVirtualThreadSchedulerImpl();
     }
 
     /**
@@ -81,63 +104,73 @@ public class VirtualThreadSchedulerImpls {
 
     /**
      * Implementation of VirtualThreadSchedulerMXBean when virtual threads are
-     * implemented with continuations + scheduler.
+     * implemented with continuations and the built-in ForkJoinPool scheduler.
      */
-    private static final class VirtualThreadSchedulerImpl extends BaseVirtualThreadSchedulerImpl {
-        /**
-         * Holder class for scheduler.
-         */
-        private static class Scheduler {
-            private static final Thread.VirtualThreadScheduler SCHEDULER =
-                SharedSecrets.getJavaLangAccess().defaultVirtualThreadScheduler();
-            static Thread.VirtualThreadScheduler instance() {
-                return SCHEDULER;
-            }
+    private static final class BuiltinVirtualThreadSchedulerImpl
+            extends BaseVirtualThreadSchedulerImpl {
+        private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
+
+        private ForkJoinPool forkJoinPool() {
+            return (ForkJoinPool) JLA.builtinVirtualThreadScheduler();
         }
 
         @Override
         public int getParallelism() {
-            if (Scheduler.instance() instanceof ForkJoinPool pool) {
-                return pool.getParallelism();
-            }
-            return -1;  // unknown
+            return forkJoinPool().getParallelism();
         }
 
         @Override
         public void setParallelism(int size) {
-            if (Scheduler.instance() instanceof ForkJoinPool pool) {
-                pool.setParallelism(size);
-                if (pool.getPoolSize() < size) {
-                    // FJ worker thread creation is on-demand
-                    Thread.startVirtualThread(() -> { });
-                }
-                return;
-            }
+            forkJoinPool().setParallelism(size);
+        }
+
+        @Override
+        public int getPoolSize() {
+            return forkJoinPool().getPoolSize();
+        }
+
+        @Override
+        public int getMountedVirtualThreadCount() {
+            return forkJoinPool().getActiveThreadCount();
+        }
+
+        @Override
+        public long getQueuedVirtualThreadCount() {
+            ForkJoinPool p = forkJoinPool();
+            return p.getQueuedTaskCount() + p.getQueuedSubmissionCount();
+        }
+    }
+
+    /**
+     * Implementation of VirtualThreadSchedulerMXBean then a custom virtual thread is
+     * configured without a VirtualThreadSchedulerMXBean implementation.
+     */
+    private static final class CustomVirtualThreadSchedulerImpl
+            extends BaseVirtualThreadSchedulerImpl {
+
+        @Override
+        public int getParallelism() {
+            return 1;
+        }
+
+        @Override
+        public void setParallelism(int size) {
             throw new UnsupportedOperationException();
         }
 
         @Override
         public int getPoolSize() {
-            if (Scheduler.instance() instanceof ForkJoinPool pool) {
-                return pool.getPoolSize();
-            }
-            return -1;  // unknown
+            return -1;
         }
 
         @Override
         public int getMountedVirtualThreadCount() {
-            if (Scheduler.instance() instanceof ForkJoinPool pool) {
-                return pool.getActiveThreadCount();
-            }
-            return -1;  // unknown
+            return -1;
         }
 
         @Override
         public long getQueuedVirtualThreadCount() {
-            if (Scheduler.instance() instanceof ForkJoinPool pool) {
-                return pool.getQueuedTaskCount() + pool.getQueuedSubmissionCount();
-            }
-            return -1L;  // unknown
+            return -1L;
         }
     }
 

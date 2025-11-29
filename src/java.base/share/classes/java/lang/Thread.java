@@ -220,8 +220,8 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
  * or method in this class will cause a {@link NullPointerException} to be thrown.
  *
  * @implNote
- * In the JDK Reference Implementation, the built-in default virtual thread scheduler
- * may be configured with the following system properties:
+ * In the JDK Reference Implementation, the virtual thread scheduler may be configured
+ * with the following system properties:
  * <table class="striped">
  * <caption style="display:none">System properties</caption>
  *   <thead>
@@ -1632,7 +1632,6 @@ public class Thread implements Runnable {
 
     /**
      * Creates a virtual thread to execute a task and schedules it to execute.
-     * The thread is scheduled by the default virtual thread scheduler.
      *
      * <p> This method is equivalent to:
      * <pre>{@code Thread.ofVirtual().start(task); }</pre>
