@@ -24,7 +24,6 @@
  */
 package com.sun.management.internal;
 
-import java.lang.reflect.Constructor;
 import java.util.concurrent.ForkJoinPool;
 import javax.management.ObjectName;
 import jdk.management.VirtualThreadSchedulerMXBean;
@@ -37,6 +36,8 @@ import sun.management.Util;
  * Provides the implementation of the management interface for the JDK's virtual thread scheduler.
  */
 public class VirtualThreadSchedulerImpls {
+    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
+
     private VirtualThreadSchedulerImpls() {
     }
 
@@ -54,19 +55,12 @@ public class VirtualThreadSchedulerImpls {
             return new BuiltinVirtualThreadSchedulerImpl();
         }
 
-        // custom scheduler with VirtualThreadSchedulerMXBean implementation
-        String cn = System.getProperty("jdk.virtualThreadSchedulerMXBean.implClass");
-        if (cn != null) {
-            try {
-                Class<?> clazz = Class.forName(cn, true, ClassLoader.getSystemClassLoader());
-                Constructor<?> ctor = clazz.getConstructor();
-                return (VirtualThreadSchedulerMXBean) ctor.newInstance();
-            } catch (Exception ex) {
-                throw new Error(ex);
-            }
+        // custom scheduler implements VirtualThreadSchedulerMXBean
+        if (JLA.defaultVirtualThreadScheduler() instanceof VirtualThreadSchedulerMXBean bean) {
+            return bean;
         }
 
-        // custom scheduler without VirtualThreadSchedulerMXBean implementation
+        // custom scheduler does not implement VirtualThreadSchedulerMXBean
         return new CustomVirtualThreadSchedulerImpl();
     }
 
@@ -108,7 +102,6 @@ public class VirtualThreadSchedulerImpls {
      */
     private static final class BuiltinVirtualThreadSchedulerImpl
             extends BaseVirtualThreadSchedulerImpl {
-        private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
 
         private ForkJoinPool forkJoinPool() {
             return (ForkJoinPool) JLA.builtinVirtualThreadScheduler();

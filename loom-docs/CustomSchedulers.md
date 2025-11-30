@@ -38,10 +38,8 @@ a `java.lang.Thread.VirtualThreadScheduler` that is a reference to the built-in 
 scheduler (this allows the custom scheduler to delegate to the built-in default
 scheduler if required).
 
-If the custom scheduler provides a management interface then it will be registered
-with the platform `MBeanServer` if system property
-`-Djdk.virtualThreadSchedulerMXBean.implClass` is set to the fully qualified name of a
-class that implements `jdk.management.VirtualThreadSchedulerMXBean`.
+If the scheduler class implements `jdk.management.VirtualThreadSchedulerMXBean` then
+the management interface will be registered with the platform `MBeanServer`.
 
 ## Prototype 2: Use API to select a custom scheduler when creating a virtual thread
 
