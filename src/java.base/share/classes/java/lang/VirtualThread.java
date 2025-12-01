@@ -246,11 +246,13 @@ final class VirtualThread extends BaseVirtualThread {
      * Creates a new {@code VirtualThread} to run the given task with the given scheduler.
      *
      * @param scheduler the scheduler or null for default scheduler
+     * @param preferredCarrier the preferred carrier or null
      * @param name thread name
      * @param characteristics characteristics
      * @param task the task to execute
      */
     VirtualThread(VirtualThreadScheduler scheduler,
+                  Thread preferredCarrier,
                   String name,
                   int characteristics,
                   Runnable task,
@@ -270,7 +272,7 @@ final class VirtualThread extends BaseVirtualThread {
         if (scheduler == BUILTIN_SCHEDULER) {
             this.runContinuation = new BuiltinSchedulerTask(this);
         } else {
-            this.runContinuation = new CustomSchedulerTask(this, att);
+            this.runContinuation = new CustomSchedulerTask(this, preferredCarrier, att);
         }
     }
 
@@ -283,20 +285,24 @@ final class VirtualThread extends BaseVirtualThread {
             this.vthread = vthread;
         }
         @Override
-        public Object attach(Object att) {
-            throw new UnsupportedOperationException();
-        }
-        @Override
-        public Object attachment() {
-            throw new UnsupportedOperationException();
-        }
-        @Override
         public Thread thread() {
             return vthread;
         }
         @Override
         public void run() {
             vthread.runContinuation();;
+        }
+        @Override
+        public Thread preferredCarrier() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Object attach(Object att) {
+            throw new UnsupportedOperationException();
+        }
+        @Override
+        public Object attachment() {
+            throw new UnsupportedOperationException();
         }
     }
 
@@ -307,20 +313,14 @@ final class VirtualThread extends BaseVirtualThread {
         private static final VarHandle ATT =
                 MhUtil.findVarHandle(MethodHandles.lookup(), "att", Object.class);
         private final VirtualThread vthread;
+        private final Thread preferredCarrier;
         private volatile Object att;
-        CustomSchedulerTask(VirtualThread vthread, Object att) {
+        CustomSchedulerTask(VirtualThread vthread, Thread preferredCarrier, Object att) {
             this.vthread = vthread;
+            this.preferredCarrier = preferredCarrier;
             if (att != null) {
                 this.att = att;
             }
-        }
-        @Override
-        public Object attach(Object att) {
-            return ATT.getAndSet(this, att);
-        }
-        @Override
-        public Object attachment() {
-            return att;
         }
         @Override
         public Thread thread() {
@@ -329,6 +329,18 @@ final class VirtualThread extends BaseVirtualThread {
         @Override
         public void run() {
             vthread.runContinuation();;
+        }
+        @Override
+        public Thread preferredCarrier() {
+            return preferredCarrier;
+        }
+        @Override
+        public Object attach(Object att) {
+            return ATT.getAndSet(this, att);
+        }
+        @Override
+        public Object attachment() {
+            return att;
         }
     }
 

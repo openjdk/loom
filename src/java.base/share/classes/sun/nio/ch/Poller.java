@@ -717,7 +717,7 @@ public abstract class Poller {
             Thread carrier = JLA.currentCarrierThread();
             var scheduler = JLA.virtualThreadScheduler(Thread.currentThread());
             @SuppressWarnings("restricted")
-            var _ = Thread.ofVirtual()
+            var _ = JLA.virtualThreadBuilder(carrier)
                     .scheduler(scheduler)
                     .inheritInheritableThreadLocals(false)
                     .name(carrier.getName() + "-Read-Poller")

@@ -2338,6 +2338,10 @@ public final class System {
                 }
             }
 
+            public Thread.Builder.OfVirtual virtualThreadBuilder(Thread carrier) {
+                return new ThreadBuilders.VirtualThreadBuilder(carrier);
+            }
+
             public StackWalker newStackWalkerInstance(Set<StackWalker.Option> options,
                                                       ContinuationScope contScope,
                                                       Continuation continuation) {

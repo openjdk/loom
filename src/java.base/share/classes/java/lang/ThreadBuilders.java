@@ -210,9 +210,15 @@ class ThreadBuilders {
      */
     static final class VirtualThreadBuilder
             extends BaseThreadBuilder implements OfVirtual {
+        private final Thread preferredCarrier;
         private Thread.VirtualThreadScheduler scheduler;
 
+        VirtualThreadBuilder(Thread preferredCarrier) {
+            this.preferredCarrier = preferredCarrier;
+        }
+
         VirtualThreadBuilder() {
+            this(null);
         }
 
         @Override
@@ -242,7 +248,12 @@ class ThreadBuilders {
         @Override
         public Thread unstarted(Runnable task) {
             Objects.requireNonNull(task);
-            var thread = newVirtualThread(scheduler, nextThreadName(), characteristics(), task, null);
+            var thread = newVirtualThread(scheduler,
+                                          preferredCarrier,
+                                          nextThreadName(),
+                                          characteristics(),
+                                          task,
+                                          null);
             UncaughtExceptionHandler uhe = uncaughtExceptionHandler();
             if (uhe != null)
                 thread.uncaughtExceptionHandler(uhe);
@@ -394,7 +405,7 @@ class ThreadBuilders {
         public Thread newThread(Runnable task) {
             Objects.requireNonNull(task);
             String name = nextThreadName();
-            Thread thread = newVirtualThread(scheduler, name, characteristics(), task, null);
+            Thread thread = newVirtualThread(scheduler, null, name, characteristics(), task, null);
             UncaughtExceptionHandler uhe = uncaughtExceptionHandler();
             if (uhe != null)
                 thread.uncaughtExceptionHandler(uhe);
@@ -406,12 +417,13 @@ class ThreadBuilders {
      * Creates a new virtual thread to run the given task.
      */
     static Thread newVirtualThread(Thread.VirtualThreadScheduler scheduler,
+                                   Thread preferredCarrier,
                                    String name,
                                    int characteristics,
                                    Runnable task,
                                    Object att) {
         if (ContinuationSupport.isSupported()) {
-            return new VirtualThread(scheduler, name, characteristics, task, att);
+            return new VirtualThread(scheduler, preferredCarrier, name, characteristics, task, att);
         } else {
             if (scheduler != null)
                 throw new UnsupportedOperationException();

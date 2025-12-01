@@ -836,7 +836,8 @@ public class Thread implements Runnable {
      *
      * <p> There is a {@code VirtualThreadTask} object for each virtual thread. The
      * scheduler arranges to execute its {@link #run()} method when called to start or
-     * continue the virtual thread. A scheduler may attach an object to the task.
+     * continue the virtual thread, if possible on the {@linkplain #preferredCarrier()
+     * preferred carrier thread}. The scheduler may attach an object to the task.
      *
      * @since 99
      */
@@ -861,6 +862,14 @@ public class Thread implements Runnable {
          */
         @Override
         void run();
+
+        /**
+         * Returns the preferred carrier thread to execute this task. The scheduler may
+         * choose to ignore this preference.
+         * @return the preferred carrier thread or {@code null} if there is no preferred
+         * carrier thread
+         */
+        Thread preferredCarrier();
 
         /**
          * Attaches the given object to this task.
@@ -955,7 +964,7 @@ public class Thread implements Runnable {
          * @return a new unstarted Thread
          */
         static Thread newThread(Runnable runnable, Object att) {
-            return ThreadBuilders.newVirtualThread(null, null, 0, runnable, att);
+            return ThreadBuilders.newVirtualThread(null, null, null, 0, runnable, att);
         }
 
         // -- prototype 2 --
@@ -1643,7 +1652,7 @@ public class Thread implements Runnable {
      */
     public static Thread startVirtualThread(Runnable task) {
         Objects.requireNonNull(task);
-        var thread = ThreadBuilders.newVirtualThread(null, null, 0, task, null);
+        var thread = ThreadBuilders.newVirtualThread(null, null, null, 0, task, null);
         thread.start();
         return thread;
     }

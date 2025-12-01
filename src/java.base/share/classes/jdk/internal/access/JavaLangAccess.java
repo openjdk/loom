@@ -643,6 +643,11 @@ public interface JavaLangAccess {
     Thread.VirtualThreadScheduler virtualThreadScheduler(Thread thread);
 
     /**
+     * Returns a builder for creating a virtual thread that uses the preferred carrier.
+     */
+    Thread.Builder.OfVirtual virtualThreadBuilder(Thread carrier);
+
+    /**
      * Creates a new StackWalker
      */
     StackWalker newStackWalkerInstance(Set<StackWalker.Option> options,
