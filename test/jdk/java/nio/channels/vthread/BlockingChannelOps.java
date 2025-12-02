@@ -97,7 +97,16 @@ class BlockingChannelOps {
     static void setup() {
         ThreadFactory factory = Thread.ofPlatform().daemon().factory();
         threadPool = Executors.newCachedThreadPool(factory);
-        customScheduler = Thread.VirtualThreadScheduler.adapt(threadPool);
+        customScheduler = new Thread.VirtualThreadScheduler() {
+            @Override
+            public void onStart(Thread.VirtualThreadTask task) {
+                threadPool.execute(task);
+            }
+            @Override
+            public void onContinue(Thread.VirtualThreadTask task) {
+                threadPool.execute(task);
+            }
+        };
     }
 
     /**

@@ -210,15 +210,9 @@ class ThreadBuilders {
      */
     static final class VirtualThreadBuilder
             extends BaseThreadBuilder implements OfVirtual {
-        private final Thread preferredCarrier;
         private Thread.VirtualThreadScheduler scheduler;
 
-        VirtualThreadBuilder(Thread preferredCarrier) {
-            this.preferredCarrier = preferredCarrier;
-        }
-
         VirtualThreadBuilder() {
-            this(null);
         }
 
         @Override
@@ -249,7 +243,7 @@ class ThreadBuilders {
         public Thread unstarted(Runnable task) {
             Objects.requireNonNull(task);
             var thread = newVirtualThread(scheduler,
-                                          preferredCarrier,
+                                          null,
                                           nextThreadName(),
                                           characteristics(),
                                           task,
@@ -271,6 +265,24 @@ class ThreadBuilders {
         public ThreadFactory factory() {
             return new VirtualThreadFactory(scheduler, name(), counter(), characteristics(),
                     uncaughtExceptionHandler());
+        }
+
+        @CallerSensitive
+        @Override
+        public Thread unstarted(Runnable task, Thread preferredCarrier, Object att) {
+            Objects.requireNonNull(task);
+            Class<?> caller = Reflection.getCallerClass();
+            caller.getModule().ensureNativeAccess(OfVirtual.class, "unstarted", caller, false);
+            var thread = newVirtualThread(scheduler,
+                                          preferredCarrier,
+                                          nextThreadName(),
+                                          characteristics(),
+                                          task,
+                                          att);
+            UncaughtExceptionHandler uhe = uncaughtExceptionHandler();
+            if (uhe != null)
+                thread.uncaughtExceptionHandler(uhe);
+            return thread;
         }
 
         @CallerSensitive
@@ -416,12 +428,12 @@ class ThreadBuilders {
     /**
      * Creates a new virtual thread to run the given task.
      */
-    static Thread newVirtualThread(Thread.VirtualThreadScheduler scheduler,
-                                   Thread preferredCarrier,
-                                   String name,
-                                   int characteristics,
-                                   Runnable task,
-                                   Object att) {
+    private static Thread newVirtualThread(Thread.VirtualThreadScheduler scheduler,
+                                           Thread preferredCarrier,
+                                           String name,
+                                           int characteristics,
+                                           Runnable task,
+                                           Object att) {
         if (ContinuationSupport.isSupported()) {
             return new VirtualThread(scheduler, preferredCarrier, name, characteristics, task, att);
         } else {
@@ -429,6 +441,10 @@ class ThreadBuilders {
                 throw new UnsupportedOperationException();
             return new BoundVirtualThread(name, characteristics, task);
         }
+    }
+
+    static Thread newVirtualThread(String name, int characteristics, Runnable task) {
+       return newVirtualThread(null, null, name, characteristics, task, null);
     }
 
     /**

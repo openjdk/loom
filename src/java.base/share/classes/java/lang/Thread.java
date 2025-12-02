@@ -31,7 +31,6 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Objects;
-import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.StructureViolationException;
@@ -52,7 +51,6 @@ import jdk.internal.vm.annotation.Hidden;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
 import jdk.internal.vm.annotation.Stable;
 import sun.nio.ch.Interruptible;
-
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
@@ -954,38 +952,7 @@ public class Thread implements Runnable {
          */
         void onContinue(VirtualThreadTask task);
 
-        /**
-         * Creates a new unstarted virtual {@code Thread} to run the given runnable.
-         * The thread will be scheduled by the default virtual thread scheduler.
-         * The {@code att} parameter is the object to attach to the {@link VirtualThreadTask}
-         * for the thread.
-         * @param runnable the object to run when the thread executes
-         * @param att the object to attach, can be {@code null}
-         * @return a new unstarted Thread
-         */
-        static Thread newThread(Runnable runnable, Object att) {
-            return ThreadBuilders.newVirtualThread(null, null, null, 0, runnable, att);
-        }
-
         // -- prototype 2 --
-
-        /**
-         * {@return a virtual thread scheduler that delegates tasks to the given executor}
-         * @param executor the executor
-         */
-        static VirtualThreadScheduler adapt(Executor executor) {
-            Objects.requireNonNull(executor);
-            return new VirtualThreadScheduler() {
-                @Override
-                public void onStart(VirtualThreadTask task) {
-                    executor.execute(task);
-                }
-                @Override
-                public void onContinue(VirtualThreadTask task) {
-                    executor.execute(task);
-                }
-            };
-        }
 
         /**
          * {@return the virtual thread scheduler for the current virtual thread}
@@ -1264,6 +1231,29 @@ public class Thread implements Runnable {
             @Override OfVirtual inheritInheritableThreadLocals(boolean inherit);
             @Override OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
 
+            // -- prototype 1 --
+
+            /**
+             * Creates a new virtual {@code Thread} from the current state of the builder
+             * to run the given task. The {@code Thread}'s {@link Thread#start() start}
+             * method must be invoked to schedule the thread to execute.
+             * The {@code preferredCarrier} parameter is the preferred carrier thread to
+             * execute the {@linkplain  VirtualThreadTask task} for the virtual thread.
+             * The scheduler may choose to ignore this preference. The {@code att} is the
+             * object to attach to the task.
+             *
+             * @param task the object to run when the thread executes
+             * @param preferredCarrier the preferred carrier thread, can be {@code null}
+             * @param att the object to attach, can be {@code null}
+             * @return a new unstarted Thread
+             * @since 99
+             *
+             * @see <a href="Thread.html#inheritance">Inheritance when creating threads</a>
+             */
+            @CallerSensitive
+            @Restricted
+            Thread unstarted(Runnable task, Thread preferredCarrier, Object att);
+
             // -- prototype 2 --
 
             /**
@@ -1285,7 +1275,6 @@ public class Thread implements Runnable {
              * @return this builder
              * @throws UnsupportedOperationException if scheduling virtual threads to a
              *         user-provided scheduler is not supported by this VM
-             *
              * @since 99
              */
             @CallerSensitive
@@ -1652,7 +1641,7 @@ public class Thread implements Runnable {
      */
     public static Thread startVirtualThread(Runnable task) {
         Objects.requireNonNull(task);
-        var thread = ThreadBuilders.newVirtualThread(null, null, null, 0, task, null);
+        var thread = ThreadBuilders.newVirtualThread(null, 0, task);
         thread.start();
         return thread;
     }
