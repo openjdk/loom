@@ -717,12 +717,13 @@ public abstract class Poller {
             Thread carrier = JLA.currentCarrierThread();
             var scheduler = JLA.virtualThreadScheduler(Thread.currentThread());
             @SuppressWarnings("restricted")
-            var _ = JLA.virtualThreadBuilder(carrier)
+            Thread thread = Thread.ofVirtual()
                     .scheduler(scheduler)
                     .inheritInheritableThreadLocals(false)
                     .name(carrier.getName() + "-Read-Poller")
                     .uncaughtExceptionHandler((_, e) -> e.printStackTrace())
-                    .start(() -> subPollerLoop(readPoller));
+                    .unstarted(() -> subPollerLoop(readPoller), carrier, null);
+            thread.start();
             return readPoller;
         }
 

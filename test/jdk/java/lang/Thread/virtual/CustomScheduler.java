@@ -64,8 +64,8 @@ class CustomScheduler {
 
         threadPool1 = Executors.newFixedThreadPool(1);
         threadPool2 = Executors.newFixedThreadPool(1);
-        scheduler1 = Thread.VirtualThreadScheduler.adapt(threadPool1);
-        scheduler2 = Thread.VirtualThreadScheduler.adapt(threadPool2);
+        scheduler1 = adapt(threadPool1);
+        scheduler2 = adapt(threadPool2);
     }
 
     @AfterAll
@@ -157,7 +157,7 @@ class CustomScheduler {
             }
             assertTrue(exc.get() instanceof WrongThreadException);
         };
-        var scheduler = Thread.VirtualThreadScheduler.adapt(executor);
+        var scheduler = adapt(executor);
         Thread.ofVirtual().scheduler(scheduler).start(LockSupport::park);
     }
 
@@ -170,7 +170,7 @@ class CustomScheduler {
         Thread carrier = Thread.currentThread();
         assumeFalse(carrier.isVirtual(), "Main thread is a virtual thread");
         try {
-            var scheduler = Thread.VirtualThreadScheduler.adapt(Runnable::run);
+            var scheduler = adapt(Runnable::run);
             Thread vthread = Thread.ofVirtual().scheduler(scheduler).start(() -> {
                 Thread.currentThread().interrupt();
                 Thread.yield();
@@ -191,7 +191,7 @@ class CustomScheduler {
         Thread carrier = Thread.currentThread();
         assumeFalse(carrier.isVirtual(), "Main thread is a virtual thread");
         try {
-            var scheduler = Thread.VirtualThreadScheduler.adapt(Runnable::run);
+            var scheduler = adapt(Runnable::run);
             Thread vthread = Thread.ofVirtual().scheduler(scheduler).start(() -> {
                 Thread.currentThread().interrupt();
             });
@@ -208,7 +208,7 @@ class CustomScheduler {
     @Test
     void testRunWithInterruptSet() throws Exception {
         assumeFalse(Thread.currentThread().isVirtual(), "Main thread is a virtual thread");
-        var scheduler = Thread.VirtualThreadScheduler.adapt(task -> {
+        var scheduler = adapt(task -> {
             Thread.currentThread().interrupt();
             task.run();
         });
@@ -228,7 +228,7 @@ class CustomScheduler {
      */
     @Test
     void testThreadStartOOME() throws Exception {
-        var scheduler = Thread.VirtualThreadScheduler.adapt(task -> {
+        var scheduler = adapt(task -> {
             System.err.println("OutOfMemoryError");
             throw new OutOfMemoryError();
         });
@@ -243,7 +243,7 @@ class CustomScheduler {
     void testThreadUnparkOOME() throws Exception {
         try (ExecutorService executor = Executors.newFixedThreadPool(1)) {
             AtomicInteger counter = new AtomicInteger();
-            var scheduler = Thread.VirtualThreadScheduler.adapt(task -> {
+            var scheduler = adapt(task -> {
                 switch (counter.getAndIncrement()) {
                     case 0 -> executor.execute(task);             // Thread.start
                     case 1, 2 -> {                                // unpark attempt 1+2
@@ -263,13 +263,25 @@ class CustomScheduler {
             LockSupport.unpark(thread);
             thread.join();
         }
+    }
 
+    private static Thread.VirtualThreadScheduler adapt(Executor executor) {
+        return new Thread.VirtualThreadScheduler() {
+            @Override
+            public void onStart(Thread.VirtualThreadTask task) {
+                executor.execute(task);
+            }
+            @Override
+            public void onContinue(Thread.VirtualThreadTask task) {
+                executor.execute(task);
+            }
+        };
     }
 
     /**
      * Waits for the given thread to reach a given state.
      */
-    private void await(Thread thread, Thread.State expectedState) throws InterruptedException {
+    private static void await(Thread thread, Thread.State expectedState) throws InterruptedException {
         Thread.State state = thread.getState();
         while (state != expectedState) {
             assertTrue(state != Thread.State.TERMINATED, "Thread has terminated");
