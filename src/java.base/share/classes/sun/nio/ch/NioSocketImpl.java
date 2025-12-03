@@ -289,6 +289,7 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
      */
     private int implRead(byte[] b, int off, int len, long remainingNanos) throws IOException {
         int n = 0;
+        SocketException ex = null;
         FileDescriptor fd = beginRead();
         try {
             if (connectionReset)
@@ -314,18 +315,24 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
                     n = tryRead(fd, b, off, len);
                 }
             }
-            return n;
         } catch (InterruptedIOException e) {
             throw e;
         } catch (ConnectionResetException e) {
             connectionReset = true;
             throw new SocketException("Connection reset");
         } catch (IOException ioe) {
-            // throw SocketException to maintain compatibility
-            throw asSocketException(ioe);
+            // translate to SocketException to maintain compatibility
+            ex = asSocketException(ioe);
         } finally {
             endRead(n > 0);
         }
+        if (n <= 0 && isInputClosed) {
+            return -1;
+        }
+        if (ex != null) {
+            throw ex;
+        }
+        return n;
     }
 
     /**
@@ -418,6 +425,7 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
      */
     private int implWrite(byte[] b, int off, int len) throws IOException {
         int n = 0;
+        SocketException ex = null;
         FileDescriptor fd = beginWrite();
         try {
 
@@ -433,15 +441,18 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
                 park(fd, Net.POLLOUT);
                 n = tryWrite(fd, b, off, len);
             }
-            return n;
         } catch (InterruptedIOException e) {
             throw e;
         } catch (IOException ioe) {
-            // throw SocketException to maintain compatibility
-            throw asSocketException(ioe);
+            // translate to SocketException to maintain compatibility
+            ex = asSocketException(ioe);
         } finally {
             endWrite(n > 0);
         }
+        if (ex != null) {
+            throw ex;
+        }
+        return n;
     }
 
     /**
