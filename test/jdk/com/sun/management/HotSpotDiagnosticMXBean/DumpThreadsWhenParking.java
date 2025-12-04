@@ -41,6 +41,16 @@
  * @run main/othervm/timeout=200 DumpThreadsWhenParking 100 4 100
  */
 
+/*
+ * @test id=concurrent_gcstress
+ * @summary HotSpotDiagnosticMXBean.dumpThreads from concurrent threads while virtual threads
+ *    are parking and unparking
+ * @requires vm.debug == true & vm.continuations
+ * @modules jdk.management
+ * @library /test/lib
+ * @run main/othervm/timeout=200 -XX:+UnlockDiagnosticVMOptions -XX:+FullGCALot -XX:FullGCALotInterval=10000 DumpThreadsWhenParking 100 4 100
+ */
+
 import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;

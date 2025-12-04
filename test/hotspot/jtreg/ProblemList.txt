@@ -80,10 +80,6 @@ compiler/c2/irTests/TestFloat16ScalarOperations.java 8367028 linux-aarch64
 
 serviceability/jvmti/NMethodRelocation/NMethodRelocationTest.java 8369150 generic-all
 
-compiler/arguments/TestCodeEntryAlignment.java 8372703 generic-x64
-
-serviceability/sa/TestJhsdbJstackMixedWithXComp.java 8371194 generic-all
-
 #############################################################################
 
 # :hotspot_gc
@@ -100,6 +96,7 @@ gc/shenandoah/TestEvilSyncBug.java#generational 8345501 generic-all
 gc/shenandoah/TestRetainObjects.java#no-tlab 8361099 generic-all
 gc/shenandoah/TestSieveObjects.java#no-tlab 8361099 generic-all
 gc/shenandoah/TestSieveObjects.java#no-tlab-genshen 8361099 generic-all
+gc/cslocker/TestCSLocker.java 8373025 generic-all
 
 #############################################################################
 
@@ -145,13 +142,8 @@ serviceability/sa/ClhsdbPstack.java#core          8318754 macosx-aarch64
 serviceability/sa/TestJmapCore.java               8318754 macosx-aarch64
 serviceability/sa/TestJmapCoreMetaspace.java      8318754 macosx-aarch64
 
-serviceability/sa/ClhsdbFindPC.java#xcomp-core 8284045 macosx-aarch64
-serviceability/sa/ClhsdbCDSCore.java 8284045 macosx-aarch64
-serviceability/sa/TestJmapCore.java 8284045 macosx-aarch64
-
-# "waiting on ..." missing from stdout/stderr
-serviceability/sa/TestClhsdbJstackLock.java 0000000 generic-all
-serviceability/sa/TestJhsdbJstackLock.java 0000000 generic-all
+serviceability/sa/ClhsdbScanOops.java#parallel    8373022 generic-all
+serviceability/sa/ClhsdbScanOops.java#serial      8373022 generic-all
 
 serviceability/sa/ClhsdbThreadContext.java        8356704 windows-x64
 
@@ -197,3 +189,9 @@ vmTestbase/nsk/jdwp/ThreadReference/ForceEarlyReturn/forceEarlyReturn001/forceEa
 vmTestbase/nsk/monitoring/ThreadMXBean/ThreadInfo/Multi/Multi005/TestDescription.java 8076494 windows-x64
 
 vmTestbase/nsk/monitoring/ThreadMXBean/findMonitorDeadlockedThreads/find006/TestDescription.java 8310144 macosx-aarch64
+
+vmTestbase/nsk/monitoring/MemoryPoolMBean/isUsageThresholdExceeded/isexceeded001/TestDescription.java 8373022 generic-all
+vmTestbase/nsk/monitoring/MemoryPoolMBean/isUsageThresholdExceeded/isexceeded002/TestDescription.java 8373022 generic-all
+vmTestbase/nsk/monitoring/MemoryPoolMBean/isUsageThresholdExceeded/isexceeded003/TestDescription.java 8373022 generic-all
+vmTestbase/nsk/monitoring/MemoryPoolMBean/isUsageThresholdExceeded/isexceeded004/TestDescription.java 8373022 generic-all
+vmTestbase/nsk/monitoring/MemoryPoolMBean/isUsageThresholdExceeded/isexceeded005/TestDescription.java 8373022 generic-all
