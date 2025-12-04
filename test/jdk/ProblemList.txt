@@ -511,6 +511,8 @@ java/awt/FullScreen/SetFullScreenTest.java 8332155 linux-x64
 sun/java2d/ClassCastExceptionForInvalidSurface.java 8354097 linux-x64
 sun/java2d/GdiRendering/ClipShapeRendering.java 8354097 linux-x64
 
+sun/awt/image/bug8038000.java 8373065 generic-all
+
 ############################################################################
 
 # jdk_beans
@@ -634,6 +636,8 @@ sun/security/smartcardio/TestPresent.java                       8039280 generic-
 sun/security/smartcardio/TestTransmit.java                      8039280 generic-all
 
 sun/security/pkcs11/sslecc/ClientJSSEServerJSSE.java            8316183 linux-ppc64le
+
+sun/security/provider/acvp/ML_DSA_Intrinsic_Test.java#1         8373059 linux-aarch64,macosx-aarch64
 
 ############################################################################
 
