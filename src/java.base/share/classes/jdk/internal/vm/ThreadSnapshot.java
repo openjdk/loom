@@ -30,7 +30,7 @@ import java.util.stream.Stream;
 /**
  * Represents a snapshot of information about a Thread.
  */
-class ThreadSnapshot {
+public class ThreadSnapshot {
     private static final StackTraceElement[] EMPTY_STACK = new StackTraceElement[0];
     private static final ThreadLock[] EMPTY_LOCKS = new ThreadLock[0];
 
@@ -54,14 +54,12 @@ class ThreadSnapshot {
 
     /**
      * Take a snapshot of a Thread to get all information about the thread.
-     * Return null if a ThreadSnapshot is not created, for example if the
-     * thread has terminated.
-     * @throws UnsupportedOperationException if not supported by VM
+     * Return null if the thread is not alive.
      */
-    static ThreadSnapshot of(Thread thread) {
+    public static ThreadSnapshot of(Thread thread) {
         ThreadSnapshot snapshot = create(thread);
         if (snapshot == null) {
-            return null; // thread terminated
+            return null; // thread not alive
         }
         if (snapshot.stackTrace == null) {
             snapshot.stackTrace = EMPTY_STACK;
@@ -98,7 +96,7 @@ class ThreadSnapshot {
     /**
      * Returns the thread stack trace.
      */
-    StackTraceElement[] stackTrace() {
+    public StackTraceElement[] stackTrace() {
         return stackTrace;
     }
 

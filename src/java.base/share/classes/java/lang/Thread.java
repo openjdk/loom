@@ -46,6 +46,7 @@ import jdk.internal.vm.Continuation;
 import jdk.internal.vm.ScopedValueContainer;
 import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.ThreadContainer;
+import jdk.internal.vm.ThreadSnapshot;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.Hidden;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
@@ -2424,40 +2425,18 @@ public class Thread implements Runnable {
      * @since 1.5
      */
     public StackTraceElement[] getStackTrace() {
-        if (this != Thread.currentThread()) {
+        if (Thread.currentThread() != this) {
             // optimization so we do not call into the vm for threads that
             // have not yet started or have terminated
             if (!isAlive()) {
-                return EMPTY_STACK_TRACE;
+                //return EMPTY_STACK_TRACE;
             }
-            StackTraceElement[] stackTrace = asyncGetStackTrace();
-            return (stackTrace != null) ? stackTrace : EMPTY_STACK_TRACE;
+            ThreadSnapshot snapshot = ThreadSnapshot.of(this);
+            return (snapshot != null) ? snapshot.stackTrace() : EMPTY_STACK_TRACE;
         } else {
             return (new Exception()).getStackTrace();
         }
     }
-
-    /**
-     * Returns an array of stack trace elements representing the stack dump of
-     * this thread. Returns null if the stack trace cannot be obtained. In
-     * the default implementation, null is returned if the thread is a virtual
-     * thread that is not mounted or the thread is a platform thread that has
-     * terminated.
-     */
-    StackTraceElement[] asyncGetStackTrace() {
-        Object stackTrace = getStackTrace0();
-        if (stackTrace == null) {
-            return null;
-        }
-        StackTraceElement[] stes = (StackTraceElement[]) stackTrace;
-        if (stes.length == 0) {
-            return null;
-        } else {
-            return StackTraceElement.of(stes);
-        }
-    }
-
-    private native Object getStackTrace0();
 
     /**
      * Returns a map of stack traces for all live platform threads. The map

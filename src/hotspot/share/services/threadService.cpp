@@ -1122,7 +1122,6 @@ ThreadsListEnumerator::ThreadsListEnumerator(Thread* cur_thread,
 
 
 // jdk.internal.vm.ThreadSnapshot support
-#if INCLUDE_JVMTI
 
 class GetThreadSnapshotHandshakeClosure: public HandshakeClosure {
 private:
@@ -1476,6 +1475,11 @@ oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, TRAPS) {
     Handshake::execute(&cl, &tlh, java_thread);
   }
 
+  // thread not alive
+  if (cl._thread_status == JavaThreadStatus::NEW || cl._thread_status == JavaThreadStatus::TERMINATED) {
+     return nullptr;
+  }
+
   // StackTrace
   InstanceKlass* ste_klass = vmClasses::StackTraceElement_klass();
   assert(ste_klass != nullptr, "must be loaded");
@@ -1534,5 +1538,3 @@ oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, TRAPS) {
   }
   return snapshot();
 }
-
-#endif // INCLUDE_JVMTI

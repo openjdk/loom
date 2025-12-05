@@ -71,7 +71,6 @@
 #include "runtime/fieldDescriptor.inline.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/handles.inline.hpp"
-#include "runtime/handshake.hpp"
 #include "runtime/init.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/java.hpp"
@@ -1902,127 +1901,6 @@ ByteSize java_lang_Thread::thread_id_offset() {
 
 oop java_lang_Thread::park_blocker(oop java_thread) {
   return java_thread->obj_field_access<MO_RELAXED>(_park_blocker_offset);
-}
-
-// Obtain stack trace for platform or mounted virtual thread.
-// If jthread is a virtual thread and it has been unmounted (or remounted to different carrier) the method returns null.
-// The caller (java.lang.VirtualThread) handles returned nulls via retry.
-oop java_lang_Thread::async_get_stack_trace(jobject jthread, TRAPS) {
-  ThreadsListHandle tlh(THREAD);
-  JavaThread* java_thread = nullptr;
-  oop thread_oop;
-
-  bool has_java_thread = tlh.cv_internal_thread_to_JavaThread(jthread, &java_thread, &thread_oop);
-  if (!has_java_thread) {
-    return nullptr;
-  }
-
-  class GetStackTraceHandshakeClosure : public HandshakeClosure {
-  public:
-    const Handle _thread_h;
-    int _depth;
-    bool _retry_handshake;
-    GrowableArray<Method*>* _methods;
-    GrowableArray<int>*     _bcis;
-
-    GetStackTraceHandshakeClosure(Handle thread_h) :
-        HandshakeClosure("GetStackTraceHandshakeClosure"), _thread_h(thread_h), _depth(0), _retry_handshake(false),
-        _methods(nullptr), _bcis(nullptr) {
-    }
-    ~GetStackTraceHandshakeClosure() {
-      delete _methods;
-      delete _bcis;
-    }
-
-    bool read_reset_retry() {
-      bool ret = _retry_handshake;
-      // If we re-execute the handshake this method need to return false
-      // when the handshake cannot be performed. (E.g. thread terminating)
-      _retry_handshake = false;
-      return ret;
-    }
-
-    void do_thread(Thread* th) {
-      if (!Thread::current()->is_Java_thread()) {
-        _retry_handshake = true;
-        return;
-      }
-
-      JavaThread* java_thread = JavaThread::cast(th);
-
-      if (!java_thread->has_last_Java_frame()) {
-        return;
-      }
-
-      bool carrier = false;
-      if (java_lang_VirtualThread::is_instance(_thread_h())) {
-        // Ensure _thread_h is still mounted to java_thread.
-        const ContinuationEntry* ce = java_thread->vthread_continuation();
-        if (ce == nullptr || ce->cont_oop(java_thread) != java_lang_VirtualThread::continuation(_thread_h())) {
-          // Target thread has been unmounted.
-          return;
-        }
-      } else {
-        carrier = (java_thread->vthread_continuation() != nullptr);
-      }
-
-      const int max_depth = MaxJavaStackTraceDepth;
-      const bool skip_hidden = !ShowHiddenFrames;
-
-      // Pick minimum length that will cover most cases
-      int init_length = 64;
-      _methods = new (mtInternal) GrowableArray<Method*>(init_length, mtInternal);
-      _bcis = new (mtInternal) GrowableArray<int>(init_length, mtInternal);
-
-      int total_count = 0;
-      for (vframeStream vfst(java_thread, false, false, carrier); // we don't process frames as we don't care about oops
-           !vfst.at_end() && (max_depth == 0 || max_depth != total_count);
-           vfst.next()) {
-
-        if (skip_hidden && (vfst.method()->is_hidden() ||
-                            vfst.method()->is_continuation_enter_intrinsic())) {
-          continue;
-        }
-
-        _methods->push(vfst.method());
-        _bcis->push(vfst.bci());
-        total_count++;
-      }
-
-      _depth = total_count;
-    }
-  };
-
-  // Handshake with target
-  ResourceMark rm(THREAD);
-  HandleMark   hm(THREAD);
-  GetStackTraceHandshakeClosure gsthc(Handle(THREAD, thread_oop));
-  do {
-   Handshake::execute(&gsthc, &tlh, java_thread);
-  } while (gsthc.read_reset_retry());
-
-  // Stop if no stack trace is found.
-  if (gsthc._depth == 0) {
-    return nullptr;
-  }
-
-  // Convert to StackTraceElement array
-  InstanceKlass* k = vmClasses::StackTraceElement_klass();
-  assert(k != nullptr, "must be loaded in 1.4+");
-  if (k->should_be_initialized()) {
-    k->initialize(CHECK_NULL);
-  }
-  objArrayHandle trace = oopFactory::new_objArray_handle(k, gsthc._depth, CHECK_NULL);
-
-  for (int i = 0; i < gsthc._depth; i++) {
-    methodHandle method(THREAD, gsthc._methods->at(i));
-    oop element = java_lang_StackTraceElement::create(method,
-                                                      gsthc._bcis->at(i),
-                                                      CHECK_NULL);
-    trace->obj_at_put(i, element);
-  }
-
-  return trace();
 }
 
 const char* java_lang_Thread::thread_status_name(oop java_thread) {
