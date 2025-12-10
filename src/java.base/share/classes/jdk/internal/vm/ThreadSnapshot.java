@@ -26,11 +26,14 @@ package jdk.internal.vm;
 
 import java.util.Arrays;
 import java.util.stream.Stream;
+import jdk.internal.access.JavaLangAccess;
+import jdk.internal.access.SharedSecrets;
 
 /**
  * Represents a snapshot of information about a Thread.
  */
 public class ThreadSnapshot {
+    private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
     private static final StackTraceElement[] EMPTY_STACK = new StackTraceElement[0];
     private static final ThreadLock[] EMPTY_LOCKS = new ThreadLock[0];
 
@@ -54,15 +57,19 @@ public class ThreadSnapshot {
 
     /**
      * Take a snapshot of a Thread to get all information about the thread.
-     * Return null if the thread is not alive.
+     * @param thread the thread
+     * @param includeMonitors true to include the blocked on and owned object monitors
+     * @return the snapshot or {@code null} if the thread is not alive
      */
-    public static ThreadSnapshot of(Thread thread) {
-        ThreadSnapshot snapshot = create(thread);
+    public static ThreadSnapshot of(Thread thread, boolean includeMonitors) {
+        ThreadSnapshot snapshot = create(thread, includeMonitors);
         if (snapshot == null) {
             return null; // thread not alive
         }
         if (snapshot.stackTrace == null) {
             snapshot.stackTrace = EMPTY_STACK;
+        } else {
+            JLA.finishInit(snapshot.stackTrace);
         }
         if (snapshot.locks != null) {
             Arrays.stream(snapshot.locks).forEach(ThreadLock::finishInit);
@@ -229,5 +236,5 @@ public class ThreadSnapshot {
         }
     }
 
-    private static native ThreadSnapshot create(Thread thread);
+    private static native ThreadSnapshot create(Thread thread, boolean includeMonitors);
 }

@@ -663,4 +663,9 @@ public interface JavaLangAccess {
      * Are the string bytes compatible with the given charset?
      */
     boolean bytesCompatible(String string, Charset charset);
+
+    /**
+     * Finish initialization of the StackTraceElement objects in a stack trace.
+     */
+    void finishInit(StackTraceElement[] stackTrace);
 }

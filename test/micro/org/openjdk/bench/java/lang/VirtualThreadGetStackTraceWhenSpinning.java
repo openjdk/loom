@@ -24,7 +24,6 @@ package org.openjdk.bench.java.lang;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.LockSupport;
 import org.openjdk.jmh.annotations.*;
 
 @BenchmarkMode(Mode.AverageTime)
@@ -33,17 +32,17 @@ import org.openjdk.jmh.annotations.*;
 @Warmup(iterations = 5, time = 1)
 @Measurement(iterations = 5, time = 1)
 @Fork(value = 3)
-public class ThreadGetStackTraceWhenParked {
+public class VirtualThreadGetStackTraceWhenSpinning {
     private volatile boolean done;
     private Thread thread;
 
     @Setup
     public void setup() throws InterruptedException {
         var started = new CountDownLatch(1);
-        thread = Thread.ofPlatform().start(() -> {
+        thread = Thread.startVirtualThread(() -> {
             started.countDown();
             while (!done) {
-                LockSupport.park();
+                Thread.onSpinWait();
             }
         });
         started.await();
@@ -52,7 +51,6 @@ public class ThreadGetStackTraceWhenParked {
     @TearDown
     public void shutdown() throws InterruptedException {
         done = true;
-        LockSupport.unpark(thread);
         thread.join();
     }
 
