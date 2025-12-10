@@ -299,7 +299,7 @@ JNIEXPORT jboolean JNICALL
 JVM_HoldsLock(JNIEnv *env, jclass threadClass, jobject obj);
 
 JNIEXPORT jobject JNICALL
-JVM_CreateThreadSnapshot(JNIEnv* env, jobject thread);
+JVM_CreateThreadSnapshot(JNIEnv* env, jobject thread, jboolean includeMonitors);
 
 JNIEXPORT jobjectArray JNICALL
 JVM_GetAllThreads(JNIEnv *env, jclass dummy);

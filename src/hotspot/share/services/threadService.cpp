@@ -44,7 +44,6 @@
 #include "runtime/atomicAccess.hpp"
 #include "runtime/handles.inline.hpp"
 #include "runtime/init.hpp"
-#include "runtime/javaCalls.hpp"
 #include "runtime/javaThread.inline.hpp"
 #include "runtime/jniHandles.inline.hpp"
 #include "runtime/objectMonitor.inline.hpp"
@@ -1172,6 +1171,7 @@ public:
   };
 
   Handle _thread_h;
+  jboolean _include_monitors;
   JavaThread* _java_thread;
   int _frame_count; // length of _methods and _bcis arrays
   GrowableArray<Method*>* _methods;
@@ -1182,9 +1182,9 @@ public:
   GrowableArray<OwnedLock>* _locks;
   Blocker _blocker;
 
-  GetThreadSnapshotHandshakeClosure(Handle thread_h):
+  GetThreadSnapshotHandshakeClosure(Handle thread_h, jboolean include_monitors):
     HandshakeClosure("GetThreadSnapshotHandshakeClosure"),
-    _thread_h(thread_h), _java_thread(nullptr),
+    _thread_h(thread_h), _include_monitors(include_monitors), _java_thread(nullptr),
     _frame_count(0), _methods(nullptr), _bcis(nullptr),
     _thread_status(), _thread_name(nullptr),
     _locks(nullptr), _blocker() {
@@ -1326,15 +1326,18 @@ public:
     _locks = new (mtInternal) GrowableArray<OwnedLock>(init_length, mtInternal);
     int total_count = 0;
 
+    bool include_monitors = (_include_monitors == JNI_TRUE);
     vframeStream vfst(_java_thread != nullptr
-      ? vframeStream(_java_thread, false, true, vthread_carrier)
+      ? vframeStream(_java_thread, false, include_monitors, vthread_carrier)
       : vframeStream(java_lang_VirtualThread::continuation(_thread_h())));
 
     for (;
       !vfst.at_end() && (max_depth == 0 || max_depth != total_count);
       vfst.next()) {
 
-      detect_locks(vfst.asJavaVFrame(), total_count);
+      if (include_monitors) {
+        detect_locks(vfst.asJavaVFrame(), total_count);
+      }
 
       if (skip_hidden && (vfst.method()->is_hidden() ||
         vfst.method()->is_continuation_enter_intrinsic())) {
@@ -1450,7 +1453,7 @@ int jdk_internal_vm_ThreadSnapshot::_blockerTypeOrdinal_offset;
 int jdk_internal_vm_ThreadSnapshot::_blockerObject_offset;
 int jdk_internal_vm_ThreadSnapshot::_parkBlockerOwner_offset;
 
-oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, TRAPS) {
+oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, jboolean include_monitors, TRAPS) {
   ThreadsListHandle tlh(THREAD);
 
   ResourceMark rm(THREAD);
@@ -1468,7 +1471,7 @@ oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, TRAPS) {
 
   // Handshake with target
   Handle thread_h(THREAD, thread_oop);
-  GetThreadSnapshotHandshakeClosure cl(thread_h);
+  GetThreadSnapshotHandshakeClosure cl(thread_h, include_monitors);
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
     Handshake::execute(&cl, thread_oop);
   } else {
@@ -1479,6 +1482,7 @@ oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, TRAPS) {
   if (cl._thread_status == JavaThreadStatus::NEW || cl._thread_status == JavaThreadStatus::TERMINATED) {
      return nullptr;
   }
+
 
   // StackTrace
   InstanceKlass* ste_klass = vmClasses::StackTraceElement_klass();
@@ -1508,17 +1512,6 @@ oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, TRAPS) {
       locks->obj_at_put(n, lock());
     }
   }
-
-  // call static StackTraceElement[] StackTraceElement.of(StackTraceElement[] stackTrace)
-  // to properly initialize STEs.
-  JavaValue result(T_OBJECT);
-  JavaCalls::call_static(&result,
-    ste_klass,
-    vmSymbols::java_lang_StackTraceElement_of_name(),
-    vmSymbols::java_lang_StackTraceElement_of_signature(),
-    trace,
-    CHECK_NULL);
-  // the method return the same trace array
 
   Symbol* snapshot_klass_name = vmSymbols::jdk_internal_vm_ThreadSnapshot();
   Klass* snapshot_klass = SystemDictionary::resolve_or_fail(snapshot_klass_name, true, CHECK_NULL);

@@ -39,7 +39,7 @@ public class ThreadGetStackTraceWhenSpinning {
     @Setup
     public void setup() throws InterruptedException {
         var started = new CountDownLatch(1);
-        thread = Thread.startVirtualThread(() -> {
+        thread = Thread.ofPlatform().start(() -> {
             started.countDown();
             while (!done) {
                 Thread.onSpinWait();

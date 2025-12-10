@@ -2429,9 +2429,9 @@ public class Thread implements Runnable {
             // optimization so we do not call into the vm for threads that
             // have not yet started or have terminated
             if (!isAlive()) {
-                //return EMPTY_STACK_TRACE;
+                return EMPTY_STACK_TRACE;
             }
-            ThreadSnapshot snapshot = ThreadSnapshot.of(this);
+            ThreadSnapshot snapshot = ThreadSnapshot.of(this, false);
             return (snapshot != null) ? snapshot.stackTrace() : EMPTY_STACK_TRACE;
         } else {
             return (new Exception()).getStackTrace();

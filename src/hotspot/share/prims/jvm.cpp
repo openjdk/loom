@@ -2913,8 +2913,8 @@ JVM_ENTRY(jboolean, JVM_HoldsLock(JNIEnv* env, jclass threadClass, jobject obj))
   return ObjectSynchronizer::current_thread_holds_lock(thread, h_obj);
 JVM_END
 
-JVM_ENTRY(jobject, JVM_CreateThreadSnapshot(JNIEnv* env, jobject jthread))
-  oop snapshot = ThreadSnapshotFactory::get_thread_snapshot(jthread, THREAD);
+JVM_ENTRY(jobject, JVM_CreateThreadSnapshot(JNIEnv* env, jobject jthread, jboolean includeMonitors))
+  oop snapshot = ThreadSnapshotFactory::get_thread_snapshot(jthread, includeMonitors, THREAD);
   return JNIHandles::make_local(THREAD, snapshot);
 JVM_END
 
