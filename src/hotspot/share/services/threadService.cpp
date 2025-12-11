@@ -1483,7 +1483,6 @@ oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, jboolean include
      return nullptr;
   }
 
-
   // StackTrace
   InstanceKlass* ste_klass = vmClasses::StackTraceElement_klass();
   assert(ste_klass != nullptr, "must be loaded");

@@ -271,6 +271,9 @@ class ThreadBuilders {
         @Override
         public Thread unstarted(Runnable task, Thread preferredCarrier, Object att) {
             Objects.requireNonNull(task);
+            if (preferredCarrier != null && preferredCarrier.isVirtual()) {
+                throw new IllegalArgumentException("Preferred carrier cannot be a virtual thread");
+            }
             Class<?> caller = Reflection.getCallerClass();
             caller.getModule().ensureNativeAccess(OfVirtual.class, "unstarted", caller, false);
             var thread = newVirtualThread(scheduler,

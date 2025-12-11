@@ -1247,6 +1247,8 @@ public class Thread implements Runnable {
              * @param preferredCarrier the preferred carrier thread, can be {@code null}
              * @param att the object to attach, can be {@code null}
              * @return a new unstarted Thread
+             * @throws IllegalArgumentException if {@code preferredCarrier} is a virtual
+             * thread
              * @since 99
              *
              * @see <a href="Thread.html#inheritance">Inheritance when creating threads</a>
