@@ -46,7 +46,6 @@ import jdk.internal.vm.Continuation;
 import jdk.internal.vm.ScopedValueContainer;
 import jdk.internal.vm.StackableScope;
 import jdk.internal.vm.ThreadContainer;
-import jdk.internal.vm.ThreadSnapshot;
 import jdk.internal.vm.annotation.ForceInline;
 import jdk.internal.vm.annotation.Hidden;
 import jdk.internal.vm.annotation.IntrinsicCandidate;
@@ -1247,6 +1246,8 @@ public class Thread implements Runnable {
              * @param preferredCarrier the preferred carrier thread, can be {@code null}
              * @param att the object to attach, can be {@code null}
              * @return a new unstarted Thread
+             * @throws IllegalArgumentException if {@code preferredCarrier} is a virtual
+             * thread
              * @since 99
              *
              * @see <a href="Thread.html#inheritance">Inheritance when creating threads</a>
@@ -2431,12 +2432,17 @@ public class Thread implements Runnable {
             if (!isAlive()) {
                 return EMPTY_STACK_TRACE;
             }
-            ThreadSnapshot snapshot = ThreadSnapshot.of(this, false);
-            return (snapshot != null) ? snapshot.stackTrace() : EMPTY_STACK_TRACE;
+            Object trace = getStackTrace0();
+            if (trace instanceof StackTraceElement[] stackTrace) {
+                return StackTraceElement.finishInit(stackTrace);
+            }
+            return EMPTY_STACK_TRACE;
         } else {
             return (new Exception()).getStackTrace();
         }
     }
+
+    private native Object getStackTrace0();
 
     /**
      * Returns a map of stack traces for all live platform threads. The map

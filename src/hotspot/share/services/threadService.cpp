@@ -1480,9 +1480,8 @@ oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, jboolean include
 
   // thread not alive
   if (cl._thread_status == JavaThreadStatus::NEW || cl._thread_status == JavaThreadStatus::TERMINATED) {
-     return nullptr;
+    return nullptr;
   }
-
 
   // StackTrace
   InstanceKlass* ste_klass = vmClasses::StackTraceElement_klass();
