@@ -141,7 +141,7 @@ class Parking {
             LockSupport.park();
             LockSupport.park();  // should park
         });
-        Thread.sleep(1000); // give time for thread to park
+        await(thread, Thread.State.WAITING);
         LockSupport.unpark(thread);
         thread.join();
     }

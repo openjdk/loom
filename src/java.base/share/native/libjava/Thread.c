@@ -47,6 +47,7 @@ static JNINativeMethod methods[] = {
     {"holdsLock",        "(" OBJ ")Z", (void *)&JVM_HoldsLock},
     {"getThreads",       "()[" THD,    (void *)&JVM_GetAllThreads},
     {"dumpThreads",      "([" THD ")[[" STE, (void *)&JVM_DumpThreads},
+    {"getStackTrace0",   "()" OBJ,     (void *)&JVM_GetStackTrace},
     {"setNativeName",    "(" STR ")V", (void *)&JVM_SetNativeThreadName},
     {"scopedValueCache", "()[" OBJ,    (void *)&JVM_ScopedValueCache},
     {"setScopedValueCache", "([" OBJ ")V",(void *)&JVM_SetScopedValueCache},

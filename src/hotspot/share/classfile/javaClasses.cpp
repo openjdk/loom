@@ -71,6 +71,7 @@
 #include "runtime/fieldDescriptor.inline.hpp"
 #include "runtime/frame.inline.hpp"
 #include "runtime/handles.inline.hpp"
+#include "runtime/handshake.hpp"
 #include "runtime/init.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
 #include "runtime/java.hpp"
@@ -1901,6 +1902,109 @@ ByteSize java_lang_Thread::thread_id_offset() {
 
 oop java_lang_Thread::park_blocker(oop java_thread) {
   return java_thread->obj_field_access<MO_RELAXED>(_park_blocker_offset);
+}
+
+// Obtain stack trace for a platform of virtual thread.
+oop java_lang_Thread::async_get_stack_trace(jobject jthread, TRAPS) {
+  ThreadsListHandle tlh(THREAD);
+  JavaThread* java_thread = nullptr;
+  oop thread_oop;
+
+  bool has_java_thread = tlh.cv_internal_thread_to_JavaThread(jthread, &java_thread, &thread_oop);
+  assert((has_java_thread && thread_oop != nullptr) || !has_java_thread, "Missing Thread oop");
+  bool is_virtual = java_lang_VirtualThread::is_instance(thread_oop);
+  if (!has_java_thread && !is_virtual) {
+    return nullptr;
+  }
+
+  class GetStackTraceHandshakeClosure : public HandshakeClosure {
+  public:
+    const Handle _thread_h;
+    int _depth;
+    GrowableArray<Method*>* _methods;
+    GrowableArray<int>*     _bcis;
+
+    GetStackTraceHandshakeClosure(Handle thread_h) :
+        HandshakeClosure("GetStackTraceHandshakeClosure"), _thread_h(thread_h), _depth(0),
+        _methods(nullptr), _bcis(nullptr) {
+    }
+    ~GetStackTraceHandshakeClosure() {
+      delete _methods;
+      delete _bcis;
+    }
+
+    void do_thread(Thread* th) {
+      JavaThread* java_thread = th != nullptr ? JavaThread::cast(th) : nullptr;
+      if (java_thread != nullptr && !java_thread->has_last_Java_frame()) {
+        // stack trace is empty
+        return;
+      }
+
+      bool is_virtual = java_lang_VirtualThread::is_instance(_thread_h());
+      bool vthread_carrier = !is_virtual && (java_thread != nullptr) && (java_thread->vthread_continuation() != nullptr);
+
+      const int max_depth = MaxJavaStackTraceDepth;
+      const bool skip_hidden = !ShowHiddenFrames;
+
+      // Pick minimum length that will cover most cases
+      int init_length = 64;
+      _methods = new (mtInternal) GrowableArray<Method*>(init_length, mtInternal);
+      _bcis = new (mtInternal) GrowableArray<int>(init_length, mtInternal);
+
+      int total_count = 0;
+      vframeStream vfst(java_thread != nullptr
+        ? vframeStream(java_thread, false, false, vthread_carrier)  // we don't process frames as we don't care about oops
+        : vframeStream(java_lang_VirtualThread::continuation(_thread_h())));
+      for (;
+           !vfst.at_end() && (max_depth == 0 || max_depth != total_count);
+           vfst.next()) {
+
+        if (skip_hidden && (vfst.method()->is_hidden() ||
+                            vfst.method()->is_continuation_enter_intrinsic())) {
+          continue;
+        }
+
+        _methods->push(vfst.method());
+        _bcis->push(vfst.bci());
+        total_count++;
+      }
+
+      _depth = total_count;
+    }
+  };
+
+  // Handshake with target
+  ResourceMark rm(THREAD);
+  HandleMark   hm(THREAD);
+  GetStackTraceHandshakeClosure gsthc(Handle(THREAD, thread_oop));
+  if (is_virtual) {
+    Handshake::execute(&gsthc, thread_oop);
+  } else {
+    Handshake::execute(&gsthc, &tlh, java_thread);
+  }
+
+  // Stop if no stack trace is found.
+  if (gsthc._depth == 0) {
+    return nullptr;
+  }
+
+  // Convert to StackTraceElement array
+  InstanceKlass* k = vmClasses::StackTraceElement_klass();
+  assert(k != nullptr, "must be loaded in 1.4+");
+  if (k->should_be_initialized()) {
+    k->initialize(CHECK_NULL);
+  }
+  objArrayHandle trace = oopFactory::new_objArray_handle(k, gsthc._depth, CHECK_NULL);
+
+  for (int i = 0; i < gsthc._depth; i++) {
+    methodHandle method(THREAD, gsthc._methods->at(i));
+    oop element = java_lang_StackTraceElement::create(method,
+                                                      gsthc._bcis->at(i),
+                                                      CHECK_NULL);
+    trace->obj_at_put(i, element);
+  }
+
+  return trace();
 }
 
 const char* java_lang_Thread::thread_status_name(oop java_thread) {
