@@ -290,7 +290,7 @@ public class Thread implements Runnable {
         volatile boolean daemon;
         volatile int threadStatus;
 
-        // Used by NativeThread for signalling, set lazily, read from any thread
+        // Used by NativeThread for signalling
         @Stable long nativeThreadID;
 
         // This map is maintained by the ThreadLocal class

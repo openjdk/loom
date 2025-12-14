@@ -23,7 +23,7 @@
 
 /*
  * @test
- * @summary Test ForkJoinPool  signalling with a virtual thread workload that oscillates
+ * @summary Test ForkJoinPool signalling with a virtual thread workload that oscillates
  *     between busy and idle
  * @requires vm.continuations
  * @requires test.thread.factory == null

@@ -77,8 +77,6 @@ compiler/interpreter/Test6833129.java 8335266 generic-i586
 
 compiler/c2/aarch64/TestStaticCallStub.java 8359963 linux-aarch64,macosx-aarch64
 
-compiler/c2/irTests/TestFloat16ScalarOperations.java 8367028 linux-aarch64
-
 serviceability/jvmti/NMethodRelocation/NMethodRelocationTest.java 8369150 generic-all
 
 #############################################################################

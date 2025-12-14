@@ -1050,10 +1050,13 @@ final class VirtualThread extends BaseVirtualThread {
                 // this timeout task is for a past timed-wait
                 return;
             }
-            if (compareAndSetState(TIMED_WAIT, UNBLOCKED)) {
-                lazySubmitRunContinuation();
+            if (!compareAndSetState(TIMED_WAIT, UNBLOCKED)) {
+                // already unblocked
+                return;
             }
         }
+
+        lazySubmitRunContinuation();
     }
 
     /**
