@@ -135,15 +135,14 @@ public class VirtualThreadSchedulerImpls {
     }
 
     /**
-     * Implementation of VirtualThreadSchedulerMXBean then a custom virtual thread scheduler
-     * is configured without a VirtualThreadSchedulerMXBean implementation.
+     * Implementation of VirtualThreadSchedulerMXBean when virtual threads are backed
+     * by platform threads.
      */
-    private static final class CustomVirtualThreadSchedulerImpl
+    private static final class BoundVirtualThreadSchedulerImpl
             extends BaseVirtualThreadSchedulerImpl {
-
         @Override
         public int getParallelism() {
-            return 1;
+            return Integer.MAX_VALUE;
         }
 
         @Override
@@ -168,13 +167,15 @@ public class VirtualThreadSchedulerImpls {
     }
 
     /**
-     * Implementation of VirtualThreadSchedulerMXBean when virtual threads are backed
-     * by platform threads.
+     * Implementation of VirtualThreadSchedulerMXBean when using a custom virtual
+     * thread scheduler that does not implement VirtualThreadSchedulerMXBean.
      */
-    private static final class BoundVirtualThreadSchedulerImpl extends BaseVirtualThreadSchedulerImpl {
+    private static final class CustomVirtualThreadSchedulerImpl
+            extends BaseVirtualThreadSchedulerImpl {
+
         @Override
         public int getParallelism() {
-            return Integer.MAX_VALUE;
+            return 1;
         }
 
         @Override
