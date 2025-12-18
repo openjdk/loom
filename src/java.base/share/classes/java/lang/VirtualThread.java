@@ -1029,10 +1029,11 @@ final class VirtualThread extends BaseVirtualThread {
      */
     private void parkTimeoutExpired() {
         assert !VirtualThread.currentThread().isVirtual();
-        if (!getAndSetParkPermit(true)
-                && (state() == TIMED_PARKED)
-                && compareAndSetState(TIMED_PARKED, UNPARKED)) {
-            lazySubmitRunContinuation();
+        if (!getAndSetParkPermit(true)) {
+            int s = state();
+            if ((s == PARKED || s == TIMED_PARKED) && compareAndSetState(s, UNPARKED)) {
+                lazySubmitRunContinuation();
+            }
         }
     }
 
