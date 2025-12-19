@@ -112,15 +112,19 @@ final class VirtualThread extends BaseVirtualThread {
      *
      *  RUNNING -> PARKING         // Thread parking with LockSupport.park
      *  PARKING -> PARKED          // cont.yield successful, parked indefinitely
-     *  PARKING -> PINNED          // cont.yield failed, parked indefinitely on carrier
      *   PARKED -> UNPARKED        // unparked, may be scheduled to continue
-     *   PINNED -> RUNNING         // unparked, continue execution on same carrier
      * UNPARKED -> RUNNING         // continue execution after park
+     *
+     *  PARKING -> RUNNING         // cont.yield failed, need to park on carrier
+     *  RUNNING -> PINNED          // park on carrier
+     *   PINNED -> RUNNING         // unparked, continue execution on same carrier
      *
      *       RUNNING -> TIMED_PARKING   // Thread parking with LockSupport.parkNanos
      * TIMED_PARKING -> TIMED_PARKED    // cont.yield successful, timed-parked
-     * TIMED_PARKING -> TIMED_PINNED    // cont.yield failed, timed-parked on carrier
      *  TIMED_PARKED -> UNPARKED        // unparked, may be scheduled to continue
+     *
+     * TIMED_PARKING -> RUNNING         // cont.yield failed, need to park on carrier
+     *       RUNNING -> TIMED_PINNED    // park on carrier
      *  TIMED_PINNED -> RUNNING         // unparked, continue execution on same carrier
      *
      *   RUNNING -> BLOCKING       // blocking on monitor enter
@@ -131,7 +135,7 @@ final class VirtualThread extends BaseVirtualThread {
      *   RUNNING -> WAITING        // transitional state during wait on monitor
      *   WAITING -> WAIT           // waiting on monitor
      *      WAIT -> BLOCKED        // notified, waiting to be unblocked by monitor owner
-     *      WAIT -> UNBLOCKED      // timed-out/interrupted
+     *      WAIT -> UNBLOCKED      // interrupted
      *
      *       RUNNING -> TIMED_WAITING   // transition state during timed-waiting on monitor
      * TIMED_WAITING -> TIMED_WAIT      // timed-waiting on monitor
@@ -610,7 +614,7 @@ final class VirtualThread extends BaseVirtualThread {
     @ChangesCurrentThread
     @ReservedStackAccess
     private void mount() {
-        startTransition(/*is_mount*/true);
+        startTransition(/*mount*/true);
         // We assume following volatile accesses provide equivalent
         // of acquire ordering, otherwise we need U.loadFence() here.
 
@@ -655,7 +659,7 @@ final class VirtualThread extends BaseVirtualThread {
 
         // We assume previous volatile accesses provide equivalent
         // of release ordering, otherwise we need U.storeFence() here.
-        endTransition(/*is_mount*/false);
+        endTransition(/*mount*/false);
     }
 
     /**
@@ -664,11 +668,11 @@ final class VirtualThread extends BaseVirtualThread {
      */
     @Hidden
     private boolean yieldContinuation() {
-        startTransition(/*is_mount*/false);
+        startTransition(/*mount*/false);
         try {
             return Continuation.yield(VTHREAD_SCOPE);
         } finally {
-            endTransition(/*is_mount*/true);
+            endTransition(/*mount*/true);
         }
     }
 
@@ -1463,11 +1467,11 @@ final class VirtualThread extends BaseVirtualThread {
 
     @IntrinsicCandidate
     @JvmtiMountTransition
-    private native void startTransition(boolean is_mount);
+    private native void startTransition(boolean mount);
 
     @IntrinsicCandidate
     @JvmtiMountTransition
-    private native void endTransition(boolean is_mount);
+    private native void endTransition(boolean mount);
 
     @IntrinsicCandidate
     private static native void notifyJvmtiDisableSuspend(boolean enter);
