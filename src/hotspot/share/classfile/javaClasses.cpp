@@ -2178,7 +2178,7 @@ void java_lang_VirtualThread::set_timeout(oop vthread, jlong value) {
 
 JavaThreadStatus java_lang_VirtualThread::map_state_to_thread_status(int state) {
   JavaThreadStatus status = JavaThreadStatus::NEW;
-  switch (state & ~SUSPENDED) {
+  switch (state) {
     case NEW:
       status = JavaThreadStatus::NEW;
       break;
