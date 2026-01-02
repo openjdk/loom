@@ -2916,7 +2916,6 @@ JVM_ENTRY(jboolean, JVM_HoldsLock(JNIEnv* env, jclass threadClass, jobject obj))
 JVM_END
 
 JVM_ENTRY(jobject, JVM_GetStackTrace(JNIEnv *env, jobject jthread))
-  oop threadObj = JNIHandles::resolve(jthread);
   oop trace = java_lang_Thread::async_get_stack_trace(jthread, THREAD);
   return JNIHandles::make_local(THREAD, trace);
 JVM_END
