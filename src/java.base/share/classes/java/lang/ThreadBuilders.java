@@ -239,19 +239,22 @@ class ThreadBuilders {
             return this;
         }
 
-        @Override
-        public Thread unstarted(Runnable task) {
+        Thread unstarted(Runnable task, Thread preferredCarrier) {
             Objects.requireNonNull(task);
             var thread = newVirtualThread(scheduler,
-                                          null,
+                                          preferredCarrier,
                                           nextThreadName(),
                                           characteristics(),
-                                          task,
-                                          null);
+                                          task);
             UncaughtExceptionHandler uhe = uncaughtExceptionHandler();
             if (uhe != null)
                 thread.uncaughtExceptionHandler(uhe);
             return thread;
+        }
+
+        @Override
+        public Thread unstarted(Runnable task) {
+            return unstarted(task, null);
         }
 
         @Override
@@ -267,29 +270,7 @@ class ThreadBuilders {
                     uncaughtExceptionHandler());
         }
 
-        @CallerSensitive
-        @Override
-        public Thread unstarted(Runnable task, Thread preferredCarrier, Object att) {
-            Objects.requireNonNull(task);
-            if (preferredCarrier != null) {
-                if (preferredCarrier.isVirtual()) {
-                    throw new IllegalArgumentException("Preferred carrier cannot be a virtual thread");
-                }
-                Class<?> caller = Reflection.getCallerClass();
-                caller.getModule().ensureNativeAccess(OfVirtual.class, "unstarted", caller, false);
-            }
-            var thread = newVirtualThread(scheduler,
-                                          preferredCarrier,
-                                          nextThreadName(),
-                                          characteristics(),
-                                          task,
-                                          att);
-            UncaughtExceptionHandler uhe = uncaughtExceptionHandler();
-            if (uhe != null)
-                thread.uncaughtExceptionHandler(uhe);
-            return thread;
-        }
-
+        @SuppressWarnings("removal")
         @CallerSensitive
         @Override
         public OfVirtual scheduler(Thread.VirtualThreadScheduler scheduler) {
@@ -422,7 +403,7 @@ class ThreadBuilders {
         public Thread newThread(Runnable task) {
             Objects.requireNonNull(task);
             String name = nextThreadName();
-            Thread thread = newVirtualThread(scheduler, null, name, characteristics(), task, null);
+            Thread thread = newVirtualThread(scheduler, null, name, characteristics(), task);
             UncaughtExceptionHandler uhe = uncaughtExceptionHandler();
             if (uhe != null)
                 thread.uncaughtExceptionHandler(uhe);
@@ -437,10 +418,9 @@ class ThreadBuilders {
                                            Thread preferredCarrier,
                                            String name,
                                            int characteristics,
-                                           Runnable task,
-                                           Object att) {
+                                           Runnable task) {
         if (ContinuationSupport.isSupported()) {
-            return new VirtualThread(scheduler, preferredCarrier, name, characteristics, task, att);
+            return new VirtualThread(scheduler, preferredCarrier, name, characteristics, task);
         } else {
             if (scheduler != null)
                 throw new UnsupportedOperationException();
@@ -449,7 +429,7 @@ class ThreadBuilders {
     }
 
     static Thread newVirtualThread(String name, int characteristics, Runnable task) {
-       return newVirtualThread(null, null, name, characteristics, task, null);
+       return newVirtualThread(null, null, name, characteristics, task);
     }
 
     /**

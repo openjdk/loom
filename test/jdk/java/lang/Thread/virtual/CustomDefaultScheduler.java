@@ -25,6 +25,7 @@
  * @test id=default
  * @summary Test using a custom scheduler as the default virtual thread scheduler
  * @requires vm.continuations
+ * @modules java.base/java.lang:+open
  * @library /test/lib
  * @run junit/othervm -Djdk.virtualThreadScheduler.implClass=CustomDefaultScheduler$CustomScheduler1
  *     --enable-native-access=ALL-UNNAMED CustomDefaultScheduler
@@ -36,6 +37,7 @@
  * @test id=poller-modes
  * @requires vm.continuations
  * @requires (os.family == "linux") | (os.family == "mac")
+ * @modules java.base/java.lang:+open
  * @library /test/lib
  * @run junit/othervm -Djdk.pollerMode=3
  *     -Djdk.virtualThreadScheduler.implClass=CustomDefaultScheduler$CustomScheduler1
@@ -62,8 +64,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
-
 import jdk.test.lib.thread.VThreadRunner;
+import jdk.test.lib.thread.VThreadScheduler;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
@@ -141,7 +143,7 @@ class CustomDefaultScheduler {
     void testUseCustomScheduler() throws Exception {
         var ref = new AtomicReference<VirtualThreadScheduler>();
         Thread.startVirtualThread(() -> {
-            ref.set(VirtualThreadScheduler.current());
+            ref.set(currentScheduler());
         }).join();
         VirtualThreadScheduler scheduler = ref.get();
         assertEquals(schedulerClassName, scheduler.getClass().getName());
@@ -221,9 +223,9 @@ class CustomDefaultScheduler {
         var vthreadRef = new AtomicReference<Thread>();
 
         var vthread1 = Thread.ofVirtual().start(() -> {
-            schedulerRef.set(VirtualThreadScheduler.current());
+            schedulerRef.set(currentScheduler());
             Thread vthread2 = Thread.ofVirtual().start(() -> {
-                assertTrue(VirtualThreadScheduler.current() == schedulerRef.get());
+                assertTrue(currentScheduler() == schedulerRef.get());
                 vthreadRef.set(Thread.currentThread());
             });
             try {
@@ -239,6 +241,13 @@ class CustomDefaultScheduler {
         var customScheduler = (CustomScheduler2) schedulerRef.get();
         assertTrue(customScheduler.threadsExecuted().contains(vthread1));
         assertTrue(customScheduler.threadsExecuted().contains(vthread2));
+    }
+
+    /**
+     * Returns the scheduler for the current virtual thread.
+     */
+    private static VirtualThreadScheduler currentScheduler() {
+        return VThreadScheduler.scheduler(Thread.currentThread());
     }
 
     /**

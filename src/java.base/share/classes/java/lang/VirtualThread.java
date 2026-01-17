@@ -244,6 +244,15 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
+     * Returns the task to start/continue this virtual thread with its custom scheduler.
+     * @throws UnsupportedOperationException if assigned to the built-in default scheduler
+     */
+    VirtualThreadTask virtualThreadTask() {
+        assert scheduler != BUILTIN_SCHEDULER;
+        return runContinuation;
+    }
+
+    /**
      * Creates a new {@code VirtualThread} to run the given task with the given scheduler.
      *
      * @param scheduler the scheduler or null for default scheduler
@@ -256,8 +265,7 @@ final class VirtualThread extends BaseVirtualThread {
                   Thread preferredCarrier,
                   String name,
                   int characteristics,
-                  Runnable task,
-                  Object att) {
+                  Runnable task) {
         super(name, characteristics, /*bound*/ false);
         Objects.requireNonNull(task);
 
@@ -273,7 +281,7 @@ final class VirtualThread extends BaseVirtualThread {
         if (scheduler == BUILTIN_SCHEDULER) {
             this.runContinuation = new BuiltinSchedulerTask(this);
         } else {
-            this.runContinuation = new CustomSchedulerTask(this, preferredCarrier, att);
+            this.runContinuation = new CustomSchedulerTask(this, preferredCarrier);
         }
     }
 
@@ -316,12 +324,9 @@ final class VirtualThread extends BaseVirtualThread {
         private final VirtualThread vthread;
         private final Thread preferredCarrier;
         private volatile Object att;
-        CustomSchedulerTask(VirtualThread vthread, Thread preferredCarrier, Object att) {
+        CustomSchedulerTask(VirtualThread vthread, Thread preferredCarrier) {
             this.vthread = vthread;
             this.preferredCarrier = preferredCarrier;
-            if (att != null) {
-                this.att = att;
-            }
         }
         @Override
         public Thread thread() {

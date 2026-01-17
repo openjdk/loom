@@ -35,7 +35,6 @@
  * @library /test/lib
  * @run junit/othervm/timeout=480 -Djdk.pollerMode=1 BlockingChannelOps
  * @run junit/othervm/timeout=480 -Djdk.pollerMode=2 BlockingChannelOps
- * @run junit/othervm/timeout=480 -Djdk.pollerMode=3 BlockingChannelOps
  */
 
 /*
@@ -75,58 +74,22 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.WritableByteChannel;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.locks.LockSupport;
-import java.util.stream.Stream;
 
 import jdk.test.lib.thread.VThreadRunner;
-import jdk.test.lib.thread.VThreadScheduler;
-
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.*;
 
 class BlockingChannelOps {
-    private static ExecutorService threadPool;
-    private static Thread.VirtualThreadScheduler customScheduler;
-
-    @BeforeAll
-    static void setup() {
-        ThreadFactory factory = Thread.ofPlatform().daemon().factory();
-        threadPool = Executors.newCachedThreadPool(factory);
-        customScheduler = new Thread.VirtualThreadScheduler() {
-            @Override
-            public void onStart(Thread.VirtualThreadTask task) {
-                threadPool.execute(task);
-            }
-            @Override
-            public void onContinue(Thread.VirtualThreadTask task) {
-                threadPool.execute(task);
-            }
-        };
-    }
-
-    /**
-     * Returns the Thread.Builder to create the virtual thread.
-     */
-    static Stream<Thread.Builder.OfVirtual> threadBuilders() {
-        if (VThreadScheduler.supportsCustomScheduler()) {
-            return Stream.of(Thread.ofVirtual(), Thread.ofVirtual().scheduler(customScheduler));
-        } else {
-            return Stream.of(Thread.ofVirtual());
-        }
-    }
 
     /**
      * SocketChannel read/write, no blocking.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testSocketChannelReadWrite1(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testSocketChannelReadWrite1() throws Exception {
+        VThreadRunner.run(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc1 = connection.channel1();
                 SocketChannel sc2 = connection.channel2();
@@ -148,10 +111,9 @@ class BlockingChannelOps {
     /**
      * Virtual thread blocks in SocketChannel read.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testSocketChannelRead(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testSocketChannelRead() throws Exception {
+        VThreadRunner.run(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc1 = connection.channel1();
                 SocketChannel sc2 = connection.channel2();
@@ -172,10 +134,9 @@ class BlockingChannelOps {
     /**
      * Virtual thread blocks in SocketChannel write.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testSocketChannelWrite(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testSocketChannelWrite() throws Exception {
+        VThreadRunner.run(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc1 = connection.channel1();
                 SocketChannel sc2 = connection.channel2();
@@ -201,10 +162,9 @@ class BlockingChannelOps {
     /**
      * SocketChannel close while virtual thread blocked in read.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testSocketChannelReadAsyncClose(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testSocketChannelReadAsyncClose() throws Exception {
+        VThreadRunner.run(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc = connection.channel1();
                 runAfterParkedAsync(sc::close);
@@ -219,10 +179,9 @@ class BlockingChannelOps {
     /**
      * SocketChannel shutdownInput while virtual thread blocked in read.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testSocketChannelReadAsyncShutdownInput(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testSocketChannelReadAsyncShutdownInput() throws Exception {
+        VThreadRunner.run(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc = connection.channel1();
                 runAfterParkedAsync(sc::shutdownInput);
@@ -236,10 +195,9 @@ class BlockingChannelOps {
     /**
      * Virtual thread interrupted while blocked in SocketChannel read.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testSocketChannelReadInterrupt(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testSocketChannelReadInterrupt() throws Exception {
+        VThreadRunner.run(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc = connection.channel1();
 
@@ -260,10 +218,9 @@ class BlockingChannelOps {
     /**
      * SocketChannel close while virtual thread blocked in write.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testSocketChannelWriteAsyncClose(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testSocketChannelWriteAsyncClose() throws Exception {
+        VThreadRunner.run(() -> {
             boolean done = false;
             while (!done) {
                 try (var connection = new Connection()) {
@@ -292,13 +249,13 @@ class BlockingChannelOps {
         });
     }
 
+
     /**
      * SocketChannel shutdownOutput while virtual thread blocked in write.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testSocketChannelWriteAsyncShutdownOutput(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testSocketChannelWriteAsyncShutdownOutput() throws Exception {
+        VThreadRunner.run(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc = connection.channel1();
 
@@ -322,10 +279,9 @@ class BlockingChannelOps {
     /**
      * Virtual thread interrupted while blocked in SocketChannel write.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testSocketChannelWriteInterrupt(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testSocketChannelWriteInterrupt() throws Exception {
+        VThreadRunner.run(() -> {
             boolean done = false;
             while (!done) {
                 try (var connection = new Connection()) {
@@ -360,23 +316,9 @@ class BlockingChannelOps {
      * Virtual thread blocks in SocketChannel adaptor read.
      */
     @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testSocketAdaptorRead1(Thread.Builder.OfVirtual builder) throws Exception {
-        testSocketAdaptorRead(builder, 0);
-    }
-
-    /**
-     * Virtual thread blocks in SocketChannel adaptor read with timeout.
-     */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testSocketAdaptorRead2(Thread.Builder.OfVirtual builder) throws Exception {
-        testSocketAdaptorRead(builder, 60_000);
-    }
-
-    private void testSocketAdaptorRead(Thread.Builder.OfVirtual builder,
-                                       int timeout) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @ValueSource(ints = { 0, 60_000 })
+    void testSocketAdaptorRead(int timeout) throws Exception {
+        VThreadRunner.run(() -> {
             try (var connection = new Connection()) {
                 SocketChannel sc1 = connection.channel1();
                 SocketChannel sc2 = connection.channel2();
@@ -399,10 +341,9 @@ class BlockingChannelOps {
     /**
      * ServerSocketChannel accept, no blocking.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testServerSocketChannelAccept1(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testServerSocketChannelAccept1() throws Exception {
+        VThreadRunner.run(() -> {
             try (var ssc = ServerSocketChannel.open()) {
                 ssc.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
                 var sc1 = SocketChannel.open(ssc.getLocalAddress());
@@ -417,10 +358,9 @@ class BlockingChannelOps {
     /**
      * Virtual thread blocks in ServerSocketChannel accept.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testServerSocketChannelAccept2(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testServerSocketChannelAccept2() throws Exception {
+        VThreadRunner.run(() -> {
             try (var ssc = ServerSocketChannel.open()) {
                 ssc.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
                 var sc1 = SocketChannel.open();
@@ -439,10 +379,9 @@ class BlockingChannelOps {
     /**
      * SeverSocketChannel close while virtual thread blocked in accept.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testServerSocketChannelAcceptAsyncClose(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testServerSocketChannelAcceptAsyncClose() throws Exception {
+        VThreadRunner.run(() -> {
             try (var ssc = ServerSocketChannel.open()) {
                 InetAddress lh = InetAddress.getLoopbackAddress();
                 ssc.bind(new InetSocketAddress(lh, 0));
@@ -459,10 +398,9 @@ class BlockingChannelOps {
     /**
      * Virtual thread interrupted while blocked in ServerSocketChannel accept.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testServerSocketChannelAcceptInterrupt(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testServerSocketChannelAcceptInterrupt() throws Exception {
+        VThreadRunner.run(() -> {
             try (var ssc = ServerSocketChannel.open()) {
                 InetAddress lh = InetAddress.getLoopbackAddress();
                 ssc.bind(new InetSocketAddress(lh, 0));
@@ -486,23 +424,9 @@ class BlockingChannelOps {
      * Virtual thread blocks in ServerSocketChannel adaptor accept.
      */
     @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testSocketChannelAdaptorAccept1(Thread.Builder.OfVirtual builder) throws Exception {
-        testSocketChannelAdaptorAccept(builder, 0);
-    }
-
-    /**
-     * Virtual thread blocks in ServerSocketChannel adaptor accept with timeout.
-     */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testSocketChannelAdaptorAccept2(Thread.Builder.OfVirtual builder) throws Exception {
-        testSocketChannelAdaptorAccept(builder, 60_000);
-    }
-
-    private void testSocketChannelAdaptorAccept(Thread.Builder.OfVirtual builder,
-                                                int timeout) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @ValueSource(ints = { 0, 60_000 })
+    void testSocketChannelAdaptorAccept(int timeout) throws Exception {
+        VThreadRunner.run(() -> {
             try (var ssc = ServerSocketChannel.open()) {
                 ssc.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0));
                 var sc = SocketChannel.open();
@@ -523,10 +447,9 @@ class BlockingChannelOps {
     /**
      * DatagramChannel receive/send, no blocking.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testDatagramChannelSendReceive1(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testDatagramChannelSendReceive1() throws Exception {
+        VThreadRunner.run(() -> {
             try (DatagramChannel dc1 = DatagramChannel.open();
                  DatagramChannel dc2 = DatagramChannel.open()) {
 
@@ -549,10 +472,9 @@ class BlockingChannelOps {
     /**
      * Virtual thread blocks in DatagramChannel receive.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testDatagramChannelSendReceive2(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testDatagramChannelSendReceive2() throws Exception {
+        VThreadRunner.run(() -> {
             try (DatagramChannel dc1 = DatagramChannel.open();
                  DatagramChannel dc2 = DatagramChannel.open()) {
 
@@ -574,10 +496,9 @@ class BlockingChannelOps {
     /**
      * DatagramChannel close while virtual thread blocked in receive.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testDatagramChannelReceiveAsyncClose(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testDatagramChannelReceiveAsyncClose() throws Exception {
+        VThreadRunner.run(() -> {
             try (DatagramChannel dc = DatagramChannel.open()) {
                 InetAddress lh = InetAddress.getLoopbackAddress();
                 dc.bind(new InetSocketAddress(lh, 0));
@@ -593,10 +514,9 @@ class BlockingChannelOps {
     /**
      * Virtual thread interrupted while blocked in DatagramChannel receive.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testDatagramChannelReceiveInterrupt(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testDatagramChannelReceiveInterrupt() throws Exception {
+        VThreadRunner.run(() -> {
             try (DatagramChannel dc = DatagramChannel.open()) {
                 InetAddress lh = InetAddress.getLoopbackAddress();
                 dc.bind(new InetSocketAddress(lh, 0));
@@ -619,23 +539,9 @@ class BlockingChannelOps {
      * Virtual thread blocks in DatagramSocket adaptor receive.
      */
     @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testDatagramSocketAdaptorReceive1(Thread.Builder.OfVirtual builder) throws Exception {
-        testDatagramSocketAdaptorReceive(builder, 0);
-    }
-
-    /**
-     * Virtual thread blocks in DatagramSocket adaptor receive with timeout.
-     */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testDatagramSocketAdaptorReceive2(Thread.Builder.OfVirtual builder) throws Exception {
-        testDatagramSocketAdaptorReceive(builder, 60_000);
-    }
-
-    private void testDatagramSocketAdaptorReceive(Thread.Builder.OfVirtual builder,
-                                                  int timeout) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @ValueSource(ints = { 0, 60_000 })
+    void testDatagramSocketAdaptorReceive(int timeout) throws Exception {
+        VThreadRunner.run(() -> {
             try (DatagramChannel dc1 = DatagramChannel.open();
                  DatagramChannel dc2 = DatagramChannel.open()) {
 
@@ -661,24 +567,9 @@ class BlockingChannelOps {
      * DatagramChannel close while virtual thread blocked in adaptor receive.
      */
     @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testDatagramSocketAdaptorReceiveAsyncClose1(Thread.Builder.OfVirtual builder) throws Exception {
-        testDatagramSocketAdaptorReceiveAsyncClose(builder, 0);
-    }
-
-    /**
-     * DatagramChannel close while virtual thread blocked in adaptor receive
-     * with timeout.
-     */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testDatagramSocketAdaptorReceiveAsyncClose2(Thread.Builder.OfVirtual builder) throws Exception {
-        testDatagramSocketAdaptorReceiveAsyncClose(builder, 60_000);
-    }
-
-    private void testDatagramSocketAdaptorReceiveAsyncClose(Thread.Builder.OfVirtual builder,
-                                                            int timeout) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @ValueSource(ints = { 0, 60_000 })
+    void testDatagramSocketAdaptorReceiveAsyncClose(int timeout) throws Exception {
+        VThreadRunner.run(() -> {
             try (DatagramChannel dc = DatagramChannel.open()) {
                 InetAddress lh = InetAddress.getLoopbackAddress();
                 dc.bind(new InetSocketAddress(lh, 0));
@@ -700,24 +591,9 @@ class BlockingChannelOps {
      * Virtual thread interrupted while blocked in DatagramSocket adaptor receive.
      */
     @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testDatagramSocketAdaptorReceiveInterrupt1(Thread.Builder.OfVirtual builder) throws Exception {
-        testDatagramSocketAdaptorReceiveInterrupt(builder, 0);
-    }
-
-    /**
-     * Virtual thread interrupted while blocked in DatagramSocket adaptor receive
-     * with timeout.
-     */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testDatagramSocketAdaptorReceiveInterrupt2(Thread.Builder.OfVirtual builder) throws Exception {
-        testDatagramSocketAdaptorReceiveInterrupt(builder, 60_000);
-    }
-
-    private void testDatagramSocketAdaptorReceiveInterrupt(Thread.Builder.OfVirtual builder,
-                                                           int timeout) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @ValueSource(ints = { 0, 60_000 })
+    void testDatagramSocketAdaptorReceiveInterrupt(int timeout) throws Exception {
+        VThreadRunner.run(() -> {
             try (DatagramChannel dc = DatagramChannel.open()) {
                 InetAddress lh = InetAddress.getLoopbackAddress();
                 dc.bind(new InetSocketAddress(lh, 0));
@@ -744,10 +620,9 @@ class BlockingChannelOps {
     /**
      * Pipe read/write, no blocking.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testPipeReadWrite1(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testPipeReadWrite1() throws Exception {
+        VThreadRunner.run(() -> {
             Pipe p = Pipe.open();
             try (Pipe.SinkChannel sink = p.sink();
                  Pipe.SourceChannel source = p.source()) {
@@ -769,10 +644,9 @@ class BlockingChannelOps {
     /**
      * Virtual thread blocks in Pipe.SourceChannel read.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testPipeReadWrite2(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testPipeReadWrite2() throws Exception {
+        VThreadRunner.run(() -> {
             Pipe p = Pipe.open();
             try (Pipe.SinkChannel sink = p.sink();
                  Pipe.SourceChannel source = p.source()) {
@@ -793,10 +667,9 @@ class BlockingChannelOps {
     /**
      * Virtual thread blocks in Pipe.SinkChannel write.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testPipeReadWrite3(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testPipeReadWrite3() throws Exception {
+        VThreadRunner.run(() -> {
             Pipe p = Pipe.open();
             try (Pipe.SinkChannel sink = p.sink();
                  Pipe.SourceChannel source = p.source()) {
@@ -822,10 +695,9 @@ class BlockingChannelOps {
     /**
      * Pipe.SourceChannel close while virtual thread blocked in read.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testPipeReadAsyncClose(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testPipeReadAsyncClose() throws Exception {
+        VThreadRunner.run(() -> {
             Pipe p = Pipe.open();
             try (Pipe.SinkChannel sink = p.sink();
                  Pipe.SourceChannel source = p.source()) {
@@ -841,10 +713,9 @@ class BlockingChannelOps {
     /**
      * Virtual thread interrupted while blocked in Pipe.SourceChannel read.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testPipeReadInterrupt(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testPipeReadInterrupt() throws Exception {
+        VThreadRunner.run(() -> {
             Pipe p = Pipe.open();
             try (Pipe.SinkChannel sink = p.sink();
                  Pipe.SourceChannel source = p.source()) {
@@ -866,10 +737,9 @@ class BlockingChannelOps {
     /**
      * Pipe.SinkChannel close while virtual thread blocked in write.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testPipeWriteAsyncClose(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testPipeWriteAsyncClose() throws Exception {
+        VThreadRunner.run(() -> {
             boolean done = false;
             while (!done) {
                 Pipe p = Pipe.open();
@@ -902,10 +772,9 @@ class BlockingChannelOps {
     /**
      * Virtual thread interrupted while blocked in Pipe.SinkChannel write.
      */
-    @ParameterizedTest
-    @MethodSource("threadBuilders")
-    void testPipeWriteInterrupt(Thread.Builder.OfVirtual builder) throws Exception {
-        VThreadRunner.run(builder, () -> {
+    @Test
+    void testPipeWriteInterrupt() throws Exception {
+        VThreadRunner.run(() -> {
             boolean done = false;
             while (!done) {
                 Pipe p = Pipe.open();
