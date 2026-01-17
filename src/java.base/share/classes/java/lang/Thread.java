@@ -919,9 +919,7 @@ public class Thread implements Runnable {
      * <p> Unless otherwise specified, passing a null argument to a method in
      * this interface causes a {@code NullPointerException} to be thrown.
      *
-     * @see Builder.OfVirtual#scheduler(VirtualThreadScheduler)
      * @since 99
-     * @see VirtualThreadScheduler
      */
     public interface VirtualThreadScheduler {
         /**
@@ -952,6 +950,43 @@ public class Thread implements Runnable {
          */
         void onContinue(VirtualThreadTask task);
 
+        // -- prototype 1 --
+
+        /**
+         * Creates a new virtual thread, returning the {@code VirtualThreadTask} that the
+         * virtual thread scheduler arranges to execute on a platform thread to start or
+         * continue execution of the virtual thread.
+         *
+         * <p> This method creates a new unstarted {@code Thread} from the current state
+         * of the given builder to run the given task. The {@link VirtualThreadTask#thread()
+         * thread()} method returns the virtual threa. The thread's {@link Thread#start()
+         * start()} method must be invoked to schedule the thread to begin execution.
+         *
+         * @apiNote This method is intended for frameworks that make use of a custom
+         * {@link VirtualThreadScheduler VirtualThreadScheduler} and need a reference
+         * to the virtual thread task before the virtual thread is started. The
+         * framework can use the {@link VirtualThreadTask#attach(Object) attach(Object)}
+         * method to attach its context object to the task before the thread is started.
+         *
+         * @implSpec The default implementation creates a new virtual thread. It should
+         * be rare to override this method.
+         *
+         * @param builder the virtual thread builder
+         * @param task the object to run when the thread executes
+         * @return the {@code VirtualThreadTask} that scheduler executes
+         *
+         * @see <a href="Thread.html#inheritance">Inheritance when creating threads</a>
+         */
+        default VirtualThreadTask newThread(Builder.OfVirtual builder, Runnable task) {
+            Objects.requireNonNull(builder);
+            var vbuilder = (ThreadBuilders.VirtualThreadBuilder) builder;
+            var vthread = (VirtualThread) vbuilder.unstarted(task, null);
+            if (vthread.scheduler(true) != this) {
+                throw new IllegalStateException("Builder is configured for prototype 2");
+            }
+            return vthread.virtualThreadTask();
+        }
+
         // -- prototype 2 --
 
         /**
@@ -960,19 +995,19 @@ public class Thread implements Runnable {
          * thread or scheduling virtual threads to a user-provided scheduler is not
          * supported by this VM
          */
+        @Deprecated(forRemoval=true)
         @CallerSensitive
         @Restricted
         static VirtualThreadScheduler current() {
-            Class<?> caller = Reflection.getCallerClass();
-            caller.getModule().ensureNativeAccess(VirtualThreadScheduler.class,
-                    "current",
-                    caller,
-                    false);
             if (Thread.currentThread() instanceof VirtualThread vthread) {
+                Class<?> caller = Reflection.getCallerClass();
+                caller.getModule().ensureNativeAccess(VirtualThreadScheduler.class,
+                                                     "current",
+                                                      caller,
+                                                      false);
                 return vthread.scheduler(false);
-            } else {
-                throw new UnsupportedOperationException();
             }
+            throw new UnsupportedOperationException();
         }
     }
 
@@ -1231,31 +1266,6 @@ public class Thread implements Runnable {
             @Override OfVirtual inheritInheritableThreadLocals(boolean inherit);
             @Override OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
 
-            // -- prototype 1 --
-
-            /**
-             * Creates a new virtual {@code Thread} from the current state of the builder
-             * to run the given task. The {@code Thread}'s {@link Thread#start() start}
-             * method must be invoked to schedule the thread to execute.
-             * The {@code preferredCarrier} parameter is the preferred carrier thread to
-             * execute the {@linkplain  VirtualThreadTask task} for the virtual thread.
-             * The scheduler may choose to ignore this preference. The {@code att} is the
-             * object to attach to the task.
-             *
-             * @param task the object to run when the thread executes
-             * @param preferredCarrier the preferred carrier thread, can be {@code null}
-             * @param att the object to attach, can be {@code null}
-             * @return a new unstarted Thread
-             * @throws IllegalArgumentException if {@code preferredCarrier} is a virtual
-             * thread
-             * @since 99
-             *
-             * @see <a href="Thread.html#inheritance">Inheritance when creating threads</a>
-             */
-            @CallerSensitive
-            @Restricted
-            Thread unstarted(Runnable task, Thread preferredCarrier, Object att);
-
             // -- prototype 2 --
 
             /**
@@ -1279,6 +1289,7 @@ public class Thread implements Runnable {
              *         user-provided scheduler is not supported by this VM
              * @since 99
              */
+            @Deprecated(forRemoval=true)
             @CallerSensitive
             @Restricted
             OfVirtual scheduler(VirtualThreadScheduler scheduler);

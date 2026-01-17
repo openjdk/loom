@@ -639,6 +639,12 @@ public interface JavaLangAccess {
     Thread.VirtualThreadScheduler virtualThreadScheduler(Thread thread);
 
     /**
+     * Creates a new virtual thread from the current state of the given builder to
+     * run the given task.
+     */
+    Thread newThread(Thread.Builder.OfVirtual builder, Runnable task, Thread preferredCarrier);
+
+    /**
      * Creates a new StackWalker
      */
     StackWalker newStackWalkerInstance(Set<StackWalker.Option> options,
@@ -659,8 +665,8 @@ public interface JavaLangAccess {
      * Are the string bytes compatible with the given charset?
      */
     boolean bytesCompatible(String string, Charset charset, int srcIndex, int numChars);
-    
-    
+
+
     /**
      * Finish initialization of the StackTraceElement objects in a stack trace.
      */

@@ -715,14 +715,11 @@ public abstract class Poller {
 
             // start virtual thread to execute sub-polling loop
             Thread carrier = JLA.currentCarrierThread();
-            var scheduler = JLA.virtualThreadScheduler(Thread.currentThread());
-            @SuppressWarnings("restricted")
-            Thread thread = Thread.ofVirtual()
-                    .scheduler(scheduler)
+            Thread.Builder.OfVirtual builder = Thread.ofVirtual()
                     .inheritInheritableThreadLocals(false)
                     .name(carrier.getName() + "-Read-Poller")
-                    .uncaughtExceptionHandler((_, e) -> e.printStackTrace())
-                    .unstarted(() -> subPollerLoop(readPoller), carrier, null);
+                    .uncaughtExceptionHandler((_, e) -> e.printStackTrace());
+            Thread thread = JLA.newThread(builder, () -> subPollerLoop(readPoller), carrier);
             thread.start();
             return readPoller;
         }

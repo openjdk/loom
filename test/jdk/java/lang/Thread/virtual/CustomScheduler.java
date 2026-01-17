@@ -25,6 +25,7 @@
  * @test
  * @summary Test virtual threads using a custom scheduler
  * @requires vm.continuations
+ * @modules java.base/java.lang:+open
  * @library /test/lib
  * @run junit CustomScheduler
  */
@@ -42,6 +43,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
 
 import jdk.test.lib.thread.VThreadRunner;
+import jdk.test.lib.thread.VThreadScheduler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.AfterAll;
@@ -57,7 +59,7 @@ class CustomScheduler {
     static void setup() throws Exception {
         var ref = new AtomicReference<Thread.VirtualThreadScheduler>();
         Thread thread = Thread.startVirtualThread(() -> {
-            ref.set(Thread.VirtualThreadScheduler.current());
+            ref.set(currentScheduler());
         });
         thread.join();
         defaultScheduler = ref.get();
@@ -80,8 +82,8 @@ class CustomScheduler {
     @Test
     void testCustomScheduler1() throws Exception {
         var ref = new AtomicReference<Thread.VirtualThreadScheduler>();
-        Thread thread = Thread.ofVirtual().scheduler(scheduler1).start(() -> {
-            ref.set(Thread.VirtualThreadScheduler.current());
+        Thread thread = VThreadScheduler.virtualThreadBuilder(scheduler1).start(() -> {
+            ref.set(currentScheduler());
         });
         thread.join();
         assertTrue(ref.get() == scheduler1);
@@ -102,10 +104,10 @@ class CustomScheduler {
     @Test
     void testCustomScheduler3() throws Exception {
         var ref = new AtomicReference<Thread.VirtualThreadScheduler>();
-        Thread thread = Thread.ofVirtual().scheduler(scheduler1).start(() -> {
+        Thread thread = VThreadScheduler.virtualThreadBuilder(scheduler1).start(() -> {
             try {
                 Thread.ofVirtual().start(() -> {
-                    ref.set(Thread.VirtualThreadScheduler.current());
+                    ref.set(currentScheduler());
                 }).join();
             } catch (Exception e) {
                 e.printStackTrace();
@@ -122,10 +124,10 @@ class CustomScheduler {
     @Test
     void testCustomScheduler4() throws Exception {
         var ref = new AtomicReference<Thread.VirtualThreadScheduler>();
-        Thread thread1 = Thread.ofVirtual().scheduler(scheduler1).start(() -> {
+        Thread thread1 = VThreadScheduler.virtualThreadBuilder(scheduler1).start(() -> {
             try {
-                Thread thread2 = Thread.ofVirtual().scheduler(scheduler2).start(() -> {
-                    ref.set(Thread.VirtualThreadScheduler.current());
+                Thread thread2 = VThreadScheduler.virtualThreadBuilder(scheduler2).start(() -> {
+                    ref.set(currentScheduler());
                 });
                 thread2.join();
             } catch (Exception e) {
@@ -158,7 +160,7 @@ class CustomScheduler {
             assertTrue(exc.get() instanceof WrongThreadException);
         };
         var scheduler = adapt(executor);
-        Thread.ofVirtual().scheduler(scheduler).start(LockSupport::park);
+        VThreadScheduler.virtualThreadBuilder(scheduler).start(LockSupport::park);
     }
 
     /**
@@ -171,7 +173,7 @@ class CustomScheduler {
         assumeFalse(carrier.isVirtual(), "Main thread is a virtual thread");
         try {
             var scheduler = adapt(Runnable::run);
-            Thread vthread = Thread.ofVirtual().scheduler(scheduler).start(() -> {
+            Thread vthread = VThreadScheduler.virtualThreadBuilder(scheduler).start(() -> {
                 Thread.currentThread().interrupt();
                 Thread.yield();
             });
@@ -192,7 +194,7 @@ class CustomScheduler {
         assumeFalse(carrier.isVirtual(), "Main thread is a virtual thread");
         try {
             var scheduler = adapt(Runnable::run);
-            Thread vthread = Thread.ofVirtual().scheduler(scheduler).start(() -> {
+            Thread vthread = VThreadScheduler.virtualThreadBuilder(scheduler).start(() -> {
                 Thread.currentThread().interrupt();
             });
             assertTrue(vthread.isInterrupted());
@@ -214,7 +216,7 @@ class CustomScheduler {
         });
         try {
             AtomicBoolean interrupted = new AtomicBoolean();
-            Thread vthread = Thread.ofVirtual().scheduler(scheduler).start(() -> {
+            Thread vthread = VThreadScheduler.virtualThreadBuilder(scheduler).start(() -> {
                 interrupted.set(Thread.currentThread().isInterrupted());
             });
             assertFalse(vthread.isInterrupted());
@@ -232,7 +234,7 @@ class CustomScheduler {
             System.err.println("OutOfMemoryError");
             throw new OutOfMemoryError();
         });
-        Thread thread = Thread.ofVirtual().scheduler(scheduler).unstarted(() -> { });
+        Thread thread = VThreadScheduler.virtualThreadBuilder(scheduler).unstarted(() -> { });
         assertThrows(OutOfMemoryError.class, thread::start);
     }
 
@@ -256,13 +258,20 @@ class CustomScheduler {
             });
 
             // start thread and wait for it to park
-            var thread = Thread.ofVirtual().scheduler(scheduler).start(LockSupport::park);
+            var thread = VThreadScheduler.virtualThreadBuilder(scheduler).start(LockSupport::park);
             await(thread, Thread.State.WAITING);
 
             // unpark thread, this should retry until OOME is not thrown
             LockSupport.unpark(thread);
             thread.join();
         }
+    }
+
+    /**
+     * Returns the scheduler for the current virtual thread.
+     */
+    private static Thread.VirtualThreadScheduler currentScheduler() {
+        return VThreadScheduler.scheduler(Thread.currentThread());
     }
 
     private static Thread.VirtualThreadScheduler adapt(Executor executor) {

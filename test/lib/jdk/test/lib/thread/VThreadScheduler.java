@@ -80,7 +80,7 @@ public class VThreadScheduler {
     public static boolean supportsCustomScheduler() {
         try (var pool = Executors.newCachedThreadPool()) {
             try {
-                virtualThreadBuilder(pool);
+                virtualThreadBuilder(pool).unstarted(() -> { });
                 return true;
             } catch (UnsupportedOperationException e) {
                 return false;
@@ -92,11 +92,23 @@ public class VThreadScheduler {
      * Returns a builder to create virtual threads that use the given scheduler.
      * @throws UnsupportedOperationException if custom schedulers are not supported
      */
-    @SuppressWarnings("restricted")
     public static Thread.Builder.OfVirtual virtualThreadBuilder(Thread.VirtualThreadScheduler scheduler) {
-        return Thread.ofVirtual().scheduler(scheduler);
+        Thread.Builder.OfVirtual builder = Thread.ofVirtual();
+        try {
+            Class<?> clazz = Class.forName("java.lang.ThreadBuilders$VirtualThreadBuilder");
+            Field field = clazz.getDeclaredField("scheduler");
+            field.setAccessible(true);
+            field.set(builder, scheduler);
+            return builder;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
+    /**
+     * Returns a builder to create virtual threads that use the given executor as scheduler.
+     * @throws UnsupportedOperationException if custom schedulers are not supported
+     */
     public static Thread.Builder.OfVirtual virtualThreadBuilder(Executor executor) {
         var scheduler = new Thread.VirtualThreadScheduler() {
             @Override
