@@ -639,12 +639,6 @@ public interface JavaLangAccess {
     Thread.VirtualThreadScheduler virtualThreadScheduler(Thread thread);
 
     /**
-     * Creates a new virtual thread from the current state of the given builder to
-     * run the given task.
-     */
-    Thread newThread(Thread.Builder.OfVirtual builder, Runnable task, Thread preferredCarrier);
-
-    /**
      * Creates a new StackWalker
      */
     StackWalker newStackWalkerInstance(Set<StackWalker.Option> options,
