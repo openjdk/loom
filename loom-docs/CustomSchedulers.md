@@ -29,9 +29,7 @@ The two methods are called with the task to execute.
 
 The custom scheduler may use its own pool of platform threads to execute the tasks,
 may assign virtual threads to be carried by specific platform threads, or may delegate
-to the built-in virtual thread scheduler. The prototype method
-`Thread.Builder.OfVirtual.unstarted(Runnable, Thread, Object)` can be used to specify
-the preferred carrier when creating an unstarted virtual thread.
+to the built-in virtual thread scheduler.
 
 The `VirtualThreadScheduler` implementation class must be public, with a public no-arg
 or one-arg constructor, and deployed on the class path or in an exported package of a
