@@ -719,7 +719,9 @@ public abstract class Poller {
                     .inheritInheritableThreadLocals(false)
                     .name(carrier.getName() + "-Read-Poller")
                     .uncaughtExceptionHandler((_, e) -> e.printStackTrace());
-            Thread thread = JLA.newThread(builder, () -> subPollerLoop(readPoller), carrier);
+            Thread thread = JLA.defaultVirtualThreadScheduler()
+                    .newThread(builder, carrier, () -> subPollerLoop(readPoller))
+                    .thread();
             thread.start();
             return readPoller;
         }

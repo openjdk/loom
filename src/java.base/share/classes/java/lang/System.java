@@ -2338,13 +2338,6 @@ public final class System {
                 }
             }
 
-            public Thread newThread(Thread.Builder.OfVirtual builder,
-                                    Runnable task,
-                                    Thread preferredCarrier) {
-                var vbuilder = (ThreadBuilders.VirtualThreadBuilder) builder;
-                return vbuilder.unstarted(task, preferredCarrier);
-            }
-
             public StackWalker newStackWalkerInstance(Set<StackWalker.Option> options,
                                                       ContinuationScope contScope,
                                                       Continuation continuation) {

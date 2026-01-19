@@ -963,7 +963,8 @@ public class Thread implements Runnable {
          * start()} method must be invoked to schedule the thread to begin execution.
          *
          * @apiNote This method is intended for frameworks that make use of a custom
-         * {@link VirtualThreadScheduler VirtualThreadScheduler} and need a reference
+         * {@link VirtualThreadScheduler VirtualThreadScheduler} and wish to specify a
+         * preferred carrier thread when creating a virtual thread, or need a reference
          * to the virtual thread task before the virtual thread is started. The
          * framework can use the {@link VirtualThreadTask#attach(Object) attach(Object)}
          * method to attach its context object to the task before the thread is started.
@@ -972,15 +973,18 @@ public class Thread implements Runnable {
          * be rare to override this method.
          *
          * @param builder the virtual thread builder
+         * @param preferredCarrier the preferred carrirer, can be {@code null}
          * @param task the object to run when the thread executes
          * @return the {@code VirtualThreadTask} that scheduler executes
          *
          * @see <a href="Thread.html#inheritance">Inheritance when creating threads</a>
          */
-        default VirtualThreadTask newThread(Builder.OfVirtual builder, Runnable task) {
+        default VirtualThreadTask newThread(Builder.OfVirtual builder,
+                                            Thread preferredCarrier,
+                                            Runnable task) {
             Objects.requireNonNull(builder);
             var vbuilder = (ThreadBuilders.VirtualThreadBuilder) builder;
-            var vthread = (VirtualThread) vbuilder.unstarted(task, null);
+            var vthread = (VirtualThread) vbuilder.unstarted(task, preferredCarrier);
             if (vthread.scheduler(true) != this) {
                 throw new IllegalStateException("Builder is configured for prototype 2");
             }
