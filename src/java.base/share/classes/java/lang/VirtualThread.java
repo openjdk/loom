@@ -36,6 +36,7 @@ import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import jdk.internal.event.VirtualThreadEndEvent;
@@ -245,11 +246,9 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Returns the task to start/continue this virtual thread with its custom scheduler.
-     * @throws UnsupportedOperationException if assigned to the built-in default scheduler
+     * Returns the task to start/continue this virtual thread.
      */
     VirtualThreadTask virtualThreadTask() {
-        assert scheduler != BUILTIN_SCHEDULER;
         return runContinuation;
     }
 
@@ -1586,6 +1585,11 @@ final class VirtualThread extends BaseVirtualThread {
             adaptAndExecute(task);
         }
 
+        @Override
+        public ScheduledFuture<?> schedule(Runnable task, long delay, TimeUnit unit) {
+            return super.schedule(task, delay, unit);
+        }
+
         /**
          * Wraps the scheduler to avoid leaking a direct reference with
          * {@link VirtualThreadScheduler#current()}.
@@ -1622,11 +1626,7 @@ final class VirtualThread extends BaseVirtualThread {
      * Schedule a runnable task to run after a delay.
      */
     private Future<?> schedule(Runnable command, long delay, TimeUnit unit) {
-        if (scheduler == BUILTIN_SCHEDULER) {
-            return BUILTIN_SCHEDULER.schedule(command, delay, unit);
-        } else {
-            return DelayedTaskSchedulers.schedule(command, delay, unit);
-        }
+        return scheduler.schedule(command, delay, unit);
     }
 
     /**
@@ -1634,7 +1634,7 @@ final class VirtualThread extends BaseVirtualThread {
      * of ScheduledThreadPoolExecutor instances to reduce contention on the delayed
      * work queue used. This class is used when using a custom scheduler.
      */
-    private static class DelayedTaskSchedulers {
+    static class DelayedTaskSchedulers {
         private static final ScheduledExecutorService[] INSTANCE = createDelayedTaskSchedulers();
 
         static Future<?> schedule(Runnable command, long delay, TimeUnit unit) {

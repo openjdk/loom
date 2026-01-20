@@ -31,9 +31,11 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Objects;
+import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.StructureViolationException;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 import jdk.internal.event.ThreadSleepEvent;
 import jdk.internal.javac.Restricted;
@@ -991,6 +993,28 @@ public class Thread implements Runnable {
             var vbuilder = (ThreadBuilders.VirtualThreadBuilder) builder;
             var vthread = (VirtualThread) vbuilder.unstarted(task, preferredCarrier);
             return vthread.virtualThreadTask();
+        }
+
+        /**
+         * Schedules a task that becomes enabled for execution after the given delay.
+         *
+         * <p> This method is invoked to schedule delayed tasks in support of timed
+         * operations and methods such as {@link Thread#sleep(long)} and {@link
+         * Object#wait(long)}. The scheduler should arrange to execute the task on
+         * a platform thread.
+         *
+         * @implSpec The default implementation schedules the task to execute after
+         * the given delay. The task executes on JDK internal thread. An implementation
+         * may wish to override this method when it is capable of scheduling delayed
+         * tasks.
+         *
+         * @param task the task to execute
+         * @param delay the time from now to delay execution
+         * @param unit the time unit of the delay parameter
+         * @return a Future representing pending completion of the task
+         */
+        default Future<?> schedule(Runnable task, long delay, TimeUnit unit) {
+            return VirtualThread.DelayedTaskSchedulers.schedule(task, delay, unit);
         }
 
         // -- prototype 2 --
