@@ -279,7 +279,7 @@ class ThreadBuilders {
             }
             // can't mix custom default scheduler and API prototypes at this time
             if (scheduler != VirtualThread.defaultScheduler()
-                    && VirtualThread.defaultScheduler() != VirtualThread.builtinScheduler()) {
+                    && VirtualThread.defaultScheduler() != VirtualThread.builtinScheduler(true)) {
                 throw new UnsupportedOperationException();
             }
             Class<?> caller = Reflection.getCallerClass();

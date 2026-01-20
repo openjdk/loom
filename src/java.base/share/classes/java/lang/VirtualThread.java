@@ -212,9 +212,10 @@ final class VirtualThread extends BaseVirtualThread {
 
     /**
      * Return the built-in scheduler.
+     * @param trusted true if caller is trusted, false if not trusted
      */
-    static VirtualThreadScheduler builtinScheduler() {
-        return BUILTIN_SCHEDULER;
+    static VirtualThreadScheduler builtinScheduler(boolean trusted) {
+        return trusted ? BUILTIN_SCHEDULER : EXTERNAL_VIEW;
     }
 
     /**

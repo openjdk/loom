@@ -2323,7 +2323,7 @@ public final class System {
             }
 
             public Thread.VirtualThreadScheduler builtinVirtualThreadScheduler() {
-                return VirtualThread.builtinScheduler();
+                return VirtualThread.builtinScheduler(true);
             }
 
             public Thread.VirtualThreadScheduler defaultVirtualThreadScheduler() {
