@@ -976,6 +976,7 @@ public class Thread implements Runnable {
          * @param preferredCarrier the preferred carrirer, can be {@code null}
          * @param task the object to run when the thread executes
          * @return the {@code VirtualThreadTask} that scheduler executes
+         * @throws UnsupportedOperationException if this is the built-in default scheduler
          *
          * @see <a href="Thread.html#inheritance">Inheritance when creating threads</a>
          */
@@ -983,11 +984,12 @@ public class Thread implements Runnable {
                                             Thread preferredCarrier,
                                             Runnable task) {
             Objects.requireNonNull(builder);
+            Objects.requireNonNull(task);
+            if (this == VirtualThread.builtinScheduler(false)) {
+                throw new UnsupportedOperationException();
+            }
             var vbuilder = (ThreadBuilders.VirtualThreadBuilder) builder;
             var vthread = (VirtualThread) vbuilder.unstarted(task, preferredCarrier);
-            if (vthread.scheduler(true) != this) {
-                throw new IllegalStateException("Builder is configured for prototype 2");
-            }
             return vthread.virtualThreadTask();
         }
 
