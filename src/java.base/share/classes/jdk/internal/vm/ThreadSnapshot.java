@@ -66,10 +66,10 @@ public class ThreadSnapshot {
         if (snapshot == null) {
             return null; // thread not alive
         }
-        if (snapshot.stackTrace == null) {
-            snapshot.stackTrace = EMPTY_STACK;
-        } else {
+        if (snapshot.stackTrace != null) {
             JLA.finishInit(snapshot.stackTrace);
+        } else {
+            snapshot.stackTrace = EMPTY_STACK;
         }
         if (snapshot.locks != null) {
             Arrays.stream(snapshot.locks).forEach(ThreadLock::finishInit);

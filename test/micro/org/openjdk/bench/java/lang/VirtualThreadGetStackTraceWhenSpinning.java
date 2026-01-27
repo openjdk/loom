@@ -32,7 +32,7 @@ import org.openjdk.jmh.annotations.*;
 @Warmup(iterations = 10, time = 1)
 @Measurement(iterations = 10, time = 1)
 @Fork(value = 3)
-public class VirtualThreadGetStackTraceWhenMounted {
+public class VirtualThreadGetStackTraceWhenSpinning {
     private volatile boolean done;
     private Thread thread;
 
