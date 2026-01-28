@@ -25,6 +25,7 @@
 package com.sun.management.internal;
 
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ThreadPoolExecutor;
 import javax.management.ObjectName;
 import jdk.management.VirtualThreadSchedulerMXBean;
 import jdk.internal.access.JavaLangAccess;
@@ -50,7 +51,7 @@ public class VirtualThreadSchedulerImpls {
             return new BoundVirtualThreadSchedulerImpl();
         }
 
-        // built-in ForkJoinPool scheduler
+        // built-in scheduler
         if (System.getProperty("jdk.virtualThreadScheduler.implClass") == null) {
             return new BuiltinVirtualThreadSchedulerImpl();
         }
@@ -98,39 +99,58 @@ public class VirtualThreadSchedulerImpls {
 
     /**
      * Implementation of VirtualThreadSchedulerMXBean when virtual threads are
-     * implemented with continuations and the built-in ForkJoinPool scheduler.
+     * implemented with continuations and the built-in scheduler.
      */
     private static final class BuiltinVirtualThreadSchedulerImpl
             extends BaseVirtualThreadSchedulerImpl {
 
-        private ForkJoinPool forkJoinPool() {
-            return (ForkJoinPool) JLA.builtinVirtualThreadScheduler();
+        private Thread.VirtualThreadScheduler builtinScheduler() {
+            return JLA.builtinVirtualThreadScheduler();
         }
 
         @Override
         public int getParallelism() {
-            return forkJoinPool().getParallelism();
+            return switch (builtinScheduler()) {
+                case ForkJoinPool pool -> pool.getParallelism();
+                case ThreadPoolExecutor pool -> pool.getMaximumPoolSize();
+                default -> -1;
+            };
         }
 
         @Override
         public void setParallelism(int size) {
-            forkJoinPool().setParallelism(size);
+            if (builtinScheduler() instanceof ForkJoinPool pool) {
+                pool.setParallelism(size);
+            } else {
+                throw new UnsupportedOperationException();
+            }
         }
 
         @Override
         public int getPoolSize() {
-            return forkJoinPool().getPoolSize();
+            return switch (builtinScheduler()) {
+                case ForkJoinPool pool -> pool.getPoolSize();
+                case ThreadPoolExecutor pool -> pool.getPoolSize();
+                default -> -1;
+            };
         }
 
         @Override
         public int getMountedVirtualThreadCount() {
-            return forkJoinPool().getActiveThreadCount();
+            return switch (builtinScheduler()) {
+                case ForkJoinPool pool -> pool.getActiveThreadCount();
+                case ThreadPoolExecutor pool -> pool.getActiveCount();
+                default -> -1;
+            };
         }
 
         @Override
         public long getQueuedVirtualThreadCount() {
-            ForkJoinPool p = forkJoinPool();
-            return p.getQueuedTaskCount() + p.getQueuedSubmissionCount();
+            return switch (builtinScheduler()) {
+                case ForkJoinPool pool -> pool.getQueuedTaskCount() + pool.getQueuedSubmissionCount();
+                case ThreadPoolExecutor pool -> pool.getQueue().size();
+                default -> -1L;
+            };
         }
     }
 
