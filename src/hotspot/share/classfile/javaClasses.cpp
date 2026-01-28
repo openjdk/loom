@@ -1904,7 +1904,7 @@ oop java_lang_Thread::park_blocker(oop java_thread) {
   return java_thread->obj_field_access<MO_RELAXED>(_park_blocker_offset);
 }
 
-// Obtain stack trace for a platform of virtual thread.
+// Obtain stack trace for a platform or virtual thread.
 oop java_lang_Thread::async_get_stack_trace(jobject jthread, TRAPS) {
   ThreadsListHandle tlh(THREAD);
   JavaThread* java_thread = nullptr;
