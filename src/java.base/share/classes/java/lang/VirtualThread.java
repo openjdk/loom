@@ -34,10 +34,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import jdk.internal.event.VirtualThreadEndEvent;
 import jdk.internal.event.VirtualThreadParkEvent;
@@ -68,15 +71,15 @@ final class VirtualThread extends BaseVirtualThread {
     private static final Unsafe U = Unsafe.getUnsafe();
     private static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
 
-    private static final BuiltinScheduler BUILTIN_SCHEDULER;
+    private static final VirtualThreadScheduler BUILTIN_SCHEDULER;
     private static final VirtualThreadScheduler DEFAULT_SCHEDULER;
     private static final VirtualThreadScheduler EXTERNAL_VIEW;
     static {
         // experimental
         String propValue = System.getProperty("jdk.virtualThreadScheduler.implClass");
         if (propValue != null) {
-            BuiltinScheduler builtinScheduler = createBuiltinScheduler(true);
-            VirtualThreadScheduler externalView = builtinScheduler.createExternalView();
+            VirtualThreadScheduler builtinScheduler = createBuiltinScheduler(true);
+            VirtualThreadScheduler externalView = createExternalView(builtinScheduler);
             VirtualThreadScheduler defaultScheduler = loadCustomScheduler(externalView, propValue);
             BUILTIN_SCHEDULER = builtinScheduler;
             DEFAULT_SCHEDULER = defaultScheduler;
@@ -85,7 +88,7 @@ final class VirtualThread extends BaseVirtualThread {
             var builtinScheduler = createBuiltinScheduler(false);
             BUILTIN_SCHEDULER = builtinScheduler;
             DEFAULT_SCHEDULER = builtinScheduler;
-            EXTERNAL_VIEW = builtinScheduler.createExternalView();
+            EXTERNAL_VIEW = createExternalView(builtinScheduler);
         }
     }
 
@@ -1534,7 +1537,7 @@ final class VirtualThread extends BaseVirtualThread {
      * Creates the built-in ForkJoinPool scheduler.
      * @param wrapped true if wrapped by a custom default scheduler
      */
-    private static BuiltinScheduler createBuiltinScheduler(boolean wrapped) {
+    private static VirtualThreadScheduler createBuiltinScheduler(boolean wrapped) {
         int parallelism, maxPoolSize, minRunnable;
         String parallelismValue = System.getProperty("jdk.virtualThreadScheduler.parallelism");
         String maxPoolSizeValue = System.getProperty("jdk.virtualThreadScheduler.maxPoolSize");
@@ -1555,23 +1558,27 @@ final class VirtualThread extends BaseVirtualThread {
         } else {
             minRunnable = Integer.max(parallelism / 2, 1);
         }
-        return new BuiltinScheduler(parallelism, maxPoolSize, minRunnable, wrapped);
+        if (System.getProperty("jdk.virtualThreadScheduler.threadPoolExecutor") != null) {
+            return new BuiltinThreadPoolExecutorScheduler(parallelism);
+        } else {
+            return new BuiltinForkJoinPoolScheduler(parallelism, maxPoolSize, minRunnable, wrapped);
+        }
     }
 
     /**
      * The built-in ForkJoinPool scheduler.
      */
-    private static class BuiltinScheduler
+    private static class BuiltinForkJoinPoolScheduler
             extends ForkJoinPool implements VirtualThreadScheduler {
 
-        BuiltinScheduler(int parallelism, int maxPoolSize, int minRunnable, boolean wrapped) {
+        BuiltinForkJoinPoolScheduler(int parallelism, int maxPoolSize, int minRunnable, boolean wrapped) {
             ForkJoinWorkerThreadFactory factory = wrapped
                     ? ForkJoinPool.defaultForkJoinWorkerThreadFactory
                     : CarrierThread::new;
             Thread.UncaughtExceptionHandler handler = (t, e) -> { };
             boolean asyncMode = true; // FIFO
             super(parallelism, factory, handler, asyncMode,
-                    0, maxPoolSize, minRunnable, pool -> true, 30, SECONDS);
+                    0, maxPoolSize, minRunnable, pool -> true, 30L, SECONDS);
         }
 
         private void adaptAndExecute(Runnable task) {
@@ -1592,37 +1599,61 @@ final class VirtualThread extends BaseVirtualThread {
         public ScheduledFuture<?> schedule(Runnable task, long delay, TimeUnit unit) {
             return super.schedule(task, delay, unit);
         }
+    }
 
-        /**
-         * Wraps the scheduler to avoid leaking a direct reference with
-         * {@link VirtualThreadScheduler#current()}.
-         */
-        VirtualThreadScheduler createExternalView() {
-            BuiltinScheduler builtin = this;
-            return new VirtualThreadScheduler() {
-                private void execute(VirtualThreadTask task) {
-                    var vthread = (VirtualThread) task.thread();
-                    VirtualThreadScheduler scheduler = vthread.scheduler;
-                    if (scheduler == this || scheduler == DEFAULT_SCHEDULER) {
-                        builtin.adaptAndExecute(task);
-                    } else {
-                        throw new IllegalArgumentException();
-                    }
-                }
-                @Override
-                public void onStart(VirtualThreadTask task) {
-                    execute(task);
-                }
-                @Override
-                public void onContinue(VirtualThreadTask task) {
-                    execute(task);
-                }
-                @Override
-                public String toString() {
-                    return builtin.toString();
-                }
-            };
+    /**
+     * Built-in ThreadPoolExecutor scheduler.
+     */
+    private static class BuiltinThreadPoolExecutorScheduler
+            extends ThreadPoolExecutor implements VirtualThreadScheduler {
+
+        BuiltinThreadPoolExecutorScheduler(int maxPoolSize) {
+            ThreadFactory factory = task -> InnocuousThread.newThread(task);
+            super(maxPoolSize, maxPoolSize,
+                    0L, SECONDS,
+                    new LinkedTransferQueue<>(),
+                    factory);
         }
+
+        @Override
+        public void onStart(VirtualThreadTask task) {
+            execute(task);
+        }
+
+        @Override
+        public void onContinue(VirtualThreadTask task) {
+            execute(task);
+        }
+    }
+
+    /**
+     * Wraps the scheduler to avoid leaking a direct reference with
+     * {@link VirtualThreadScheduler#current()}.
+     */
+    static VirtualThreadScheduler createExternalView(VirtualThreadScheduler delegate) {
+        return new VirtualThreadScheduler() {
+            private void check(VirtualThreadTask task) {
+                var vthread = (VirtualThread) task.thread();
+                VirtualThreadScheduler scheduler = vthread.scheduler;
+                if (scheduler != this && scheduler != DEFAULT_SCHEDULER) {
+                    throw new IllegalArgumentException();
+                }
+            }
+            @Override
+            public void onStart(VirtualThreadTask task) {
+                check(task);
+                delegate.onStart(task);
+            }
+            @Override
+            public void onContinue(VirtualThreadTask task) {
+                check(task);
+                delegate.onContinue(task);
+            }
+            @Override
+            public String toString() {
+                return delegate.toString();
+            }
+        };
     }
 
     /**
