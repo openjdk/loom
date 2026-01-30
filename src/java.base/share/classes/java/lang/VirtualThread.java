@@ -74,6 +74,7 @@ final class VirtualThread extends BaseVirtualThread {
     private static final VirtualThreadScheduler BUILTIN_SCHEDULER;
     private static final VirtualThreadScheduler DEFAULT_SCHEDULER;
     private static final VirtualThreadScheduler EXTERNAL_VIEW;
+    private static final boolean USE_STPE;
     static {
         // experimental
         String propValue = System.getProperty("jdk.virtualThreadScheduler.implClass");
@@ -90,6 +91,7 @@ final class VirtualThread extends BaseVirtualThread {
             DEFAULT_SCHEDULER = builtinScheduler;
             EXTERNAL_VIEW = createExternalView(builtinScheduler);
         }
+        USE_STPE = Boolean.getBoolean("jdk.virtualThreadScheduler.useSTPE");
     }
 
     private static final long STATE = U.objectFieldOffset(VirtualThread.class, "state");
@@ -1558,7 +1560,7 @@ final class VirtualThread extends BaseVirtualThread {
         } else {
             minRunnable = Integer.max(parallelism / 2, 1);
         }
-        if (System.getProperty("jdk.virtualThreadScheduler.threadPoolExecutor") != null) {
+        if (Boolean.getBoolean("jdk.virtualThreadScheduler.useTPE")) {
             return new BuiltinThreadPoolExecutorScheduler(parallelism);
         } else {
             return new BuiltinForkJoinPoolScheduler(parallelism, maxPoolSize, minRunnable, wrapped);
@@ -1608,7 +1610,11 @@ final class VirtualThread extends BaseVirtualThread {
             extends ThreadPoolExecutor implements VirtualThreadScheduler {
 
         BuiltinThreadPoolExecutorScheduler(int maxPoolSize) {
-            ThreadFactory factory = task -> InnocuousThread.newThread(task);
+            ThreadFactory factory = task -> {
+                Thread t = InnocuousThread.newThread(task);
+                t.setDaemon(true);
+                return t;
+            };
             super(maxPoolSize, maxPoolSize,
                     0L, SECONDS,
                     new LinkedTransferQueue<>(),
@@ -1660,7 +1666,11 @@ final class VirtualThread extends BaseVirtualThread {
      * Schedule a runnable task to run after a delay.
      */
     private Future<?> schedule(Runnable command, long delay, TimeUnit unit) {
-        return scheduler.schedule(command, delay, unit);
+        if (USE_STPE) {
+            return DelayedTaskSchedulers.schedule(command, delay, unit);
+        } else {
+            return scheduler.schedule(command, delay, unit);
+        }
     }
 
     /**
