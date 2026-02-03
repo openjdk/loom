@@ -784,3 +784,16 @@ tools/sincechecker/modules/java.base/JavaBaseCheckSince.java 0000000 generic-all
 
 # confused by java.base/jdk/internal/ffi/generated/iouring/sockaddr_in.java
 build/translations/VerifyTranslations.java 0000000 generic-all
+
+#############################################################################
+
+# Preview project specific failures go here at the end of the file.
+#
+# These are NOT failures that occur with the '--enable-preview' option
+# specified; those go in the appropriate ProblemList-enable-preview.txt file.
+# These are failures that occur WITHOUT the '--enable-preview' option
+# specified AND occur because of some issue with preview project code,
+# in either implementation or test code.
+
+#############################################################################
+
