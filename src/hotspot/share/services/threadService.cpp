@@ -1299,7 +1299,7 @@ public:
       return;
     }
 
-    bool vthread_carrier = !is_virtual && (_java_thread != nullptr) && (_java_thread->vthread_continuation() != nullptr);
+    bool vthread_carrier = !is_virtual && (_java_thread->vthread_continuation() != nullptr);
 
     oop park_blocker = java_lang_Thread::park_blocker(_thread_h());
     if (park_blocker != nullptr) {
@@ -1460,13 +1460,13 @@ oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, jboolean include
   HandleMark   hm(THREAD);
 
   JavaThread* java_thread = nullptr;
-  oop thread_oop;
+  oop thread_oop = nullptr;
   bool has_javathread = tlh.cv_internal_thread_to_JavaThread(jthread, &java_thread, &thread_oop);
-  assert((has_javathread && thread_oop != nullptr) || !has_javathread, "Missing Thread oop");
+  assert(thread_oop != nullptr, "Missing Thread oop");
   bool is_virtual = java_lang_VirtualThread::is_instance(thread_oop);  // Deals with null
 
   if (!has_javathread && !is_virtual) {
-    return nullptr; // thread terminated so not of interest
+    return nullptr; // platform thread terminated
   }
 
   // Handshake with target
@@ -1478,9 +1478,9 @@ oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, jboolean include
     Handshake::execute(&cl, &tlh, java_thread);
   }
 
-  // thread not alive
-  if (cl._thread_status == JavaThreadStatus::NEW || cl._thread_status == JavaThreadStatus::TERMINATED) {
-    return nullptr;
+  assert(cl._thread_status != JavaThreadStatus::NEW, "unstarted Thread");
+  if (is_virtual && (cl._thread_status == JavaThreadStatus::TERMINATED)) {
+    return nullptr; // virtual thread terminated
   }
 
   // StackTrace
