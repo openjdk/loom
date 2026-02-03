@@ -301,7 +301,7 @@ JVM_Interrupt(JNIEnv *env, jobject thread);
 JNIEXPORT jboolean JNICALL
 JVM_HoldsLock(JNIEnv *env, jclass threadClass, jobject obj);
 
-JNIEXPORT jobject JNICALL
+JNIEXPORT jobjectArray JNICALL
 JVM_GetStackTrace(JNIEnv *env, jobject thread);
 
 JNIEXPORT jobject JNICALL
