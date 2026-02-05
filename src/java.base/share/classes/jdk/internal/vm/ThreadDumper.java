@@ -178,7 +178,7 @@ public class ThreadDumper {
     }
 
     private static boolean dumpThread(Thread thread, TextWriter writer) {
-        ThreadSnapshot snapshot = ThreadSnapshot.of(thread, true);
+        ThreadSnapshot snapshot = ThreadSnapshot.of(thread);
         if (snapshot == null) {
             return false; // thread not alive
         }
@@ -316,7 +316,7 @@ public class ThreadDumper {
      */
     private static boolean dumpThread(Thread thread, JsonWriter jsonWriter) {
         Instant now = Instant.now();
-        ThreadSnapshot snapshot = ThreadSnapshot.of(thread, true);
+        ThreadSnapshot snapshot = ThreadSnapshot.of(thread);
         if (snapshot == null) {
             return false; // thread not alive
         }

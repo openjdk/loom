@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003, 2025, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2003, 2026, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -1121,7 +1121,6 @@ ThreadsListEnumerator::ThreadsListEnumerator(Thread* cur_thread,
 
 
 // jdk.internal.vm.ThreadSnapshot support
-
 class GetThreadSnapshotHandshakeClosure: public HandshakeClosure {
 private:
   static OopStorage* oop_storage() {
@@ -1171,7 +1170,6 @@ public:
   };
 
   Handle _thread_h;
-  jboolean _include_monitors;
   JavaThread* _java_thread;
   int _frame_count; // length of _methods and _bcis arrays
   GrowableArray<Method*>* _methods;
@@ -1182,9 +1180,9 @@ public:
   GrowableArray<OwnedLock>* _locks;
   Blocker _blocker;
 
-  GetThreadSnapshotHandshakeClosure(Handle thread_h, jboolean include_monitors):
+  GetThreadSnapshotHandshakeClosure(Handle thread_h):
     HandshakeClosure("GetThreadSnapshotHandshakeClosure"),
-    _thread_h(thread_h), _include_monitors(include_monitors), _java_thread(nullptr),
+    _thread_h(thread_h), _java_thread(nullptr),
     _frame_count(0), _methods(nullptr), _bcis(nullptr),
     _thread_status(), _thread_name(nullptr),
     _locks(nullptr), _blocker() {
@@ -1326,18 +1324,15 @@ public:
     _locks = new (mtInternal) GrowableArray<OwnedLock>(init_length, mtInternal);
     int total_count = 0;
 
-    bool include_monitors = (_include_monitors == JNI_TRUE);
     vframeStream vfst(_java_thread != nullptr
-      ? vframeStream(_java_thread, false, include_monitors, vthread_carrier)
+      ? vframeStream(_java_thread, false, true, vthread_carrier)
       : vframeStream(java_lang_VirtualThread::continuation(_thread_h())));
 
     for (;
       !vfst.at_end() && (max_depth == 0 || max_depth != total_count);
       vfst.next()) {
 
-      if (include_monitors) {
-        detect_locks(vfst.asJavaVFrame(), total_count);
-      }
+      detect_locks(vfst.asJavaVFrame(), total_count);
 
       if (skip_hidden && (vfst.method()->is_hidden() ||
         vfst.method()->is_continuation_enter_intrinsic())) {
@@ -1453,7 +1448,7 @@ int jdk_internal_vm_ThreadSnapshot::_blockerTypeOrdinal_offset;
 int jdk_internal_vm_ThreadSnapshot::_blockerObject_offset;
 int jdk_internal_vm_ThreadSnapshot::_parkBlockerOwner_offset;
 
-oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, jboolean include_monitors, TRAPS) {
+oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, TRAPS) {
   ThreadsListHandle tlh(THREAD);
 
   ResourceMark rm(THREAD);
@@ -1471,7 +1466,7 @@ oop ThreadSnapshotFactory::get_thread_snapshot(jobject jthread, jboolean include
 
   // Handshake with target
   Handle thread_h(THREAD, thread_oop);
-  GetThreadSnapshotHandshakeClosure cl(thread_h, include_monitors);
+  GetThreadSnapshotHandshakeClosure cl(thread_h);
   if (java_lang_VirtualThread::is_instance(thread_oop)) {
     Handshake::execute(&cl, thread_oop);
   } else {

@@ -1073,7 +1073,7 @@ final class VirtualThread extends BaseVirtualThread {
                 return;
             }
             if (!compareAndSetState(TIMED_WAIT, UNBLOCKED)) {
-                // already unblocked
+                // already notified (or interrupted)
                 return;
             }
         }

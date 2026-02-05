@@ -2915,8 +2915,8 @@ JVM_ENTRY(jobjectArray, JVM_GetStackTrace(JNIEnv *env, jobject jthread))
   return (jobjectArray) JNIHandles::make_local(THREAD, trace);
 JVM_END
 
-JVM_ENTRY(jobject, JVM_CreateThreadSnapshot(JNIEnv* env, jobject jthread, jboolean includeMonitors))
-  oop snapshot = ThreadSnapshotFactory::get_thread_snapshot(jthread, includeMonitors, THREAD);
+JVM_ENTRY(jobject, JVM_CreateThreadSnapshot(JNIEnv* env, jobject jthread))
+  oop snapshot = ThreadSnapshotFactory::get_thread_snapshot(jthread, THREAD);
   return JNIHandles::make_local(THREAD, snapshot);
 JVM_END
 
