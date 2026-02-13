@@ -92,10 +92,7 @@ public class TestRestricted {
             RestrictedMethod.of(System.class, "load", void.class, String.class),
             RestrictedMethod.of(System.class, "loadLibrary", void.class, String.class),
             RestrictedMethod.of(Runtime.class, "load", void.class, String.class),
-            RestrictedMethod.of(Runtime.class, "loadLibrary", void.class, String.class),
-            // custom scheduler prototype 2
-            RestrictedMethod.of(Thread.Builder.OfVirtual.class, "scheduler", Thread.Builder.OfVirtual.class, Thread.VirtualThreadScheduler.class),
-            RestrictedMethod.of(Thread.VirtualThreadScheduler.class, "current", Thread.VirtualThreadScheduler.class)
+            RestrictedMethod.of(Runtime.class, "loadLibrary", void.class, String.class)
     );
 
     @Test
