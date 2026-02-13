@@ -34,8 +34,6 @@ import java.util.Objects;
 import java.util.concurrent.ThreadFactory;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.invoke.MhUtil;
-import jdk.internal.reflect.CallerSensitive;
-import jdk.internal.reflect.Reflection;
 import jdk.internal.vm.ContinuationSupport;
 
 /**
@@ -268,24 +266,6 @@ class ThreadBuilders {
         public ThreadFactory factory() {
             return new VirtualThreadFactory(scheduler, name(), counter(), characteristics(),
                     uncaughtExceptionHandler());
-        }
-
-        @SuppressWarnings("removal")
-        @CallerSensitive
-        @Override
-        public OfVirtual scheduler(Thread.VirtualThreadScheduler scheduler) {
-            if (!ContinuationSupport.isSupported()) {
-                throw new UnsupportedOperationException();
-            }
-            // can't mix custom default scheduler and API prototypes at this time
-            if (scheduler != VirtualThread.defaultScheduler()
-                    && VirtualThread.defaultScheduler() != VirtualThread.builtinScheduler(true)) {
-                throw new UnsupportedOperationException();
-            }
-            Class<?> caller = Reflection.getCallerClass();
-            caller.getModule().ensureNativeAccess(OfVirtual.class, "scheduler", caller, false);
-            this.scheduler = Objects.requireNonNull(scheduler);
-            return this;
         }
     }
 

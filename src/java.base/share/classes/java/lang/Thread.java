@@ -38,12 +38,9 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 import jdk.internal.event.ThreadSleepEvent;
-import jdk.internal.javac.Restricted;
 import jdk.internal.misc.TerminatingThreadLocal;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.misc.VM;
-import jdk.internal.reflect.CallerSensitive;
-import jdk.internal.reflect.Reflection;
 import jdk.internal.vm.Continuation;
 import jdk.internal.vm.ScopedValueContainer;
 import jdk.internal.vm.StackableScope;
@@ -842,7 +839,7 @@ public class Thread implements Runnable {
      * @since 99
      */
     public sealed interface VirtualThreadTask extends Runnable permits
-            VirtualThread.BuiltinSchedulerTask, VirtualThread.CustomSchedulerTask {
+            VirtualThread.VThreadRunner {
 
         /**
          * {@return the virtual thread that this task starts or continues}
@@ -952,8 +949,6 @@ public class Thread implements Runnable {
          */
         void onContinue(VirtualThreadTask task);
 
-        // -- prototype 1 --
-
         /**
          * Creates a new virtual thread, returning the {@code VirtualThreadTask} that the
          * virtual thread scheduler arranges to execute on a platform thread to start or
@@ -1015,29 +1010,6 @@ public class Thread implements Runnable {
          */
         default Future<?> schedule(Runnable task, long delay, TimeUnit unit) {
             return VirtualThread.DelayedTaskSchedulers.schedule(task, delay, unit);
-        }
-
-        // -- prototype 2 --
-
-        /**
-         * {@return the virtual thread scheduler for the current virtual thread}
-         * @throws UnsupportedOperationException if the current thread is not a virtual
-         * thread or scheduling virtual threads to a user-provided scheduler is not
-         * supported by this VM
-         */
-        @Deprecated(forRemoval=true)
-        @CallerSensitive
-        @Restricted
-        static VirtualThreadScheduler current() {
-            if (Thread.currentThread() instanceof VirtualThread vthread) {
-                Class<?> caller = Reflection.getCallerClass();
-                caller.getModule().ensureNativeAccess(VirtualThreadScheduler.class,
-                                                     "current",
-                                                      caller,
-                                                      false);
-                return vthread.scheduler(false);
-            }
-            throw new UnsupportedOperationException();
         }
     }
 
@@ -1295,34 +1267,6 @@ public class Thread implements Runnable {
 
             @Override OfVirtual inheritInheritableThreadLocals(boolean inherit);
             @Override OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
-
-            // -- prototype 2 --
-
-            /**
-             * Sets the scheduler.
-             *
-             * <p> The virtual thread will be scheduled by the Java virtual machine with
-             * the given scheduler. The scheduler's {@link
-             * VirtualThreadScheduler#onStart(VirtualThreadTask) onStart} and
-             * {@link VirtualThreadScheduler#onContinue(VirtualThreadTask) onContinue}
-             * methods may be invoked in the context of a virtual thread. The scheduler
-             * must arrange to execute the {@link VirtualThreadTask}'s
-             * {@code run} method on a platform thread. Attempting to execute the run
-             * method in a virtual thread causes {@link WrongThreadException} to be thrown.
-             * The {@code onStart} and {@code onContinue }methods may be invoked at
-             * sensitive times (e.g. when unparking a thread) so care should be taken to
-             * not directly execute the task on the <em>current thread</em>.
-             *
-             * @param scheduler the scheduler
-             * @return this builder
-             * @throws UnsupportedOperationException if scheduling virtual threads to a
-             *         user-provided scheduler is not supported by this VM
-             * @since 99
-             */
-            @Deprecated(forRemoval=true)
-            @CallerSensitive
-            @Restricted
-            OfVirtual scheduler(VirtualThreadScheduler scheduler);
         }
     }
 

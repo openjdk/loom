@@ -2330,14 +2330,6 @@ public final class System {
                 return VirtualThread.defaultScheduler();
             }
 
-            public Thread.VirtualThreadScheduler virtualThreadScheduler(Thread thread) {
-                if (thread instanceof VirtualThread vthread) {
-                    return vthread.scheduler(true);
-                } else {
-                    throw new IllegalArgumentException();
-                }
-            }
-
             public StackWalker newStackWalkerInstance(Set<StackWalker.Option> options,
                                                       ContinuationScope contScope,
                                                       Continuation continuation) {
