@@ -1,7 +1,6 @@
 # Custom Schedulers
 
-The following is a summary of the experimental support for custom virtual thread schedulers
-in the `fibers` branch of the loom repo.
+The following is a summary of the experimental support for custom virtual thread schedulers.
 
 The purpose of the experimental support is to allow exploration and get feedback to help
 inform this project on whether to expose anything.
@@ -42,6 +41,9 @@ If the scheduler class implements `jdk.management.VirtualThreadSchedulerMXBean` 
 the management interface will be registered with the platform `MBeanServer`.
 
 ## Prototype 2: Use API to select a custom scheduler when creating a virtual thread
+
+(This prototype has been removed from the fibers branch to allow for more testing with
+prototype 1)
 
 The `Thread.Builder.OfVirtual.scheduler(Thread.VirtualThreadScheduler)` API can be used
 to set the scheduler when creating a virtual thread. The following example uses a thread

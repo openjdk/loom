@@ -638,11 +638,6 @@ public interface JavaLangAccess {
     Thread.VirtualThreadScheduler defaultVirtualThreadScheduler();
 
     /**
-     * Returns the scheduler for the given virtual thread.
-     */
-    Thread.VirtualThreadScheduler virtualThreadScheduler(Thread thread);
-
-    /**
      * Creates a new StackWalker
      */
     StackWalker newStackWalkerInstance(Set<StackWalker.Option> options,

@@ -103,7 +103,7 @@ final class VirtualThread extends BaseVirtualThread {
     // scheduler and continuation
     private final VirtualThreadScheduler scheduler;
     private final Continuation cont;
-    private final VirtualThreadTask runContinuation;
+    private final VThreadRunner runContinuation;
 
     // virtual thread state, accessed by VM
     private volatile int state;
@@ -239,18 +239,6 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Return the scheduler for this thread.
-     * @param trusted true if caller is trusted, false if not trusted
-     */
-    VirtualThreadScheduler scheduler(boolean trusted) {
-        if (scheduler == BUILTIN_SCHEDULER && !trusted) {
-            return EXTERNAL_VIEW;
-        } else {
-            return scheduler;
-        }
-    }
-
-    /**
      * Returns the task to start/continue this virtual thread.
      */
     VirtualThreadTask virtualThreadTask() {
@@ -284,26 +272,26 @@ final class VirtualThread extends BaseVirtualThread {
         this.cont = new VThreadContinuation(this, task);
 
         if (scheduler == BUILTIN_SCHEDULER) {
-            this.runContinuation = new BuiltinSchedulerTask(this);
+            this.runContinuation = new VThreadRunner(this);
         } else {
-            this.runContinuation = new CustomSchedulerTask(this, preferredCarrier);
+            this.runContinuation = new CustomSchedulerVThreadRunner(this, preferredCarrier);
         }
     }
 
     /**
-     * The task to execute when using the built-in scheduler.
+     * The task to start/continue a virtual thread.
      */
-    static final class BuiltinSchedulerTask implements VirtualThreadTask {
+    static non-sealed class VThreadRunner implements VirtualThreadTask {
         private final VirtualThread vthread;
-        BuiltinSchedulerTask(VirtualThread vthread) {
+        VThreadRunner(VirtualThread vthread) {
             this.vthread = vthread;
         }
         @Override
-        public Thread thread() {
+        public final Thread thread() {
             return vthread;
         }
         @Override
-        public void run() {
+        public final void run() {
             vthread.runContinuation();;
         }
         @Override
@@ -321,25 +309,16 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * The task to execute when using a custom scheduler.
+     * The task to start/continue a virtual thread when using a custom scheduler.
      */
-    static final class CustomSchedulerTask implements VirtualThreadTask {
+    static final class CustomSchedulerVThreadRunner extends VThreadRunner {
         private static final VarHandle ATT =
                 MhUtil.findVarHandle(MethodHandles.lookup(), "att", Object.class);
-        private final VirtualThread vthread;
         private final Thread preferredCarrier;
         private volatile Object att;
-        CustomSchedulerTask(VirtualThread vthread, Thread preferredCarrier) {
-            this.vthread = vthread;
+        CustomSchedulerVThreadRunner(VirtualThread vthread, Thread preferredCarrier) {
+            super(vthread);
             this.preferredCarrier = preferredCarrier;
-        }
-        @Override
-        public Thread thread() {
-            return vthread;
-        }
-        @Override
-        public void run() {
-            vthread.runContinuation();;
         }
         @Override
         public Thread preferredCarrier() {
@@ -1583,18 +1562,14 @@ final class VirtualThread extends BaseVirtualThread {
                     0, maxPoolSize, minRunnable, pool -> true, 30L, SECONDS);
         }
 
-        private void adaptAndExecute(Runnable task) {
+        @Override
+        public void onStart(VirtualThreadTask task) {
             execute(ForkJoinTask.adapt(task));
         }
 
         @Override
-        public void onStart(VirtualThreadTask task) {
-            adaptAndExecute(task);
-        }
-
-        @Override
         public void onContinue(VirtualThreadTask task) {
-            adaptAndExecute(task);
+            execute(ForkJoinTask.adapt(task));
         }
 
         @Override
