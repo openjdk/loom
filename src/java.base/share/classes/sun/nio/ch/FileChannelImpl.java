@@ -359,7 +359,8 @@ public class FileChannelImpl
                 do {
                     boolean attempted = Blocker.begin(sync || direct);
                     try {
-                        boolean usePoller = supportPollerWrite && sync;
+                        boolean usePoller = supportPollerWrite && sync
+                                && Thread.currentThread().isVirtual();
                         n = IOUtil.write(fd, src, -1, direct, false, alignment, nd, usePoller, this::isOpen);
                     } finally {
                         Blocker.end(attempted);
