@@ -29,6 +29,7 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.ref.Cleaner.Cleanable;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.LockSupport;
@@ -300,7 +301,24 @@ public class IoUringPoller extends Poller {
         // copy the bytes from the byte array into the buffer
         MemorySegment src = MemorySegment.ofArray(b);
         MemorySegment.copy(src, off, buf, 0, len);
+        return implWrite0(fd, buf, len, isOpen);
+    }
 
+    @Override
+    int implWrite(int fd, ByteBuffer bb, BooleanSupplier isOpen) throws IOException {
+        int len = bb.remaining();
+        // off-heap buffer for write op
+        MemorySegment buf = takeMemorySegment();
+        len = Math.min(len, (int) buf.byteSize());
+
+        // copy the bytes from the byte array into the buffer
+        MemorySegment src = MemorySegment.ofBuffer(bb);
+        MemorySegment.copy(src, 0, buf, 0, len);
+        return implWrite0(fd, buf, len, isOpen);
+    }
+
+    private int implWrite0(int fd, MemorySegment buf, int len, BooleanSupplier isOpen)
+            throws IOException {
         // use the buffer address as the user_data
         long udata = buf.address();
         var op = new Op(Thread.currentThread());

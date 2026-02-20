@@ -29,6 +29,9 @@ import java.io.FileDescriptor;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
+
+import jdk.internal.access.JavaIOFileDescriptorAccess;
 import jdk.internal.access.JavaNioAccess;
 import jdk.internal.access.SharedSecrets;
 import jdk.internal.foreign.MemorySessionImpl;
@@ -55,30 +58,30 @@ public final class IOUtil {
                      NativeDispatcher nd)
         throws IOException
     {
-        return write(fd, src, position, false, false, -1, nd);
+        return write(fd, src, position, false, false, -1, nd, false, null);
     }
 
     static int write(FileDescriptor fd, ByteBuffer src, long position,
                      boolean async, NativeDispatcher nd)
         throws IOException
     {
-        return write(fd, src, position, false, async, -1, nd);
+        return write(fd, src, position, false, async, -1, nd, false, null);
     }
 
     static int write(FileDescriptor fd, ByteBuffer src, long position,
                      boolean directIO, int alignment, NativeDispatcher nd)
         throws IOException
     {
-        return write(fd, src, position, directIO, false, alignment, nd);
+        return write(fd, src, position, directIO, false, alignment, nd, false, null);
     }
 
     static int write(FileDescriptor fd, ByteBuffer src, long position,
                      boolean directIO, boolean async, int alignment,
-                     NativeDispatcher nd)
+                     NativeDispatcher nd,  boolean usePoller, BooleanSupplier isOpen)
         throws IOException
     {
         if (src instanceof DirectBuffer) {
-            return writeFromNativeBuffer(fd, src, position, directIO, async, alignment, nd);
+            return writeFromNativeBuffer(fd, src, position, directIO, async, alignment, nd, usePoller, isOpen);
         }
 
         // Substitute a native buffer
@@ -99,7 +102,7 @@ public final class IOUtil {
             // Do not update src until we see how many bytes were written
             src.position(pos);
 
-            int n = writeFromNativeBuffer(fd, bb, position, directIO, async, alignment, nd);
+            int n = writeFromNativeBuffer(fd, bb, position, directIO, async, alignment, nd, usePoller, isOpen);
             if (n > 0) {
                 // now update src
                 src.position(pos + n);
@@ -113,7 +116,7 @@ public final class IOUtil {
     private static int writeFromNativeBuffer(FileDescriptor fd, ByteBuffer bb,
                                              long position, boolean directIO,
                                              boolean async, int alignment,
-                                             NativeDispatcher nd)
+                                             NativeDispatcher nd, boolean usePoller, BooleanSupplier isOpen)
         throws IOException
     {
         int pos = bb.position();
@@ -134,7 +137,11 @@ public final class IOUtil {
             if (position != -1) {
                 written = nd.pwrite(fd, bufferAddress(bb) + pos, rem, position);
             } else {
-                written = nd.write(fd, bufferAddress(bb) + pos, rem);
+                if (usePoller) {
+                    written = Poller.write(fdVal0(fd), bb, isOpen );
+                } else {
+                    written = nd.write(fd, bufferAddress(bb) + pos, rem);
+                }
             }
         } finally {
             releaseScope(bb);
@@ -148,26 +155,26 @@ public final class IOUtil {
                       NativeDispatcher nd)
         throws IOException
     {
-        return write(fd, bufs, 0, bufs.length, false, async, -1, nd);
+        return write(fd, bufs, 0, bufs.length, false, async, -1, nd, false, null);
     }
 
     static long write(FileDescriptor fd, ByteBuffer[] bufs, int offset, int length,
                       NativeDispatcher nd)
         throws IOException
     {
-        return write(fd, bufs, offset, length, false, false, -1, nd);
+        return write(fd, bufs, offset, length, false, false, -1, nd, false, null);
     }
 
     static long write(FileDescriptor fd, ByteBuffer[] bufs, int offset, int length,
                       boolean direct, int alignment, NativeDispatcher nd)
         throws IOException
     {
-        return write(fd, bufs, offset, length, direct, false, alignment, nd);
+        return write(fd, bufs, offset, length, direct, false, alignment, nd, false, null);
     }
 
     static long write(FileDescriptor fd, ByteBuffer[] bufs, int offset, int length,
                       boolean directIO, boolean async,
-                      int alignment, NativeDispatcher nd)
+                      int alignment, NativeDispatcher nd, boolean usePoller, BooleanSupplier isOpen) // TODO: implement
         throws IOException
     {
         IOVecWrapper vec = IOVecWrapper.get(length);
@@ -476,12 +483,20 @@ public final class IOUtil {
     }
 
     private static final JavaNioAccess NIO_ACCESS = SharedSecrets.getJavaNioAccess();
+    private static final JavaIOFileDescriptorAccess JIOFDA = SharedSecrets.getJavaIOFileDescriptorAccess();
 
     static void acquireScope(ByteBuffer bb, boolean async) {
         if (async && NIO_ACCESS.isThreadConfined(bb)) {
             throw new IllegalArgumentException("Buffer is thread confined");
         }
         NIO_ACCESS.acquireSession(bb);
+    }
+
+    /**
+     * Return the file descriptor value. Existing native function does this
+     */
+    private static int fdVal0(FileDescriptor fd) {
+        return JIOFDA.get(fd);
     }
 
     static void releaseScope(ByteBuffer bb) {

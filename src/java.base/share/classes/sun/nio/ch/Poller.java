@@ -26,6 +26,7 @@ package sun.nio.ch;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
 import java.lang.ref.Reference;
 import java.util.Arrays;
 import java.util.List;
@@ -449,6 +450,11 @@ public abstract class Poller {
          */
         abstract int write(int fdVal, byte[] b, int off, int len,
                            BooleanSupplier isOpen) throws IOException;
+        /**
+         * Write from ByteBuffer
+         */
+        abstract int write(int fdVal, ByteBuffer buf, BooleanSupplier isOpen) 
+                           throws IOException;
     }
 
     /**
@@ -519,6 +525,11 @@ public abstract class Poller {
         @Override
         int write(int fdVal, byte[] b, int off, int len, BooleanSupplier isOpen) throws IOException {
             return writePoller(fdVal).implWrite(fdVal, b, off, len, isOpen);
+        }
+
+        @Override
+        int write(int fdVal, ByteBuffer buf, BooleanSupplier isOpen) throws IOException {
+            return writePoller(fdVal).implWrite(fdVal, buf, isOpen);
         }
 
         @Override
@@ -622,6 +633,11 @@ public abstract class Poller {
         @Override
         int write(int fdVal, byte[] b, int off, int len, BooleanSupplier isOpen) throws IOException {
             return writePoller(fdVal).implWrite(fdVal, b, off, len, isOpen);
+        }
+
+        @Override
+        int write(int fdVal, ByteBuffer buf, BooleanSupplier isOpen) throws IOException {
+            return writePoller(fdVal).implWrite(fdVal, buf, isOpen);
         }
 
         @Override
@@ -781,6 +797,11 @@ public abstract class Poller {
             return writePoller(fdVal).implWrite(fdVal, b, off, len, isOpen);
         }
 
+        @Override
+        int write(int fdVal, ByteBuffer buf, BooleanSupplier isOpen) throws IOException {
+            return writePoller(fdVal).implWrite(fdVal, buf, isOpen);
+        }
+
         /**
          * Sub-poller polling loop.
          */
@@ -883,6 +904,11 @@ public abstract class Poller {
         return POLLER_GROUP.write(fdVal, b, off, len, isOpen);
     }
 
+    public static int write(int fdVal, ByteBuffer buf,
+                            BooleanSupplier isOpen) throws IOException {
+        return POLLER_GROUP.write(fdVal, buf, isOpen);
+    }
+
     /**
      * Parks the current thread until bytes are read a byte array. This method is
      * overridden by poller implementations that support this operation.
@@ -897,6 +923,11 @@ public abstract class Poller {
      * method is overridden by poller implementations that support this operation.
      */
     int implWrite(int fdVal, byte[] b, int off, int len,
+                 BooleanSupplier isOpen) throws IOException {
+        throw new UnsupportedOperationException();
+    }
+
+    int implWrite(int fdVal, ByteBuffer buf,
                  BooleanSupplier isOpen) throws IOException {
         throw new UnsupportedOperationException();
     }

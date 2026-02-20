@@ -78,6 +78,9 @@ public class FileChannelImpl
     // file reads and writes should be traced by JFR.
     private static boolean jfrTracing;
 
+    private static final boolean supportPollerWrite = Poller.supportWriteOps();
+    private static final boolean supportPollerRead = Poller.supportReadOps();
+
     // File descriptor
     private final FileDescriptor fd;
 
@@ -356,7 +359,8 @@ public class FileChannelImpl
                 do {
                     boolean attempted = Blocker.begin(sync || direct);
                     try {
-                        n = IOUtil.write(fd, src, -1, direct, alignment, nd);
+                        boolean usePoller = supportPollerWrite && sync;
+                        n = IOUtil.write(fd, src, -1, direct, false, alignment, nd, usePoller, this::isOpen);
                     } finally {
                         Blocker.end(attempted);
                     }
