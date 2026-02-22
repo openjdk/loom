@@ -43,7 +43,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import jdk.internal.event.VirtualThreadEndEvent;
-import jdk.internal.event.VirtualThreadParkEvent;
 import jdk.internal.event.VirtualThreadStartEvent;
 import jdk.internal.event.VirtualThreadSubmitFailedEvent;
 import jdk.internal.invoke.MhUtil;
@@ -866,7 +865,6 @@ final class VirtualThread extends BaseVirtualThread {
 
         // park the thread
         boolean yielded = false;
-        long eventStartTime = VirtualThreadParkEvent.eventStartTime();
         setState(PARKING);
         try {
             yielded = yieldContinuation();
@@ -874,9 +872,7 @@ final class VirtualThread extends BaseVirtualThread {
             // park on carrier
         } finally {
             assert (Thread.currentThread() == this) && (yielded == (state() == RUNNING));
-            if (yielded) {
-                VirtualThreadParkEvent.offer(eventStartTime, Long.MIN_VALUE);
-            } else {
+            if (!yielded) {
                 assert state() == PARKING;
                 setState(RUNNING);
             }
@@ -910,7 +906,6 @@ final class VirtualThread extends BaseVirtualThread {
 
             // park the thread, afterYield will schedule the thread to unpark
             boolean yielded = false;
-            long eventStartTime = VirtualThreadParkEvent.eventStartTime();
             timeout = nanos;
             setState(TIMED_PARKING);
             try {
@@ -919,9 +914,7 @@ final class VirtualThread extends BaseVirtualThread {
                 // park on carrier
             } finally {
                 assert (Thread.currentThread() == this) && (yielded == (state() == RUNNING));
-                if (yielded) {
-                    VirtualThreadParkEvent.offer(eventStartTime, nanos);
-                } else {
+                if (!yielded) {
                     assert state() == TIMED_PARKING;
                     setState(RUNNING);
                 }
@@ -1478,13 +1471,6 @@ final class VirtualThread extends BaseVirtualThread {
 
         // ensure VTHREAD_GROUP is created, may be accessed by JVMTI
         var group = Thread.virtualThreadGroup();
-
-        // ensure event class is initialized
-        try {
-            MethodHandles.lookup().ensureInitialized(VirtualThreadParkEvent.class);
-        } catch (IllegalAccessException e) {
-            throw new ExceptionInInitializerError(e);
-        }
     }
 
     /**

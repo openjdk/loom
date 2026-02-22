@@ -71,7 +71,6 @@ public final class JDKEvents {
         jdk.internal.event.SocketWriteEvent.class,
         jdk.internal.event.ThreadSleepEvent.class,
         jdk.internal.event.TLSHandshakeEvent.class,
-        jdk.internal.event.VirtualThreadParkEvent.class,
         jdk.internal.event.VirtualThreadStartEvent.class,
         jdk.internal.event.VirtualThreadEndEvent.class,
         jdk.internal.event.VirtualThreadSubmitFailedEvent.class,

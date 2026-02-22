@@ -100,46 +100,6 @@ class JfrEvents {
     }
 
     /**
-     * Test jdk.VirtualThreadPark.
-     */
-    @ParameterizedTest
-    @ValueSource(longs = { 0, 30_000_000_000L, Long.MAX_VALUE })
-    void testPark(long timeout) throws Exception {
-        try (Recording recording = new Recording()) {
-            recording.enable("jdk.VirtualThreadPark");
-
-            recording.start();
-
-            var started = new AtomicBoolean();
-            var done = new AtomicBoolean();
-            var vthread = Thread.startVirtualThread(() -> {
-                started.set(true);
-                while (!done.get()) {
-                    if (timeout > 0) {
-                        LockSupport.parkNanos(timeout);
-                    } else {
-                        LockSupport.park();
-                    }
-                }
-            });
-
-            try {
-                // wait for thread to start and park
-                awaitTrue(started);
-                await(vthread, timeout > 0 ? Thread.State.TIMED_WAITING : Thread.State.WAITING);
-            } finally {
-                done.set(true);
-                LockSupport.unpark(vthread);
-                vthread.join();
-                recording.stop();
-            }
-
-            assertContainsParkEvent(recording, vthread, timeout);
-        }
-
-    }
-
-    /**
      * Test jdk.VirtualThreadPinned event when parking while pinned.
      */
     @ParameterizedTest
@@ -492,30 +452,6 @@ class JfrEvents {
         assertTrue(pinnedEvents.stream()
                         .anyMatch(e -> e.getThread().getJavaThreadId() == tid),
                 "jdk.VirtualThreadPinned for javaThreadId = " + tid + " not found");
-    }
-
-    /**
-     * Assert that a recording contains a jdk.VirtualThreadPark event on the given thread.
-     */
-    private void assertContainsParkEvent(Recording recording,
-                                         Thread thread,
-                                         long testTimeout) throws IOException {
-        List<RecordedEvent> allParkEvents = find(recording, "jdk.VirtualThreadPark");
-        assertTrue(allParkEvents.size() > 0, "No jdk.VirtualThreadPark events in recording");
-        System.err.println(allParkEvents);
-
-        // park events for the given thread
-        long tid = thread.threadId();
-        List<RecordedEvent> parkEvents = allParkEvents.stream()
-                .filter(e -> e.getThread().getJavaThreadId() == tid)
-                .toList();
-
-        long expectedTimeout = (testTimeout != 0) ? testTimeout : Long.MIN_VALUE;
-        boolean found = parkEvents.stream()
-                .map(e -> e.getLong("timeout"))
-                .allMatch(t -> t == expectedTimeout);
-        assertTrue(found, "jdk.VirtualThreadPark for javaThreadId = " + tid
-                + ", timeout = " + expectedTimeout + " not found");
     }
 
     /**

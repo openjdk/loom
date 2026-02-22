@@ -79,7 +79,7 @@ public class TestLookForUntestedEvents {
     );
     // These events are tested in test/jdk/java/lang/Thread/virtual/JfrEvents.java
     private static final Set<String> coveredVirtualThreadEvents = Set.of(
-        "VirtualThreadPark", "VirtualThreadPinned", "VirtualThreadSubmitFailed");
+        "VirtualThreadPinned", "VirtualThreadSubmitFailed");
 
     // This event is tested in test/jdk/java/lang/reflect/Field/mutateFinals/FinalFieldMutationEventTest.java
     private static final Set<String> coveredFinalFieldMutationEvents = Set.of(
