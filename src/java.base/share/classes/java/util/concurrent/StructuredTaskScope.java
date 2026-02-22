@@ -942,7 +942,7 @@ public sealed interface StructuredTaskScope<T, R>
      * Opens a new {@code StructuredTaskScope}to use the given {@code Joiner} object. The
      * scope is created with the {@linkplain ##DefaultConfiguration default configuration}.
      * The default configuration has a {@code ThreadFactory} that creates unnamed
-     * {@linkplain Thread##virtual-threads virtual threads}, does not name the scope, and
+     * {@linkplain Thread##irtual-threads virtual threads}, does not name the scope, and
      * has no timeout.
      *
      * @implSpec
