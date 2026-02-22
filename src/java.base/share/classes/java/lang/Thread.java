@@ -838,8 +838,7 @@ public class Thread implements Runnable {
      *
      * @since 99
      */
-    public sealed interface VirtualThreadTask extends Runnable permits
-            VirtualThread.VThreadRunner {
+    public sealed interface VirtualThreadTask extends Runnable permits VirtualThread.VThreadTask {
 
         /**
          * {@return the virtual thread that this task starts or continues}
