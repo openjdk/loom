@@ -43,7 +43,6 @@ import jdk.jfr.events.SocketReadEvent;
 import jdk.jfr.events.SocketWriteEvent;
 import jdk.jfr.events.TLSHandshakeEvent;
 import jdk.jfr.events.ThreadSleepEvent;
-import jdk.jfr.events.VirtualThreadParkEvent;
 import jdk.jfr.events.VirtualThreadEndEvent;
 import jdk.jfr.events.VirtualThreadStartEvent;
 import jdk.jfr.events.VirtualThreadSubmitFailedEvent;
@@ -71,7 +70,6 @@ final class MirrorEvents {
         register("jdk.internal.event.SocketWriteEvent", SocketWriteEvent.class);
         register("jdk.internal.event.ThreadSleepEvent", ThreadSleepEvent.class);
         register("jdk.internal.event.TLSHandshakeEvent", TLSHandshakeEvent.class);
-        register("jdk.internal.event.VirtualThreadParkEvent", VirtualThreadParkEvent.class);
         register("jdk.internal.event.VirtualThreadStartEvent", VirtualThreadStartEvent.class);
         register("jdk.internal.event.VirtualThreadEndEvent", VirtualThreadEndEvent.class);
         register("jdk.internal.event.VirtualThreadSubmitFailedEvent", VirtualThreadSubmitFailedEvent.class);

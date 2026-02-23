@@ -48,8 +48,6 @@ import jdk.internal.vm.annotation.Stable;
 
 /**
  * I/O poller to allow virtual threads park until a file descriptor is ready for I/O.
- * Implementations also optionally support read/write operations where virtual threads
- * park until bytes are read or written.
  */
 public abstract class Poller {
     private static final JavaLangAccess JLA = SharedSecrets.getJavaLangAccess();
@@ -169,12 +167,6 @@ public abstract class Poller {
      */
     int fdVal() {
         throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Invoked if when this poller's file descriptor is polled by the master poller.
-     */
-    void pollerPolled() throws IOException {
     }
 
     /**
@@ -327,7 +319,6 @@ public abstract class Poller {
             while (!isShutdown()) {
                 if (polled == 0) {
                     masterPoller.poll(fdVal(), 0, () -> true);  // park
-                    pollerPolled();
                 } else {
                     Thread.yield();
                 }
@@ -419,36 +410,6 @@ public abstract class Poller {
                 }
             }
         }
-
-        /**
-         * Returns true if the read pollers in this poller group support read ops in
-         * addition to POLLIN polling.
-         */
-        boolean supportReadOps() {
-            return provider().supportReadOps();
-        }
-
-        /**
-         * Reads bytes into a byte array.
-         * @throws UnsupportedOperationException if not supported
-         */
-        abstract int read(int fdVal, byte[] b, int off, int len, long nanos,
-                          BooleanSupplier isOpen) throws IOException;
-
-        /**
-         * Returns true if the write pollers in this poller group support write ops in
-         * addition to POLLOUT polling.
-         */
-        boolean supportWriteOps() {
-            return provider().supportWriteOps();
-        }
-
-        /**
-         * Write bytes from a byte array.
-         * @throws UnsupportedOperationException if not supported
-         */
-        abstract int write(int fdVal, byte[] b, int off, int len,
-                           BooleanSupplier isOpen) throws IOException;
     }
 
     /**
@@ -508,17 +469,6 @@ public abstract class Poller {
                     ? readPoller(fdVal)
                     : writePoller(fdVal);
             poller.poll(fdVal, nanos, isOpen);
-        }
-
-        @Override
-        int read(int fdVal, byte[] b, int off, int len, long nanos,
-                 BooleanSupplier isOpen) throws IOException {
-            return readPoller(fdVal).implRead(fdVal, b, off, len, nanos, isOpen);
-        }
-
-        @Override
-        int write(int fdVal, byte[] b, int off, int len, BooleanSupplier isOpen) throws IOException {
-            return writePoller(fdVal).implWrite(fdVal, b, off, len, isOpen);
         }
 
         @Override
@@ -611,17 +561,6 @@ public abstract class Poller {
                     ? readPoller(fdVal)
                     : writePoller(fdVal);
             poller.poll(fdVal, nanos, isOpen);
-        }
-
-        @Override
-        int read(int fdVal, byte[] b, int off, int len, long nanos,
-                 BooleanSupplier isOpen) throws IOException {
-            return readPoller(fdVal).implRead(fdVal, b, off, len, nanos, isOpen);
-        }
-
-        @Override
-        int write(int fdVal, byte[] b, int off, int len, BooleanSupplier isOpen) throws IOException {
-            return writePoller(fdVal).implWrite(fdVal, b, off, len, isOpen);
         }
 
         @Override
@@ -770,17 +709,6 @@ public abstract class Poller {
             masterPoller.poll(fdVal, nanos, () -> true);
         }
 
-        @Override
-        int read(int fdVal, byte[] b, int off, int len, long nanos,
-                 BooleanSupplier isOpen) throws IOException {
-            return readPoller().implRead(fdVal, b, off, len, nanos, isOpen);
-        }
-
-        @Override
-        int write(int fdVal, byte[] b, int off, int len, BooleanSupplier isOpen) throws IOException {
-            return writePoller(fdVal).implWrite(fdVal, b, off, len, isOpen);
-        }
-
         /**
          * Sub-poller polling loop.
          */
@@ -842,63 +770,6 @@ public abstract class Poller {
             throw new IllegalArgumentException(msg);
         }
         return count;
-    }
-
-
-    /**
-     * Returns true if read ops are supported in addition to POLLIN polling.
-     */
-    public static boolean supportReadOps() {
-        return POLLER_GROUP.supportReadOps();
-    }
-
-    /**
-     * Returns true if write ops are supported in addition to POLLOUT polling.
-     */
-    public static boolean supportWriteOps() {
-        return POLLER_GROUP.supportWriteOps();
-    }
-
-    /**
-     * Parks the current thread until bytes are read into a byte array.
-     * @param isOpen supplies a boolean to indicate if the enclosing object is open
-     * @return the number of bytes read (>0), EOF (-1), or UNAVAILABLE (-2) if unparked
-     * or the timeout expires while waiting for bytes to be read
-     * @throws UnsupportedOperationException if not supported
-     */
-    public static int read(int fdVal, byte[] b, int off, int len, long nanos,
-                           BooleanSupplier isOpen) throws IOException {
-        return POLLER_GROUP.read(fdVal, b, off, len, nanos, isOpen);
-    }
-
-    /**
-     * Parks the current thread until bytes are written from a byte array.
-     * @param isOpen supplies a boolean to indicate if the enclosing object is open
-     * @return the number of bytes read (>0), EOF (-1), or UNAVAILABLE (-2) if unparked
-     * or the timeout expires while waiting for bytes to be read
-     * @throws UnsupportedOperationException if not supported
-     */
-    public static int write(int fdVal, byte[] b, int off, int len,
-                            BooleanSupplier isOpen) throws IOException {
-        return POLLER_GROUP.write(fdVal, b, off, len, isOpen);
-    }
-
-    /**
-     * Parks the current thread until bytes are read a byte array. This method is
-     * overridden by poller implementations that support this operation.
-     */
-    int implRead(int fdVal, byte[] b, int off, int len, long nanos,
-                 BooleanSupplier isOpen) throws IOException {
-        throw new UnsupportedOperationException();
-    }
-
-    /**
-     * Parks the current thread until bytes are written from a byte array. This
-     * method is overridden by poller implementations that support this operation.
-     */
-    int implWrite(int fdVal, byte[] b, int off, int len,
-                 BooleanSupplier isOpen) throws IOException {
-        throw new UnsupportedOperationException();
     }
 
     /**

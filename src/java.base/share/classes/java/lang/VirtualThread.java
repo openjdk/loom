@@ -43,7 +43,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import jdk.internal.event.VirtualThreadEndEvent;
-import jdk.internal.event.VirtualThreadParkEvent;
 import jdk.internal.event.VirtualThreadStartEvent;
 import jdk.internal.event.VirtualThreadSubmitFailedEvent;
 import jdk.internal.invoke.MhUtil;
@@ -103,7 +102,7 @@ final class VirtualThread extends BaseVirtualThread {
     // scheduler and continuation
     private final VirtualThreadScheduler scheduler;
     private final Continuation cont;
-    private final VThreadRunner runContinuation;
+    private final VThreadTask runContinuation;
 
     // virtual thread state, accessed by VM
     private volatile int state;
@@ -272,18 +271,18 @@ final class VirtualThread extends BaseVirtualThread {
         this.cont = new VThreadContinuation(this, task);
 
         if (scheduler == BUILTIN_SCHEDULER) {
-            this.runContinuation = new VThreadRunner(this);
+            this.runContinuation = new VThreadTask(this);
         } else {
-            this.runContinuation = new CustomSchedulerVThreadRunner(this, preferredCarrier);
+            this.runContinuation = new CustomVThreadTask(this, preferredCarrier);
         }
     }
 
     /**
      * The task to start/continue a virtual thread.
      */
-    static non-sealed class VThreadRunner implements VirtualThreadTask {
+    static non-sealed class VThreadTask implements VirtualThreadTask {
         private final VirtualThread vthread;
-        VThreadRunner(VirtualThread vthread) {
+        VThreadTask(VirtualThread vthread) {
             this.vthread = vthread;
         }
         @Override
@@ -311,12 +310,12 @@ final class VirtualThread extends BaseVirtualThread {
     /**
      * The task to start/continue a virtual thread when using a custom scheduler.
      */
-    static final class CustomSchedulerVThreadRunner extends VThreadRunner {
+    static final class CustomVThreadTask extends VThreadTask {
         private static final VarHandle ATT =
                 MhUtil.findVarHandle(MethodHandles.lookup(), "att", Object.class);
         private final Thread preferredCarrier;
         private volatile Object att;
-        CustomSchedulerVThreadRunner(VirtualThread vthread, Thread preferredCarrier) {
+        CustomVThreadTask(VirtualThread vthread, Thread preferredCarrier) {
             super(vthread);
             this.preferredCarrier = preferredCarrier;
         }
@@ -866,7 +865,6 @@ final class VirtualThread extends BaseVirtualThread {
 
         // park the thread
         boolean yielded = false;
-        long eventStartTime = VirtualThreadParkEvent.eventStartTime();
         setState(PARKING);
         try {
             yielded = yieldContinuation();
@@ -874,9 +872,7 @@ final class VirtualThread extends BaseVirtualThread {
             // park on carrier
         } finally {
             assert (Thread.currentThread() == this) && (yielded == (state() == RUNNING));
-            if (yielded) {
-                VirtualThreadParkEvent.offer(eventStartTime, Long.MIN_VALUE);
-            } else {
+            if (!yielded) {
                 assert state() == PARKING;
                 setState(RUNNING);
             }
@@ -910,7 +906,6 @@ final class VirtualThread extends BaseVirtualThread {
 
             // park the thread, afterYield will schedule the thread to unpark
             boolean yielded = false;
-            long eventStartTime = VirtualThreadParkEvent.eventStartTime();
             timeout = nanos;
             setState(TIMED_PARKING);
             try {
@@ -919,9 +914,7 @@ final class VirtualThread extends BaseVirtualThread {
                 // park on carrier
             } finally {
                 assert (Thread.currentThread() == this) && (yielded == (state() == RUNNING));
-                if (yielded) {
-                    VirtualThreadParkEvent.offer(eventStartTime, nanos);
-                } else {
+                if (!yielded) {
                     assert state() == TIMED_PARKING;
                     setState(RUNNING);
                 }
@@ -1478,13 +1471,6 @@ final class VirtualThread extends BaseVirtualThread {
 
         // ensure VTHREAD_GROUP is created, may be accessed by JVMTI
         var group = Thread.virtualThreadGroup();
-
-        // ensure event class is initialized
-        try {
-            MethodHandles.lookup().ensureInitialized(VirtualThreadParkEvent.class);
-        } catch (IllegalAccessException e) {
-            throw new ExceptionInInitializerError(e);
-        }
     }
 
     /**
@@ -1608,8 +1594,7 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Wraps the scheduler to avoid leaking a direct reference with
-     * {@link VirtualThreadScheduler#current()}.
+     * Wraps the scheduler to avoid leaking a direct reference to built-in scheduler.
      */
     static VirtualThreadScheduler createExternalView(VirtualThreadScheduler delegate) {
         return new VirtualThreadScheduler() {
