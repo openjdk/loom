@@ -779,6 +779,9 @@ java/awt/Cursor/CursorDragTest/ListDragCursor.java 7177297 macosx-all
 
 tools/sincechecker/modules/jdk.management.jfr/JdkManagementJfrCheckSince.java 8354921 generic-all
 
+# confused by java.base/jdk/internal/ffi/generated/iouring/sockaddr_in.java
+build/translations/VerifyTranslations.java 0000000 generic-all
+
 #############################################################################
 
 # Preview project specific failures go here at the end of the file.

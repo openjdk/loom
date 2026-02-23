@@ -26,7 +26,7 @@
  * @bug 8284161
  * @summary Test virtual threads doing blocking I/O on NIO channels
  * @library /test/lib
- * @run junit/timeout=480 BlockingChannelOps
+ * @run junit/othervm/timeout=480 BlockingChannelOps
  */
 
 /*
@@ -36,6 +36,18 @@
  * @run junit/othervm/timeout=480 -Djdk.pollerMode=1 BlockingChannelOps
  * @run junit/othervm/timeout=480 -Djdk.pollerMode=2 BlockingChannelOps
  * @run junit/othervm/timeout=480 -Djdk.pollerMode=3 BlockingChannelOps
+ */
+
+/*
+ * @test id=io_uring
+ * @requires os.family == "linux"
+ * @library /test/lib
+ * @run junit/othervm/timeout=480 -Djdk.pollerMode=1 -Djdk.io_uring=true BlockingChannelOps
+ * @run junit/othervm/timeout=480 -Djdk.pollerMode=2 -Djdk.io_uring=true BlockingChannelOps
+ * @run junit/othervm/timeout=480 -Djdk.pollerMode=3 -Djdk.io_uring=true BlockingChannelOps
+ * @run junit/othervm/timeout=480 -Djdk.pollerMode=1 -Djdk.io_uring.sqpoll_idle=20 -Djdk.io_uring=true BlockingChannelOps
+ * @run junit/othervm/timeout=480 -Djdk.pollerMode=2 -Djdk.io_uring.sqpoll_idle=20 -Djdk.io_uring=true BlockingChannelOps
+ * @run junit/othervm/timeout=480 -Djdk.pollerMode=3 -Djdk.io_uring.sqpoll_idle=20 -Djdk.io_uring=true BlockingChannelOps
  */
 
 /*

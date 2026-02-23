@@ -39,6 +39,24 @@
  */
 
 /*
+ * @test id=io_uring
+ * @requires os.family == "linux"
+ * @library /test/lib
+ * @run junit/othervm -Djdk.pollerMode=1 -Djdk.io_uring=true BlockingSocketOps
+ * @run junit/othervm -Djdk.pollerMode=2 -Djdk.io_uring=true BlockingSocketOps
+ * @run junit/othervm -Djdk.pollerMode=3 -Djdk.io_uring=true BlockingSocketOps
+ * @run junit/othervm -Djdk.pollerMode=1 -Djdk.io_uring=true -Djdk.io_uring.sqpoll_idle=20 BlockingSocketOps
+ * @run junit/othervm -Djdk.pollerMode=2 -Djdk.io_uring=true -Djdk.io_uring.sqpoll_idle=20 BlockingSocketOps
+ * @run junit/othervm -Djdk.pollerMode=3 -Djdk.io_uring=true -Djdk.io_uring.sqpoll_idle=20 BlockingSocketOps
+ * @run junit/othervm -Djdk.pollerMode=1 -Djdk.io_uring=true -Djdk.io_uring.read=true -Djdk.io_uring.write=true BlockingSocketOps
+ * @run junit/othervm -Djdk.pollerMode=2 -Djdk.io_uring=true -Djdk.io_uring.read=true -Djdk.io_uring.write=true BlockingSocketOps
+ * @run junit/othervm -Djdk.pollerMode=3 -Djdk.io_uring=true -Djdk.io_uring.read=true -Djdk.io_uring.write=true BlockingSocketOps
+ * @run junit/othervm -Djdk.pollerMode=1 -Djdk.io_uring=true -Djdk.io_uring.read=true -Djdk.io_uring.write=true -Djdk.io_uring.sqpoll_idle=20 BlockingSocketOps
+ * @run junit/othervm -Djdk.pollerMode=2 -Djdk.io_uring=true -Djdk.io_uring.read=true -Djdk.io_uring.write=true -Djdk.io_uring.sqpoll_idle=20 BlockingSocketOps
+ * @run junit/othervm -Djdk.pollerMode=3 -Djdk.io_uring=true -Djdk.io_uring.read=true -Djdk.io_uring.write=true -Djdk.io_uring.sqpoll_idle=20 BlockingSocketOps
+ */
+
+/*
  * @test id=no-vmcontinuations
  * @requires vm.continuations
  * @library /test/lib

@@ -38,6 +38,18 @@
  */
 
 /*
+ * @test id=io_uring
+ * @requires os.family == "linux"
+ * @library /test/lib
+ * @run junit/othervm -Djdk.pollerMode=1 -Djdk.io_uring=true --enable-native-access=ALL-UNNAMED SelectorOps
+ * @run junit/othervm -Djdk.pollerMode=2 -Djdk.io_uring=true --enable-native-access=ALL-UNNAMED SelectorOps
+ * @run junit/othervm -Djdk.pollerMode=3 -Djdk.io_uring=true --enable-native-access=ALL-UNNAMED SelectorOps
+ * @run junit/othervm -Djdk.pollerMode=1 -Djdk.io_uring=true -Djdk.io_uring.sqpoll_idle=20 --enable-native-access=ALL-UNNAMED SelectorOps
+ * @run junit/othervm -Djdk.pollerMode=2 -Djdk.io_uring=true -Djdk.io_uring.sqpoll_idle=20 --enable-native-access=ALL-UNNAMED SelectorOps
+ * @run junit/othervm -Djdk.pollerMode=3 -Djdk.io_uring=true -Djdk.io_uring.sqpoll_idle=20 --enable-native-access=ALL-UNNAMED SelectorOps
+ */
+
+/*
  * @test id=no-vmcontinuations
  * @requires vm.continuations
  * @library /test/lib
