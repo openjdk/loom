@@ -89,20 +89,4 @@ abstract class PollerProvider {
      * @param subPoller true to create a sub-poller
      */
     abstract Poller writePoller(boolean subPoller) throws IOException;
-
-    /**
-     * Returns true if read pollers support read ops in addition to POLLIN polling.
-     * @implSpec The default implementation returns false.
-     */
-    boolean supportReadOps() {
-        return false;
-    }
-
-    /**
-     * Returns true if write pollers support write ops in addition to POLLOUT polling.
-     * @implSpec The default implementation returns false.
-     */
-    boolean supportWriteOps() {
-        return false;
-    }
 }
