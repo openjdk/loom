@@ -29,7 +29,6 @@ import java.lang.invoke.VarHandle;
 import java.lang.reflect.Constructor;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
@@ -96,7 +95,6 @@ final class VirtualThread extends BaseVirtualThread {
     private static final long STATE = U.objectFieldOffset(VirtualThread.class, "state");
     private static final long PARK_PERMIT = U.objectFieldOffset(VirtualThread.class, "parkPermit");
     private static final long CARRIER_THREAD = U.objectFieldOffset(VirtualThread.class, "carrierThread");
-    private static final long TERMINATION = U.objectFieldOffset(VirtualThread.class, "termination");
     private static final long ON_WAITING_LIST = U.objectFieldOffset(VirtualThread.class, "onWaitingList");
 
     // scheduler and continuation
@@ -212,8 +210,8 @@ final class VirtualThread extends BaseVirtualThread {
     // carrier thread when mounted, accessed by VM
     private volatile Thread carrierThread;
 
-    // termination object when joining, created lazily if needed
-    private volatile CountDownLatch termination;
+    // true to notifyAll after this virtual thread terminates
+    private volatile boolean notifyAllAfterTerminate;
 
     /**
      * Return the built-in scheduler.
@@ -787,11 +785,11 @@ final class VirtualThread extends BaseVirtualThread {
         assert carrierThread == null;
         setState(TERMINATED);
 
-        // notify anyone waiting for this virtual thread to terminate
-        CountDownLatch termination = this.termination;
-        if (termination != null) {
-            assert termination.getCount() == 1;
-            termination.countDown();
+        // notifyAll to wakeup any threads waiting for this thread to terminate
+        if (notifyAllAfterTerminate) {
+            synchronized (this) {
+                notifyAll();
+            }
         }
 
         // notify container
@@ -848,6 +846,13 @@ final class VirtualThread extends BaseVirtualThread {
     @Override
     public void run() {
         // do nothing
+    }
+
+    /**
+     * Invoked by Thread.join before a thread waits for this virtual thread to terminate.
+     */
+    void beforeJoin() {
+        notifyAllAfterTerminate = true;
     }
 
     /**
@@ -1109,36 +1114,6 @@ final class VirtualThread extends BaseVirtualThread {
         }
     }
 
-    /**
-     * Waits up to {@code nanos} nanoseconds for this virtual thread to terminate.
-     * A timeout of {@code 0} means to wait forever.
-     *
-     * @throws InterruptedException if interrupted while waiting
-     * @return true if the thread has terminated
-     */
-    boolean joinNanos(long nanos) throws InterruptedException {
-        if (state() == TERMINATED)
-            return true;
-
-        // ensure termination object exists, then re-check state
-        CountDownLatch termination = getTermination();
-        if (state() == TERMINATED)
-            return true;
-
-        // wait for virtual thread to terminate
-        if (nanos == 0) {
-            termination.await();
-        } else {
-            boolean terminated = termination.await(nanos, NANOSECONDS);
-            if (!terminated) {
-                // waiting time elapsed
-                return false;
-            }
-        }
-        assert state() == TERMINATED;
-        return true;
-    }
-
     @Override
     void blockedOn(Interruptible b) {
         disableSuspendAndPreempt();
@@ -1347,20 +1322,6 @@ final class VirtualThread extends BaseVirtualThread {
     @Override
     public boolean equals(Object obj) {
         return obj == this;
-    }
-
-    /**
-     * Returns the termination object, creating it if needed.
-     */
-    private CountDownLatch getTermination() {
-        CountDownLatch termination = this.termination;
-        if (termination == null) {
-            termination = new CountDownLatch(1);
-            if (!U.compareAndSetReference(this, TERMINATION, null, termination)) {
-                termination = this.termination;
-            }
-        }
-        return termination;
     }
 
     /**
