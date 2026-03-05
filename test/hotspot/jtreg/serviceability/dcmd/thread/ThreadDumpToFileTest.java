@@ -27,7 +27,8 @@
  * @summary Basic test for jcmd Thread.dump_to_file
  * @modules jdk.jcmd
  * @library /test/lib
- * @run junit/othervm ThreadDumpToFileTest
+ * @run junit/othervm -Dminify=true ThreadDumpToFileTest
+ * @run junit/othervm -Dminify=false ThreadDumpToFileTest
  */
 
 import java.io.IOException;
@@ -39,9 +40,16 @@ import jdk.test.lib.process.OutputAnalyzer;
 import jdk.test.lib.threaddump.ThreadDump;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeAll;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ThreadDumpToFileTest {
+    private static boolean minify;
+
+    @BeforeAll
+    static void setup() throws Exception {
+        minify = Boolean.getBoolean("minify");
+    }
 
     /**
      * Test thread dump, should be in plain text format.
@@ -154,6 +162,9 @@ class ThreadDumpToFileTest {
         String cmd = "Thread.dump_to_file";
         for (String option : options) {
             cmd += " " + option;
+        }
+        if (minify) {
+            cmd += " -minify";
         }
         return new PidJcmdExecutor().execute(cmd + " " + file);
     }

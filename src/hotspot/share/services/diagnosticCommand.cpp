@@ -1072,23 +1072,26 @@ void DumpSharedArchiveDCmd::execute(DCmdSource source, TRAPS) {
 
 ThreadDumpToFileDCmd::ThreadDumpToFileDCmd(outputStream* output, bool heap) :
                                            DCmdWithParser(output, heap),
-  _overwrite("-overwrite", "May overwrite existing file", "BOOLEAN", false, "false"),
   _format("-format", "Output format (\"plain\" or \"json\")", "STRING", false, "plain"),
-  _filepath("filepath", "The file path to the output file", "FILE", true) {
-  _dcmdparser.add_dcmd_option(&_overwrite);
+  _minify("-minify", "Remove whitespace and line breaks when format is \"json\"", "BOOLEAN", false, "false"),
+  _filepath("filepath", "The file path to the output file", "FILE", true),
+  _overwrite("-overwrite", "May overwrite existing file", "BOOLEAN", false, "false") {
   _dcmdparser.add_dcmd_option(&_format);
+  _dcmdparser.add_dcmd_option(&_minify);
   _dcmdparser.add_dcmd_argument(&_filepath);
+  _dcmdparser.add_dcmd_option(&_overwrite);
 }
 
 void ThreadDumpToFileDCmd::execute(DCmdSource source, TRAPS) {
   bool json = (_format.value() != nullptr) && (strcmp(_format.value(), "json") == 0);
   char* path = _filepath.value();
   bool overwrite = _overwrite.value();
+  bool minify = (json) ? _minify.value() : false;
   Symbol* name = (json) ? vmSymbols::dumpThreadsToJson_name() : vmSymbols::dumpThreads_name();
-  dumpToFile(name, vmSymbols::string_bool_byte_array_signature(), path, overwrite, CHECK);
+  dumpToFile(name, vmSymbols::string_bool_bool_byte_array_signature(), path, overwrite, minify, CHECK);
 }
 
-void ThreadDumpToFileDCmd::dumpToFile(Symbol* name, Symbol* signature, const char* path, bool overwrite, TRAPS) {
+void ThreadDumpToFileDCmd::dumpToFile(Symbol* name, Symbol* signature, const char* path, bool overwrite, bool minify, TRAPS) {
   ResourceMark rm(THREAD);
   HandleMark hm(THREAD);
 
@@ -1102,6 +1105,7 @@ void ThreadDumpToFileDCmd::dumpToFile(Symbol* name, Symbol* signature, const cha
   JavaCallArguments args;
   args.push_oop(h_path);
   args.push_int(overwrite ? JNI_TRUE : JNI_FALSE);
+  args.push_int(minify ? JNI_TRUE : JNI_FALSE);
   JavaCalls::call_static(&result,
                          k,
                          name,

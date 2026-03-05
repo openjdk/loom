@@ -64,13 +64,14 @@ public class ThreadDumper {
      *
      * @param file the file path to the file, null or "-" to return a byte array
      * @param okayToOverwrite true to overwrite an existing file
+     * @param ignore not used
      * @return the UTF-8 encoded thread dump or message to return to the tool user
      */
-    public static byte[] dumpThreads(String file, boolean okayToOverwrite) {
+    public static byte[] dumpThreads(String file, boolean okayToOverwrite, boolean ignore) {
         if (file == null || file.equals("-")) {
-            return dumpThreadsToByteArray(false, MAX_BYTE_ARRAY_SIZE);
+            return dumpThreadsToByteArray(false, false, MAX_BYTE_ARRAY_SIZE);
         } else {
-            return dumpThreadsToFile(file, okayToOverwrite, false);
+            return dumpThreadsToFile(file, okayToOverwrite, false, false);
         }
     }
 
@@ -82,11 +83,11 @@ public class ThreadDumper {
      * @param okayToOverwrite true to overwrite an existing file
      * @return the UTF-8 encoded thread dump or message to return to the tool user
      */
-    public static byte[] dumpThreadsToJson(String file, boolean okayToOverwrite) {
+    public static byte[] dumpThreadsToJson(String file, boolean okayToOverwrite, boolean minify) {
         if (file == null || file.equals("-")) {
-            return dumpThreadsToByteArray(true, MAX_BYTE_ARRAY_SIZE);
+            return dumpThreadsToByteArray(true, !minify, MAX_BYTE_ARRAY_SIZE);
         } else {
-            return dumpThreadsToFile(file, okayToOverwrite, true);
+            return dumpThreadsToFile(file, okayToOverwrite, true, minify);
         }
     }
 
@@ -96,11 +97,11 @@ public class ThreadDumper {
      * when a file path is not specified. It returns the thread dump and/or message to
      * send to the tool user.
      */
-    private static byte[] dumpThreadsToByteArray(boolean json, int maxSize) {
+    private static byte[] dumpThreadsToByteArray(boolean json,  boolean minify, int maxSize) {
         var out = new BoundedByteArrayOutputStream(maxSize);
         try (out; var writer = new TextWriter(out)) {
             if (json) {
-                dumpThreadsToJson(writer);
+                dumpThreadsToJson(writer, minify);
             } else {
                 dumpThreads(writer);
             }
@@ -119,7 +120,10 @@ public class ThreadDumper {
      * This method is the implementation of the Thread.dump_to_file diagnostic command.
      * It returns the thread dump and/or message to send to the tool user.
      */
-    private static byte[] dumpThreadsToFile(String file, boolean okayToOverwrite, boolean json) {
+    private static byte[] dumpThreadsToFile(String file,
+                                            boolean okayToOverwrite,
+                                            boolean json,
+                                            boolean minify) {
         Path path = Path.of(file).toAbsolutePath();
         OpenOption[] options = (okayToOverwrite)
                 ? new OpenOption[0]
@@ -128,7 +132,7 @@ public class ThreadDumper {
         try (OutputStream out = Files.newOutputStream(path, options)) {
             try (var writer = new TextWriter(out)) {
                 if (json) {
-                    dumpThreadsToJson(writer);
+                    dumpThreadsToJson(writer, minify);
                 } else {
                     dumpThreads(writer);
                 }
@@ -242,7 +246,7 @@ public class ThreadDumper {
     public static void dumpThreadsToJson(OutputStream out) throws IOException {
         var writer = new TextWriter(out);
         try {
-            dumpThreadsToJson(writer);
+            dumpThreadsToJson(writer, /*prettyPrint*/ true);
             writer.flush();
         } catch (UncheckedIOException e) {
             IOException ioe = e.getCause();
@@ -254,8 +258,8 @@ public class ThreadDumper {
      * Generate a thread dump to the given text stream in JSON format.
      * @throws UncheckedIOException if an I/O error occurs
      */
-    private static void dumpThreadsToJson(TextWriter textWriter) {
-        var jsonWriter = new JsonWriter(textWriter);
+    private static void dumpThreadsToJson(TextWriter textWriter, boolean minify) {
+        var jsonWriter = new JsonWriter(textWriter, minify);
 
         jsonWriter.startObject();  // top-level object
 
@@ -412,14 +416,36 @@ public class ThreadDumper {
         }
         private final Deque<Node> stack = new ArrayDeque<>();
         private final TextWriter writer;
+        private final boolean prettyPrint;  // pretty print or minify
 
-        JsonWriter(TextWriter writer) {
+        JsonWriter(TextWriter writer, boolean minify) {
             this.writer = writer;
+            this.prettyPrint = !minify;
+        }
+
+        private void print(Object obj) {
+            writer.print(obj);
+        }
+
+        private void println(Object obj) {
+            if (prettyPrint) {
+                writer.println(obj);
+            } else {
+                writer.print(obj);
+            }
+        }
+
+        private void println() {
+            if (prettyPrint) {
+                writer.println();
+            }
         }
 
         private void indent() {
-            int indent = stack.size() * 2;
-            writer.print(" ".repeat(indent));
+            if (prettyPrint) {
+                int indent = stack.size() * 2;
+                writer.print(" ".repeat(indent));
+            }
         }
 
         /**
@@ -429,14 +455,15 @@ public class ThreadDumper {
             if (!stack.isEmpty()) {
                 Node node = stack.peek();
                 if (node.getAndIncrementPropertyCount() > 0) {
-                    writer.println(",");
+                    println(",");
                 }
             }
             indent();
             if (name != null) {
-                writer.print("\"" + name + "\": ");
+                String gap = prettyPrint ? " " : "";
+                print("\"" + name + "\":" + gap);
             }
-            writer.println(isArray ? "[" : "{");
+            println(isArray ? "[" : "{");
             stack.push(new Node(isArray));
         }
 
@@ -448,10 +475,10 @@ public class ThreadDumper {
             if (node.isArray() != isArray)
                 throw new IllegalStateException();
             if (node.propertyCount() > 0) {
-                writer.println();
+                println();
             }
             indent();
-            writer.print(isArray ? "]" : "}");
+            print(isArray ? "]" : "}");
         }
 
         /**
@@ -461,20 +488,21 @@ public class ThreadDumper {
          */
         void writeProperty(String name, Object obj) {
             Node node = stack.peek();
+            assert node != null;
             if (node.getAndIncrementPropertyCount() > 0) {
-                writer.println(",");
+                println(",");
             }
             indent();
             if (name != null) {
-                writer.print("\"" + name + "\": ");
+                print("\"" + name + "\": ");
             }
             switch (obj) {
                 // Long may be larger than safe range of JSON integer value
-                case Long   _  -> writer.print("\"" + obj + "\"");
-                case Number _  -> writer.print(obj);
-                case Boolean _ -> writer.print(obj);
-                case null      -> writer.print("null");
-                default        -> writer.print("\"" + escape(obj.toString()) + "\"");
+                case Long   _  -> print("\"" + obj + "\"");
+                case Number _  -> print(obj);
+                case Boolean _ -> print(obj);
+                case null      -> print("null");
+                default        -> print("\"" + escape(obj.toString()) + "\"");
             }
         }
 
