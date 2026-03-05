@@ -780,7 +780,7 @@ protected:
   DCmdArgument<char*> _filepath;
   DCmdArgument<bool> _overwrite;
 public:
-  static int num_arguments() { return 3; }
+  static int num_arguments() { return 4; }
   ThreadDumpToFileDCmd(outputStream *output, bool heap);
   static const char *name() {
     return "Thread.dump_to_file";
