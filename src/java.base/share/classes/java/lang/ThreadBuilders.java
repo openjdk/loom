@@ -263,6 +263,17 @@ class ThreadBuilders {
         }
 
         @Override
+        public Thread lazyStart(Runnable task) {
+            Thread thread = unstarted(task);
+            if (thread instanceof VirtualThread vthread) {
+                vthread.lazyStart();
+            } else {
+                thread.start();
+            }
+            return thread;
+        }
+
+        @Override
         public ThreadFactory factory() {
             return new VirtualThreadFactory(scheduler, name(), counter(), characteristics(),
                     uncaughtExceptionHandler());

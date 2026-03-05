@@ -515,42 +515,6 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
-     * Invoked from Thread.start to externally submit the runContinuation task to the
-     * scheduler. If this virtual thread is scheduled by the built-in scheduler,
-     * and this method is called from a virtual thread scheduled by the built-in
-     * scheduler, then it uses externalSubmit to ensure that the task is pushed to an
-     * external submission queue rather than the local queue.
-     * @throws RejectedExecutionException
-     * @throws OutOfMemoryError
-     * @see ForkJoinPool#externalSubmit(ForkJoinTask)
-     */
-    private void externalSubmitRunContinuationOrThrow() {
-        try {
-            if (currentThread().isVirtual()) {
-                // Pin the continuation to prevent the virtual thread from unmounting
-                // when submitting a task. This avoids deadlock that could arise due to
-                // carriers and virtual threads contending for a lock.
-                Continuation.pin();
-                try {
-                    if (scheduler == BUILTIN_SCHEDULER
-                            && currentCarrierThread() instanceof CarrierThread ct) {
-                        ct.getPool().externalSubmit(ForkJoinTask.adapt(runContinuation));
-                    } else {
-                        scheduler.onStart(runContinuation);
-                    }
-                } finally {
-                    Continuation.unpin();
-                }
-            } else {
-                scheduler.onStart(runContinuation);
-            }
-        } catch (RejectedExecutionException ree) {
-            submitFailed(ree);
-            throw ree;
-        }
-    }
-
-    /**
      * If enabled, emits a JFR VirtualThreadSubmitFailedEvent.
      */
     private void submitFailed(RejectedExecutionException ree) {
@@ -808,8 +772,7 @@ final class VirtualThread extends BaseVirtualThread {
      * @throws IllegalThreadStateException if the thread has already been started
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
-    @Override
-    void start(ThreadContainer container) {
+    private void start(ThreadContainer container, boolean lazy) {
         if (!compareAndSetState(NEW, STARTED)) {
             throw new IllegalThreadStateException("Already started");
         }
@@ -828,8 +791,34 @@ final class VirtualThread extends BaseVirtualThread {
             // scoped values may be inherited
             inheritScopedValueBindings(container);
 
-            // submit task to run thread, using externalSubmit if possible
-            externalSubmitRunContinuationOrThrow();
+            // submit task to schedule
+            try {
+                if (currentThread().isVirtual()) {
+                    Continuation.pin();
+                    try {
+                        if (scheduler == BUILTIN_SCHEDULER
+                                && currentCarrierThread() instanceof CarrierThread ct) {
+                            ForkJoinPool pool = ct.getPool();
+                            ForkJoinTask<?> task = ForkJoinTask.adapt(runContinuation);
+                            if (lazy) {
+                                pool.lazySubmit(task);
+                            } else {
+                                pool.externalSubmit(task);
+                            }
+                        } else {
+                            scheduler.onStart(runContinuation);
+                        }
+                    } finally {
+                        Continuation.unpin();
+                    }
+                } else {
+                    scheduler.onStart(runContinuation);
+                }
+            } catch (RejectedExecutionException ree) {
+                submitFailed(ree);
+                throw ree;
+            }
+
             started = true;
         } finally {
             if (!started) {
@@ -839,8 +828,20 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     @Override
+    void start(ThreadContainer container) {
+        start(container, false);
+    }
+
+    @Override
     public void start() {
-        start(ThreadContainers.root());
+        start(ThreadContainers.root(), false);
+    }
+
+    /**
+     * Schedules this thread to begin execution without guarantee that it will execute.
+     */
+    void lazyStart() {
+        start(ThreadContainers.root(), true);
     }
 
     @Override
@@ -984,11 +985,26 @@ final class VirtualThread extends BaseVirtualThread {
 
             // unparked while parked
             if ((s == PARKED || s == TIMED_PARKED) && compareAndSetState(s, UNPARKED)) {
-                if (lazySubmit) {
-                    lazySubmitRunContinuation();
-                } else {
-                    submitRunContinuation();
+
+                if (lazySubmit && currentThread().isVirtual()) {
+                    Continuation.pin();
+                    try {
+                        if (scheduler == BUILTIN_SCHEDULER
+                                && currentCarrierThread() instanceof CarrierThread ct) {
+                            ct.getPool().lazySubmit(ForkJoinTask.adapt(runContinuation));
+                            return;
+                        }
+                    } catch (RejectedExecutionException ree) {
+                        submitFailed(ree);
+                        throw ree;
+                    } catch (OutOfMemoryError e) {
+                        // fall-though
+                    } finally {
+                        Continuation.unpin();
+                    }
                 }
+
+                submitRunContinuation();
                 return;
             }
 
@@ -1014,6 +1030,11 @@ final class VirtualThread extends BaseVirtualThread {
     @Override
     void unpark() {
         unpark(false);
+    }
+
+    @Override
+    void lazyUnpark() {
+        unpark(true);
     }
 
     /**
