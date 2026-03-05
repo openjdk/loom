@@ -246,7 +246,7 @@ public class ThreadDumper {
     public static void dumpThreadsToJson(OutputStream out) throws IOException {
         var writer = new TextWriter(out);
         try {
-            dumpThreadsToJson(writer, /*prettyPrint*/ true);
+            dumpThreadsToJson(writer, /*minify*/false);
             writer.flush();
         } catch (UncheckedIOException e) {
             IOException ioe = e.getCause();
