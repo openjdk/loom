@@ -568,7 +568,7 @@ class SerializeClosure;
   template(object_boolean_signature,                  "(Ljava/lang/Object;)Z")                    \
   template(object_object_signature,                   "(Ljava/lang/Object;)Ljava/lang/Object;")   \
   template(string_void_signature,                     "(Ljava/lang/String;)V")                    \
-  template(string_bool_byte_array_signature,          "(Ljava/lang/String;Z)[B")                  \
+  template(string_bool_bool_byte_array_signature,     "(Ljava/lang/String;ZZ)[B")                 \
   template(throwable_signature,                       "Ljava/lang/Throwable;")                    \
   template(throwable_void_signature,                  "(Ljava/lang/Throwable;)V")                 \
   template(void_throwable_signature,                  "()Ljava/lang/Throwable;")                  \
