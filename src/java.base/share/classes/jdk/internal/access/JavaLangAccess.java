@@ -619,13 +619,20 @@ public interface JavaLangAccess {
     void parkVirtualThread(long nanos);
 
     /**
-     * Re-enables a virtual thread for scheduling. If the thread was parked then
-     * it will be unblocked, otherwise its next attempt to park will not block
+     * Re-enables a virtual thread for scheduling. If the thread is parked then it will
+     * be scheduled to continue, otherwise its next attempt to park will not block.
      * @param thread the virtual thread to unpark
      * @throws IllegalArgumentException if the thread is not a virtual thread
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
     void unparkVirtualThread(Thread thread);
+
+    /**
+     * Re-enables a virtual thread for scheduling. If the thread is parked then it will
+     * be scheduled to continue, without guaranteeing that it will eventually continue
+     * execution.
+     */
+    void lazyUnparkVirtualThread(Thread thread);
 
     /**
      * Returns the builtin virtual thread scheduler.

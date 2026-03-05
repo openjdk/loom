@@ -1266,6 +1266,18 @@ public class Thread implements Runnable {
 
             @Override OfVirtual inheritInheritableThreadLocals(boolean inherit);
             @Override OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
+
+            /**
+             * Creates a new {@code Thread} from the current state of the builder and
+             * schedules it without guaranteeing that it will eventually execute.
+             *
+             * @param task the object to run when the thread executes
+             * @return a new started Thread
+             *
+             * @see <a href="Thread.html#inheritance">Inheritance when creating threads</a>
+             * @since 99
+             */
+            Thread lazyStart(Runnable task);
         }
     }
 
