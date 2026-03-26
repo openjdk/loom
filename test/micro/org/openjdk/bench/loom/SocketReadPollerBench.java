@@ -36,7 +36,6 @@ import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
-import org.openjdk.jmh.infra.Control;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -56,19 +55,17 @@ import java.util.concurrent.TimeUnit;
  * RPC-style benchmark for virtual thread poller registration overhead.
  *
  * <p>A single platform thread runs a non-blocking NIO echo server
- * spinning on {@code selectNow()}, pinned to its own core. Client VTs
- * do blocking I/O round-trips through the poller path. The FJP
- * parallelism is set to {@code availableProcessors - 1} so the server
- * thread has a dedicated core with no carrier contention.
+ * spinning on {@code selectNow()}. Persistent JMH virtual threads
+ * do blocking I/O round-trips through the poller path.
  *
- * <p>Each JMH call spawns a short-lived VT that writes a request then
- * blocking-reads the response. The blocking read exercises the poller
- * registration path (epoll_ctl for one-shot, or skip for edge-triggered).
+ * <p>Each JMH iteration does a write-then-blocking-read round-trip.
+ * The blocking read exercises the poller registration path
+ * (epoll_ctl for one-shot, or skip for edge-triggered).
  *
  * <p>Usage:
  * <pre>
  * java -jar benchmarks.jar SocketReadPollerBench \
- *   -jvmArgs "-Djdk.pollerMode=2"
+ *   -jvmArgs "-Djdk.pollerMode=2 -Djdk.virtualThreadScheduler.parallelism=31"
  * </pre>
  */
 @BenchmarkMode(Mode.Throughput)
@@ -76,7 +73,7 @@ import java.util.concurrent.TimeUnit;
 @State(Scope.Benchmark)
 @Warmup(iterations = 5, time = 5)
 @Measurement(iterations = 5, time = 10)
-@Fork(3)
+@Fork(value = 3, jvmArgsAppend = "-Djmh.executor=VIRTUAL")
 @Threads(100)
 public class SocketReadPollerBench {
 
@@ -155,8 +152,7 @@ public class SocketReadPollerBench {
 
     /**
      * Per-thread state: owns one TCP connection to the NIO server.
-     * Buffers allocated once — zero GC in steady state (aside from
-     * the per-call VT, which is ~1µs overhead).
+     * Buffers allocated once — zero GC in steady state.
      */
     @State(Scope.Thread)
     public static class Connection {
@@ -183,24 +179,16 @@ public class SocketReadPollerBench {
     }
 
     /**
-     * One RPC round-trip via a fresh client VT. The VT writes a
-     * request then blocking-reads the response. The blocking read
+     * One RPC round-trip on a persistent virtual thread. The VT writes
+     * a request then blocking-reads the response. The blocking read
      * parks through the poller because the NIO server hasn't echoed
      * the response yet at the time of the read call.
      */
     @Benchmark
-    public int rpcRoundTrip(Control cnt, Connection conn) throws Exception {
-        if (cnt.stopMeasurement) return 0;
-        Thread vt = Thread.ofVirtual().start(() -> {
-            try {
-                conn.out.write(conn.writeBuf);
-                conn.out.flush();
-                readFully(conn.in, conn.readBuf, conn.readBuf.length);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        });
-        vt.join();
+    public int rpcRoundTrip(Connection conn) throws Exception {
+        conn.out.write(conn.writeBuf);
+        conn.out.flush();
+        readFully(conn.in, conn.readBuf, conn.readBuf.length);
         return conn.readBuf.length;
     }
 
