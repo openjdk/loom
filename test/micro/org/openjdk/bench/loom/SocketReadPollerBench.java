@@ -38,11 +38,8 @@ import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -115,7 +112,7 @@ public class SocketReadPollerBench {
                                 ch.configureBlocking(false);
                                 ch.socket().setTcpNoDelay(true);
                                 ch.register(selector, SelectionKey.OP_READ,
-                                        ByteBuffer.allocate(size));
+                                        ByteBuffer.allocateDirect(size));
                             }
                         } else if (key.isReadable()) {
                             SocketChannel ch = (SocketChannel) key.channel();
@@ -152,29 +149,26 @@ public class SocketReadPollerBench {
 
     /**
      * Per-thread state: owns one TCP connection to the NIO server.
-     * Buffers allocated once — zero GC in steady state.
+     * Uses direct ByteBuffers to avoid heap-to-direct copies.
      */
     @State(Scope.Thread)
     public static class Connection {
-        Socket socket;
-        InputStream in;
-        OutputStream out;
-        byte[] readBuf;
-        byte[] writeBuf;
+        SocketChannel channel;
+        ByteBuffer readBuf;
+        ByteBuffer writeBuf;
 
         @Setup(Level.Trial)
         public void setup(SocketReadPollerBench bench) throws Exception {
-            socket = new Socket(InetAddress.getLoopbackAddress(), bench.serverPort);
-            socket.setTcpNoDelay(true);
-            in = socket.getInputStream();
-            out = socket.getOutputStream();
-            readBuf = new byte[bench.readSize];
-            writeBuf = new byte[bench.readSize];
+            channel = SocketChannel.open(
+                    new InetSocketAddress(InetAddress.getLoopbackAddress(), bench.serverPort));
+            channel.socket().setTcpNoDelay(true);
+            readBuf = ByteBuffer.allocateDirect(bench.readSize);
+            writeBuf = ByteBuffer.allocateDirect(bench.readSize);
         }
 
         @TearDown(Level.Trial)
         public void tearDown() throws Exception {
-            socket.close();
+            channel.close();
         }
     }
 
@@ -186,18 +180,17 @@ public class SocketReadPollerBench {
      */
     @Benchmark
     public int rpcRoundTrip(Connection conn) throws Exception {
-        conn.out.write(conn.writeBuf);
-        conn.out.flush();
-        readFully(conn.in, conn.readBuf, conn.readBuf.length);
-        return conn.readBuf.length;
+        conn.writeBuf.clear();
+        conn.channel.write(conn.writeBuf);
+        conn.readBuf.clear();
+        readFully(conn.channel, conn.readBuf);
+        return conn.readBuf.position();
     }
 
-    private static void readFully(InputStream in, byte[] buf, int len) throws IOException {
-        int total = 0;
-        while (total < len) {
-            int n = in.read(buf, total, len - total);
+    private static void readFully(SocketChannel ch, ByteBuffer buf) throws IOException {
+        while (buf.hasRemaining()) {
+            int n = ch.read(buf);
             if (n < 0) throw new IOException("unexpected EOF");
-            total += n;
         }
     }
 }
