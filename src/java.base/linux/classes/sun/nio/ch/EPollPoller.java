@@ -77,7 +77,7 @@ class EPollPoller extends Poller {
         this.maxEvents = maxEvents;
         this.address = address;
         this.eventfd = eventfd;
-        this.edgeTriggered = subPoller && read;
+        this.edgeTriggered = subPoller && read && (mode != Mode.POLLER_PER_CARRIER);
 
         // create action to close epoll instance, register cleaner when wakeable
         this.closer = closer(epfd, address, eventfd);
