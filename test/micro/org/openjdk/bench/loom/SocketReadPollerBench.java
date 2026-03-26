@@ -45,8 +45,8 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * RPC-style benchmark for virtual thread poller registration overhead.
@@ -59,10 +59,10 @@ import java.util.concurrent.TimeUnit;
  * The blocking read exercises the poller registration path
  * (epoll_ctl for one-shot, or skip for edge-triggered).
  *
- * <p>Usage:
+ * <p>Usage (constrain to 1 carrier to make per-op CPU savings visible):
  * <pre>
- * java -jar benchmarks.jar SocketReadPollerBench \
- *   -jvmArgs "-Djdk.pollerMode=2 -Djdk.virtualThreadScheduler.parallelism=31"
+ * java -jar benchmarks.jar SocketReadPollerBench -t 100 -p readSize=1 \
+ *   -jvmArgs "-Djdk.pollerMode=2 -Djdk.virtualThreadScheduler.parallelism=1"
  * </pre>
  */
 @BenchmarkMode(Mode.Throughput)
@@ -83,8 +83,14 @@ public class SocketReadPollerBench {
     private volatile boolean serverRunning;
     private int serverPort;
 
+    // Guard: JMH VIRTUAL executor may call Scope.Benchmark setup() per thread.
+    private final AtomicBoolean serverStarted = new AtomicBoolean();
+
     @Setup(Level.Trial)
     public void setup() throws Exception {
+        if (!serverStarted.compareAndSet(false, true)) {
+            return;
+        }
         serverChannel = ServerSocketChannel.open();
         serverChannel.configureBlocking(false);
         serverChannel.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 1000);
@@ -94,11 +100,9 @@ public class SocketReadPollerBench {
 
         serverRunning = true;
         int size = readSize;
-        var ready = new CountDownLatch(1);
 
         // Single platform thread: NIO spin loop echo server
         serverThread = Thread.ofPlatform().daemon(true).start(() -> {
-            ready.countDown();
             try {
                 while (serverRunning) {
                     selector.selectNow();
@@ -135,7 +139,6 @@ public class SocketReadPollerBench {
                 if (serverRunning) e.printStackTrace();
             }
         });
-        ready.await();
     }
 
     @TearDown(Level.Trial)
