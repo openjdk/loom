@@ -59,11 +59,15 @@ public abstract class Poller {
     // underlying polling mechanism but no virtual thread is waiting
     private static final Thread REGISTERED = new Thread("registered");
 
+    // sentinel value indicating an fd is registered AND an event was consumed
+    // while no virtual thread was waiting (edge-triggered race avoidance)
+    private static final Thread POLLED = new Thread("polled");
+
     // the poller or sub-poller thread (used for observability only)
     private @Stable Thread owner;
 
-    // maps file descriptors to parked Thread, or to REGISTERED sentinel for
-    // pollers that retain registrations across park/unpark cycles
+    // maps file descriptors to parked Thread, or to REGISTERED/POLLED sentinel
+    // for pollers that retain registrations across park/unpark cycles
     private final Map<Integer, Thread> map = new ConcurrentHashMap<>();
 
     // shutdown (if supported by poller group)
@@ -220,8 +224,8 @@ public abstract class Poller {
     final void polled(int fdVal) {
         Thread t;
         if (retainRegistration()) {
-            t = map.replace(fdVal, REGISTERED);
-            if (t == REGISTERED) return;
+            t = map.replace(fdVal, POLLED);
+            if (t == REGISTERED || t == POLLED) return;
         } else {
             t = map.remove(fdVal);
         }
@@ -293,10 +297,14 @@ public abstract class Poller {
      */
     private void startPoll(int fdVal) throws IOException {
         Thread previous = map.put(fdVal, Thread.currentThread());
-        assert previous == null || previous == REGISTERED;
+        assert previous == null || previous == REGISTERED || previous == POLLED;
         try {
-            if (previous != REGISTERED) {
+            if (previous == null) {
                 implStartPoll(fdVal);
+            } else if (previous == POLLED) {
+                // An event was consumed while no VT was waiting (edge-triggered
+                // race). Self-unpark so the caller retries without blocking.
+                LockSupport.unpark(Thread.currentThread());
             }
         } catch (Throwable t) {
             map.remove(fdVal);
@@ -331,6 +339,7 @@ public abstract class Poller {
      */
     private void clearRegistration(int fdVal) {
         map.remove(fdVal, REGISTERED);
+        map.remove(fdVal, POLLED);
     }
 
     /**
