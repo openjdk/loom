@@ -47,13 +47,14 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * RPC-style benchmark for virtual thread poller registration overhead.
  *
- * <p>A single platform thread runs a non-blocking NIO echo server
- * spinning on {@code selectNow()}. Persistent JMH virtual threads
- * do blocking I/O round-trips through the poller path.
+ * <p>Multiple platform threads each run a non-blocking NIO echo server
+ * on separate ports. Persistent JMH virtual threads round-robin across
+ * servers and do blocking I/O round-trips through the poller path.
  *
  * <p>Each JMH iteration does a write-then-blocking-read round-trip.
  * The blocking read exercises the poller registration path
@@ -74,85 +75,100 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Threads(100)
 public class SocketReadPollerBench {
 
+    @Param({"4"})
+    int serverCount;
+
     @Param({"1", "64"})
     int readSize;
 
-    private ServerSocketChannel serverChannel;
-    private Selector selector;
-    private Thread serverThread;
+    private ServerSocketChannel[] serverChannels;
+    private Selector[] selectors;
+    private Thread[] serverThreads;
+    private int[] serverPorts;
     private volatile boolean serverRunning;
-    private int serverPort;
 
     // Guard: JMH VIRTUAL executor may call Scope.Benchmark setup() per thread.
     private final AtomicBoolean serverStarted = new AtomicBoolean();
+    // Round-robin counter for client connections.
+    private final AtomicInteger nextServer = new AtomicInteger();
 
     @Setup(Level.Trial)
     public void setup() throws Exception {
         if (!serverStarted.compareAndSet(false, true)) {
             return;
         }
-        serverChannel = ServerSocketChannel.open();
-        serverChannel.configureBlocking(false);
-        serverChannel.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 1000);
-        serverPort = serverChannel.socket().getLocalPort();
-        selector = Selector.open();
-        serverChannel.register(selector, SelectionKey.OP_ACCEPT);
-
         serverRunning = true;
         int size = readSize;
+        serverChannels = new ServerSocketChannel[serverCount];
+        selectors = new Selector[serverCount];
+        serverThreads = new Thread[serverCount];
+        serverPorts = new int[serverCount];
 
-        // Single platform thread: NIO spin loop echo server
-        serverThread = Thread.ofPlatform().daemon(true).start(() -> {
-            try {
-                while (serverRunning) {
-                    selector.selectNow();
-                    var it = selector.selectedKeys().iterator();
-                    while (it.hasNext()) {
-                        SelectionKey key = it.next();
-                        it.remove();
-                        if (key.isAcceptable()) {
-                            SocketChannel ch = serverChannel.accept();
-                            if (ch != null) {
-                                ch.configureBlocking(false);
-                                ch.socket().setTcpNoDelay(true);
-                                ch.register(selector, SelectionKey.OP_READ,
-                                        ByteBuffer.allocateDirect(size));
-                            }
-                        } else if (key.isReadable()) {
-                            SocketChannel ch = (SocketChannel) key.channel();
-                            ByteBuffer buf = (ByteBuffer) key.attachment();
-                            int n = ch.read(buf);
-                            if (n < 0) {
-                                key.cancel();
-                                ch.close();
-                            } else if (!buf.hasRemaining()) {
-                                buf.flip();
-                                while (buf.hasRemaining()) {
-                                    ch.write(buf);
+        for (int i = 0; i < serverCount; i++) {
+            serverChannels[i] = ServerSocketChannel.open();
+            serverChannels[i].configureBlocking(false);
+            serverChannels[i].bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 1000);
+            serverPorts[i] = serverChannels[i].socket().getLocalPort();
+            selectors[i] = Selector.open();
+            serverChannels[i].register(selectors[i], SelectionKey.OP_ACCEPT);
+
+            Selector sel = selectors[i];
+            serverThreads[i] = Thread.ofPlatform().daemon(true).start(() -> {
+                try {
+                    while (serverRunning) {
+                        sel.select(1);
+                        var it = sel.selectedKeys().iterator();
+                        while (it.hasNext()) {
+                            SelectionKey key = it.next();
+                            it.remove();
+                            if (key.isAcceptable()) {
+                                SocketChannel ch = ((ServerSocketChannel) key.channel()).accept();
+                                if (ch != null) {
+                                    ch.configureBlocking(false);
+                                    ch.socket().setTcpNoDelay(true);
+                                    ch.register(sel, SelectionKey.OP_READ,
+                                            ByteBuffer.allocateDirect(size));
                                 }
-                                buf.clear();
+                            } else if (key.isReadable()) {
+                                SocketChannel ch = (SocketChannel) key.channel();
+                                ByteBuffer buf = (ByteBuffer) key.attachment();
+                                int n = ch.read(buf);
+                                if (n < 0) {
+                                    key.cancel();
+                                    ch.close();
+                                } else if (!buf.hasRemaining()) {
+                                    buf.flip();
+                                    while (buf.hasRemaining()) {
+                                        ch.write(buf);
+                                    }
+                                    buf.clear();
+                                }
                             }
                         }
                     }
+                } catch (IOException e) {
+                    if (serverRunning) e.printStackTrace();
                 }
-            } catch (IOException e) {
-                if (serverRunning) e.printStackTrace();
-            }
-        });
+            });
+        }
     }
 
     @TearDown(Level.Trial)
     public void tearDown() throws Exception {
         serverRunning = false;
-        selector.wakeup();
-        serverThread.join(5000);
-        selector.close();
-        serverChannel.close();
+        for (int i = 0; i < serverCount; i++) {
+            selectors[i].wakeup();
+            serverThreads[i].join(5000);
+            selectors[i].close();
+            serverChannels[i].close();
+        }
+        serverStarted.set(false);
+        nextServer.set(0);
     }
 
     /**
-     * Per-thread state: owns one TCP connection to the NIO server.
-     * Uses direct ByteBuffers to avoid heap-to-direct copies.
+     * Per-thread state: owns one TCP connection to a server.
+     * Connections are round-robined across server instances.
      */
     @State(Scope.Thread)
     public static class Connection {
@@ -162,8 +178,9 @@ public class SocketReadPollerBench {
 
         @Setup(Level.Trial)
         public void setup(SocketReadPollerBench bench) throws Exception {
+            int idx = bench.nextServer.getAndIncrement() % bench.serverCount;
             channel = SocketChannel.open(
-                    new InetSocketAddress(InetAddress.getLoopbackAddress(), bench.serverPort));
+                    new InetSocketAddress(InetAddress.getLoopbackAddress(), bench.serverPorts[idx]));
             channel.socket().setTcpNoDelay(true);
             readBuf = ByteBuffer.allocateDirect(bench.readSize);
             writeBuf = ByteBuffer.allocateDirect(bench.readSize);
