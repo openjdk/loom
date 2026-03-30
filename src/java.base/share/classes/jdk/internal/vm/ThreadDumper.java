@@ -83,11 +83,11 @@ public class ThreadDumper {
      * @param okayToOverwrite true to overwrite an existing file
      * @return the UTF-8 encoded thread dump or message to return to the tool user
      */
-    public static byte[] dumpThreadsToJson(String file, boolean okayToOverwrite, boolean minify) {
+    public static byte[] dumpThreadsToJson(String file, boolean okayToOverwrite, boolean prettyPrint) {
         if (file == null || file.equals("-")) {
-            return dumpThreadsToByteArray(true, !minify, MAX_BYTE_ARRAY_SIZE);
+            return dumpThreadsToByteArray(true, prettyPrint, MAX_BYTE_ARRAY_SIZE);
         } else {
-            return dumpThreadsToFile(file, okayToOverwrite, true, minify);
+            return dumpThreadsToFile(file, okayToOverwrite, true, prettyPrint);
         }
     }
 
@@ -97,11 +97,11 @@ public class ThreadDumper {
      * when a file path is not specified. It returns the thread dump and/or message to
      * send to the tool user.
      */
-    private static byte[] dumpThreadsToByteArray(boolean json,  boolean minify, int maxSize) {
+    private static byte[] dumpThreadsToByteArray(boolean json, boolean prettyPrint, int maxSize) {
         var out = new BoundedByteArrayOutputStream(maxSize);
         try (out; var writer = new TextWriter(out)) {
             if (json) {
-                dumpThreadsToJson(writer, minify);
+                dumpThreadsToJson(writer, prettyPrint);
             } else {
                 dumpThreads(writer);
             }
@@ -123,7 +123,7 @@ public class ThreadDumper {
     private static byte[] dumpThreadsToFile(String file,
                                             boolean okayToOverwrite,
                                             boolean json,
-                                            boolean minify) {
+                                            boolean prettyPrint) {
         Path path = Path.of(file).toAbsolutePath();
         OpenOption[] options = (okayToOverwrite)
                 ? new OpenOption[0]
@@ -132,7 +132,7 @@ public class ThreadDumper {
         try (OutputStream out = Files.newOutputStream(path, options)) {
             try (var writer = new TextWriter(out)) {
                 if (json) {
-                    dumpThreadsToJson(writer, minify);
+                    dumpThreadsToJson(writer, prettyPrint);
                 } else {
                     dumpThreads(writer);
                 }
@@ -246,7 +246,7 @@ public class ThreadDumper {
     public static void dumpThreadsToJson(OutputStream out) throws IOException {
         var writer = new TextWriter(out);
         try {
-            dumpThreadsToJson(writer, /*minify*/false);
+            dumpThreadsToJson(writer, /*prettyPrint*/true);
             writer.flush();
         } catch (UncheckedIOException e) {
             IOException ioe = e.getCause();
@@ -258,8 +258,8 @@ public class ThreadDumper {
      * Generate a thread dump to the given text stream in JSON format.
      * @throws UncheckedIOException if an I/O error occurs
      */
-    private static void dumpThreadsToJson(TextWriter textWriter, boolean minify) {
-        var jsonWriter = new JsonWriter(textWriter, minify);
+    private static void dumpThreadsToJson(TextWriter textWriter, boolean prettyPrint) {
+        var jsonWriter = new JsonWriter(textWriter, prettyPrint);
 
         jsonWriter.startObject();  // top-level object
 
@@ -418,9 +418,9 @@ public class ThreadDumper {
         private final TextWriter writer;
         private final boolean prettyPrint;  // pretty print or minify
 
-        JsonWriter(TextWriter writer, boolean minify) {
+        JsonWriter(TextWriter writer, boolean prettyPrint) {
             this.writer = writer;
-            this.prettyPrint = !minify;
+            this.prettyPrint = prettyPrint;
         }
 
         private void print(Object obj) {

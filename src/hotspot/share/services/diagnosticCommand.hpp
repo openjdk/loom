@@ -773,10 +773,10 @@ public:
 
 class ThreadDumpToFileDCmd : public DCmdWithParser {
 private:
-  void dumpToFile(Symbol* name, Symbol* signature, const char* path, bool overwrite, bool minify, TRAPS);
+  void dumpToFile(Symbol* name, Symbol* signature, const char* path, bool overwrite, bool no_prettyprint, TRAPS);
 protected:
   DCmdArgument<char*> _format;
-  DCmdArgument<bool> _minify;
+  DCmdArgument<bool> _no_prettyprint;
   DCmdArgument<char*> _filepath;
   DCmdArgument<bool> _overwrite;
 public:

@@ -27,8 +27,8 @@
  * @summary Basic test for jcmd Thread.dump_to_file
  * @modules jdk.jcmd
  * @library /test/lib
- * @run junit/othervm -Dminify=true ThreadDumpToFileTest
- * @run junit/othervm -Dminify=false ThreadDumpToFileTest
+ * @run junit/othervm -DprettyPrint=true ThreadDumpToFileTest
+ * @run junit/othervm -DprettyPrint=false ThreadDumpToFileTest
  */
 
 import java.io.IOException;
@@ -44,11 +44,11 @@ import org.junit.jupiter.api.BeforeAll;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ThreadDumpToFileTest {
-    private static boolean minify;
+    private static boolean prettyPrint;
 
     @BeforeAll
     static void setup() throws Exception {
-        minify = Boolean.getBoolean("minify");
+        prettyPrint = Boolean.getBoolean("prettyPrint");
     }
 
     /**
@@ -163,8 +163,8 @@ class ThreadDumpToFileTest {
         for (String option : options) {
             cmd += " " + option;
         }
-        if (minify) {
-            cmd += " -minify";
+        if (!prettyPrint) {
+            cmd += " -no-prettyprint";
         }
         return new PidJcmdExecutor().execute(cmd + " " + file);
     }
