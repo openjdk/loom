@@ -89,7 +89,12 @@ final class VirtualThread extends BaseVirtualThread {
             DEFAULT_SCHEDULER = builtinScheduler;
             EXTERNAL_VIEW = createExternalView(builtinScheduler);
         }
-        USE_STPE = Boolean.getBoolean("jdk.virtualThreadScheduler.useSTPE");
+        propValue = System.getProperty("jdk.virtualThreadScheduler.useSTPE");
+        if (propValue != null) {
+            USE_STPE = Boolean.parseBoolean(propValue);
+        } else {
+            USE_STPE = Runtime.getRuntime().availableProcessors() < 4;
+        }
     }
 
     private static final long STATE = U.objectFieldOffset(VirtualThread.class, "state");
