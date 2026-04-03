@@ -1074,6 +1074,7 @@ class SocketChannelImpl
         assert Thread.holdsLock(stateLock) && state == ST_CLOSING;
         if ((readerThread == null) && (writerThread == null) && !isRegistered()) {
             state = ST_CLOSED;
+            Poller.closePoll(fdVal);
             nd.close(fd);
             return true;
         } else {

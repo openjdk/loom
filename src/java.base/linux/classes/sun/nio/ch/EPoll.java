@@ -67,6 +67,7 @@ class EPoll {
     static final int EPOLLOUT  = 0x4;
 
     // flags
+    static final int EPOLLET        = (1 << 31);
     static final int EPOLLONESHOT   = (1 << 30);
 
     /**
