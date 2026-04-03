@@ -281,15 +281,10 @@ public class ThreadDumper {
      * Generate a thread dump to the given text stream in JSON format.
      * @throws UncheckedIOException if an I/O error occurs
      */
-<<<<<<< HEAD
     private static void dumpThreadsToJson(TextWriter textWriter, boolean prettyPrint) {
-        var jsonWriter = new JsonWriter(textWriter, prettyPrint);
-
-=======
-    private static void dumpThreadsToJson(TextWriter textWriter) {
         int format = JsonFormat.formatVersion();
-        var jsonWriter = new JsonWriter(textWriter, (format == JsonFormat.JSON_FORMAT_V1));
->>>>>>> master
+        boolean generateLongsAsString = (format == JsonFormat.JSON_FORMAT_V1);
+        var jsonWriter = new JsonWriter(textWriter, prettyPrint, generateLongsAsString);
         jsonWriter.startObject();  // top-level object
         jsonWriter.startObject("threadDump");
         if (format > JsonFormat.JSON_FORMAT_V1) {
@@ -450,14 +445,14 @@ public class ThreadDumper {
             }
         }
         private final Deque<Node> stack = new ArrayDeque<>();
-        private final boolean generateLongsAsString;
         private final TextWriter writer;
         private final boolean prettyPrint;  // pretty print or minify
+        private final boolean generateLongsAsString;
 
-<<<<<<< HEAD
-        JsonWriter(TextWriter writer, boolean prettyPrint) {
+        JsonWriter(TextWriter writer, boolean prettyPrint, boolean generateLongsAsString) {
             this.writer = writer;
             this.prettyPrint = prettyPrint;
+            this.generateLongsAsString = generateLongsAsString;
         }
 
         private void print(Object obj) {
@@ -476,11 +471,6 @@ public class ThreadDumper {
             if (prettyPrint) {
                 writer.println();
             }
-=======
-        JsonWriter(TextWriter writer, boolean generateLongsAsString) {
-            this.writer = writer;
-            this.generateLongsAsString = generateLongsAsString;
->>>>>>> master
         }
 
         private void indent() {
@@ -539,19 +529,10 @@ public class ThreadDumper {
                 print("\"" + name + "\": ");
             }
             switch (obj) {
-<<<<<<< HEAD
-                // Long may be larger than safe range of JSON integer value
-                case Long   _  -> print("\"" + obj + "\"");
                 case Number _  -> print(obj);
                 case Boolean _ -> print(obj);
                 case null      -> print("null");
                 default        -> print("\"" + escape(obj.toString()) + "\"");
-=======
-                case Number _  -> writer.print(obj);
-                case Boolean _ -> writer.print(obj);
-                case null      -> writer.print("null");
-                default        -> writer.print("\"" + escape(obj.toString()) + "\"");
->>>>>>> master
             }
         }
 
