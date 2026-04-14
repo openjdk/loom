@@ -43,7 +43,12 @@ public class ScheduleAndCancelDelayedTasks2 {
 
     private void scheduleAndCancelDelayedTask(Deque<Future<?>> queue, int maxPending) {
         long delay = 60 + ThreadLocalRandom.current().nextInt(60);
-        Future<?> future = fjpPool.schedule(() -> { }, delay, TimeUnit.SECONDS);
+        Future<?> future;
+        try {
+            future = fjpPool.schedule(() -> { }, delay, TimeUnit.SECONDS);
+        } catch (RejectedExecutionException _) {
+            return;
+        }
         if (maxPending > 1) {
             queue.offer(future);
             if (queue.size() >= maxPending) {
