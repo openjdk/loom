@@ -926,7 +926,7 @@ void ShenandoahBarrierSetAssembler::store_c2(const MachNode* node, MacroAssemble
                                              Register src, bool src_narrow,
                                              Register tmp) {
 
-  ShenandoahBarrierStubC2::store_pre(masm, node, tmp, dst, noreg, noreg, dst_narrow);
+  ShenandoahBarrierStubC2::store_pre(masm, node, dst, tmp, noreg, noreg, dst_narrow);
 
   // Need to encode into tmp, because we cannot clobber src.
   if (dst_narrow && !src_narrow) {
@@ -961,7 +961,7 @@ void ShenandoahBarrierSetAssembler::compare_and_set_c2(const MachNode* node, Mac
   assert_different_registers(oldval, tmp, addr.base(), addr.index());
   assert_different_registers(newval, tmp, addr.base(), addr.index());
 
-  ShenandoahBarrierStubC2::load_store_pre(masm, node, tmp, addr, noreg, noreg, narrow);
+  ShenandoahBarrierStubC2::load_store_pre(masm, node, addr, tmp, noreg, noreg, narrow);
 
   // CAS!
   __ lock();
@@ -982,7 +982,7 @@ void ShenandoahBarrierSetAssembler::compare_and_set_c2(const MachNode* node, Mac
 void ShenandoahBarrierSetAssembler::get_and_set_c2(const MachNode* node, MacroAssembler* masm, Register newval, Address addr, Register tmp, bool narrow) {
   assert_different_registers(newval, tmp, addr.base(), addr.index());
 
-  ShenandoahBarrierStubC2::load_store_pre(masm, node, tmp, addr, noreg, noreg, narrow);
+  ShenandoahBarrierStubC2::load_store_pre(masm, node, addr, tmp, noreg, noreg, narrow);
 
   if (narrow) {
     __ xchgl(newval, addr);

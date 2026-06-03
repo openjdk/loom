@@ -792,7 +792,7 @@ void ShenandoahBarrierSetAssembler::load_c2(const MachNode* node, MacroAssembler
 void ShenandoahBarrierSetAssembler::store_c2(const MachNode* node, MacroAssembler* masm, Address dst, bool dst_narrow,
     Register src, bool src_narrow, Register tmp1, Register tmp2, Register tmp3) {
 
-  ShenandoahBarrierStubC2::store_pre(masm, node, tmp1, dst, tmp2, tmp3, dst_narrow);
+  ShenandoahBarrierStubC2::store_pre(masm, node, dst, tmp1, tmp2, tmp3, dst_narrow);
 
   // Do the actual store
   if (dst_narrow) {
@@ -820,7 +820,7 @@ void ShenandoahBarrierSetAssembler::compare_and_set_c2(const MachNode* node, Mac
   const Assembler::Aqrl release = Assembler::rl;
   const Assembler::operand_size size = narrow ? Assembler::uint32 : Assembler::int64;
 
-  ShenandoahBarrierStubC2::load_store_pre(masm, node, tmp1, Address(addr), tmp2, tmp3, narrow);
+  ShenandoahBarrierStubC2::load_store_pre(masm, node, Address(addr), tmp1, tmp2, tmp3, narrow);
 
   // CAS!
   __ cmpxchg(addr, oldval, newval, size, acquire, release, /* result */ res, !exchange /* result_as_bool */);
@@ -832,7 +832,7 @@ void ShenandoahBarrierSetAssembler::get_and_set_c2(const MachNode* node, MacroAs
     Register newval, Register addr, Register tmp1, Register tmp2, Register tmp3, bool is_acquire) {
   const bool is_narrow = node->bottom_type()->isa_narrowoop();
 
-  ShenandoahBarrierStubC2::load_store_pre(masm, node, tmp1, Address(addr, 0), tmp2, tmp3, is_narrow);
+  ShenandoahBarrierStubC2::load_store_pre(masm, node, Address(addr, 0), tmp1, tmp2, tmp3, is_narrow);
 
   if (is_narrow) {
     if (is_acquire) {
