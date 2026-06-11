@@ -268,6 +268,64 @@ class CustomScheduler {
     }
 
     /**
+     * Test currentVirtualThreadTask from a virtual thread with custom scheduler.
+     */
+    @Test
+    void testCurrentVirtualThreadTask1() throws Exception {
+        var ref = new AtomicReference<Thread.VirtualThreadTask>();
+        Thread thread = VThreadScheduler.virtualThreadBuilder(scheduler1).start(() -> {
+            ref.set(scheduler1.currentVirtualThreadTask());
+        });
+        thread.join();
+        assertNotNull(ref.get());
+        assertTrue(ref.get().thread() == thread);
+    }
+
+    /**
+     * Test currentVirtualThreadTask from a platform thread, should return null.
+     */
+    @Test
+    void testCurrentVirtualThreadTask2() {
+        assumeFalse(Thread.currentThread().isVirtual(), "Main thread is a virtual thread");
+        assertNull(scheduler1.currentVirtualThreadTask());
+    }
+
+    /**
+     * Test currentVirtualThreadTask attachment survives yield.
+     */
+    @Test
+    void testCurrentVirtualThreadTask3() throws Exception {
+        var ref = new AtomicReference<Object>();
+        Thread thread = VThreadScheduler.virtualThreadBuilder(scheduler1).start(() -> {
+            var task = scheduler1.currentVirtualThreadTask();
+            task.attach("test-attachment");
+            Thread.yield();
+            var taskAfterYield = scheduler1.currentVirtualThreadTask();
+            ref.set(taskAfterYield.attachment());
+        });
+        thread.join();
+        assertEquals("test-attachment", ref.get());
+    }
+
+    /**
+     * Test currentVirtualThreadTask on the default scheduler, should throw UOE.
+     */
+    @Test
+    void testCurrentVirtualThreadTaskDefaultScheduler() throws Exception {
+        var ref = new AtomicReference<Throwable>();
+        Thread thread = Thread.startVirtualThread(() -> {
+            try {
+                defaultScheduler.currentVirtualThreadTask();
+                fail("Expected UnsupportedOperationException");
+            } catch (UnsupportedOperationException e) {
+                ref.set(e);
+            }
+        });
+        thread.join();
+        assertNotNull(ref.get());
+    }
+
+    /**
      * Returns the scheduler for the current virtual thread.
      */
     private static Thread.VirtualThreadScheduler currentScheduler() {

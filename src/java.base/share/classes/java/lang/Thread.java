@@ -990,6 +990,30 @@ public class Thread implements Runnable {
         }
 
         /**
+         * Returns the {@code VirtualThreadTask} for the current virtual thread, or
+         * {@code null} if the current thread is not a virtual thread.
+         *
+         * @apiNote This method is intended for frameworks that make use of a custom
+         * {@link VirtualThreadScheduler VirtualThreadScheduler} and need to access the
+         * task's {@link VirtualThreadTask#attachment() attachment} from within a running
+         * virtual thread.
+         *
+         * @return the {@code VirtualThreadTask} for the current virtual thread,
+         *         or {@code null} if the current thread is not a virtual thread
+         * @throws UnsupportedOperationException if this is the built-in default scheduler
+         */
+        default VirtualThreadTask currentVirtualThreadTask() {
+            if (this == VirtualThread.builtinScheduler(false)) {
+                throw new UnsupportedOperationException();
+            }
+            Thread t = Thread.currentThread();
+            if (t instanceof VirtualThread vt) {
+                return vt.virtualThreadTask();
+            }
+            return null;
+        }
+
+        /**
          * Schedules a task that becomes enabled for execution after the given delay.
          *
          * <p> This method is invoked to schedule delayed tasks in support of timed
