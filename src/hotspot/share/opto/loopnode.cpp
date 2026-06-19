@@ -3129,8 +3129,12 @@ Node* LoopLimitNode::Identity(PhaseGVN* phase) {
   return this;
 }
 
-// Match increment with optional truncation:
-// CHAR: (i+1)&0x7fff, BYTE: ((i+1)<<8)>>8, or SHORT: ((i+1)<<16)>>16
+// CHAR: (i+1)&0x7fff      Note: does NOT work for char cast (0xffff)
+// BYTE: ((i+1)<<8)>>8     Note: does NOT work for byte cast (<< 24 >> 24)
+// SHORT: ((i+1)<<16)>>16
+//
+// Note: in the future, we should fix both the BYTE and the CHAR case,
+//       to allow proper optimization of byte/char cast truncation.
 void CountedLoopConverter::TruncatedIncrement::build(Node* expr) {
   _is_valid = false;
 
@@ -3146,15 +3150,19 @@ void CountedLoopConverter::TruncatedIncrement::build(Node* expr) {
   const TypeInteger* trunc_t = TypeInteger::bottom(_bt);
 
   if (_bt == T_INT) {
-    // Try to strip (n1 & M) or (n1 << N >> N) from n1.
     if (n1op == Op_AndI &&
-        n1->in(2)->is_Con() &&
-        n1->in(2)->bottom_type()->is_int()->get_con() == 0x7fff) {
-      // %%% This check should match any mask of 2**K-1.
-      t1 = n1;
-      n1 = t1->in(1);
-      n1op = n1->Opcode();
-      trunc_t = TypeInt::CHAR;
+        n1->in(2)->is_Con()) {
+      // Unsigned truncation.
+      // Pattern: ((i+1) & mask)
+      jint mask = n1->in(2)->bottom_type()->is_int()->get_con();
+      switch (mask) {
+        case 0x7fff: // Unsigned 15-bit truncation. For historical reasons.
+          t1 = n1;
+          n1 = t1->in(1);
+          n1op = n1->Opcode();
+          trunc_t = TypeInt::make_unsigned(0, mask, 0);
+          break;
+      }
     } else if (n1op == Op_RShiftI &&
                n1->in(1) != nullptr &&
                n1->in(1)->Opcode() == Op_LShiftI &&
