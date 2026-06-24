@@ -43,18 +43,6 @@
 #include "memory/iterator.inline.hpp"
 #include "oops/oop.inline.hpp"
 
-inline oop ShenandoahBarrierSet::resolve_forwarded_not_null(oop p) {
-  return ShenandoahForwarding::get_forwardee(p);
-}
-
-inline oop ShenandoahBarrierSet::resolve_forwarded(oop p) {
-  if (p != nullptr) {
-    return resolve_forwarded_not_null(p);
-  } else {
-    return p;
-  }
-}
-
 template <DecoratorSet decorators, class T>
 inline oop ShenandoahBarrierSet::load_reference_barrier_mutator(oop obj, T* load_addr) {
   assert(ShenandoahLoadRefBarrier, "Should be enabled");
@@ -119,7 +107,7 @@ inline oop ShenandoahBarrierSet::load_reference_barrier(oop obj) {
   if (_heap->has_forwarded_objects() && _heap->in_collection_set(obj)) {
     // Subsumes null-check
     assert(obj != nullptr, "cset check must have subsumed null-check");
-    oop fwd = resolve_forwarded_not_null(obj);
+    oop fwd = ShenandoahForwarding::get_forwardee(obj);
     if (obj == fwd && _heap->is_evacuation_in_progress()) {
       Thread* t = Thread::current();
       return _heap->evacuate_object(obj, t);
@@ -536,7 +524,7 @@ void ShenandoahBarrierSet::arraycopy_work(T* src, size_t count) {
     if (!CompressedOops::is_null(o)) {
       oop obj = CompressedOops::decode_not_null(o);
       if (HAS_FWD && cset->is_in(obj)) {
-        oop fwd = resolve_forwarded_not_null(obj);
+        oop fwd = ShenandoahForwarding::get_forwardee(obj);
         if (EVAC && obj == fwd) {
           fwd = _heap->evacuate_object(obj, thread);
         }

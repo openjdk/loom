@@ -93,9 +93,6 @@ public:
   void on_thread_attach(Thread* thread) override;
   void on_thread_detach(Thread* thread) override;
 
-  static inline oop resolve_forwarded_not_null(oop p);
-  static inline oop resolve_forwarded(oop p);
-
   template <DecoratorSet decorators, typename T>
   inline void satb_barrier(T* field);
   inline void satb_enqueue(oop value);
