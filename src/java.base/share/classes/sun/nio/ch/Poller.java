@@ -207,11 +207,7 @@ public abstract class Poller {
     final void polled(int fdVal) {
         Thread t = map.remove(fdVal);
         if (t != null) {
-            if (POLLER_GROUP.useLazyUnpark() && Thread.currentThread().isVirtual()) {
-                JLA.lazyUnparkVirtualThread(t);
-            } else {
-                LockSupport.unpark(t);
-            }
+            LockSupport.unpark(t);
         }
     }
 
@@ -539,6 +535,7 @@ public abstract class Poller {
 
             ThreadFactory factory = Thread.ofVirtual()
                     .inheritInheritableThreadLocals(false)
+                    .stickyAffinity()
                     .name("SubPoller-", 0)
                     .uncaughtExceptionHandler((_, e) -> e.printStackTrace())
                     .factory();
@@ -667,6 +664,7 @@ public abstract class Poller {
             Thread carrier = JLA.currentCarrierThread();
             Thread.Builder.OfVirtual builder = Thread.ofVirtual()
                     .inheritInheritableThreadLocals(false)
+                    .stickyAffinity()
                     .name(carrier.getName() + "-Read-Poller")
                     .uncaughtExceptionHandler((_, e) -> e.printStackTrace());
             Thread thread = JLA.defaultVirtualThreadScheduler()

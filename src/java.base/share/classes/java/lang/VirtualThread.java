@@ -106,6 +106,7 @@ final class VirtualThread extends BaseVirtualThread {
     private final VirtualThreadScheduler scheduler;
     private final Continuation cont;
     private final VThreadTask runContinuation;
+    private final boolean stickyAffinity;
 
     // virtual thread state, accessed by VM
     private volatile int state;
@@ -234,6 +235,13 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
+     * Returns true if the current thread is a virtual thread with sticky affinity.
+     */
+    static boolean currentThreadIsSticky() {
+        return currentThread() instanceof VirtualThread vt && vt.stickyAffinity;
+    }
+
+    /**
      * Returns the continuation scope used for virtual threads.
      */
     static ContinuationScope continuationScope() {
@@ -271,6 +279,7 @@ final class VirtualThread extends BaseVirtualThread {
             throw new UnsupportedOperationException();
         }
         this.scheduler = scheduler;
+        this.stickyAffinity = (characteristics & Thread.STICKY_AFFINITY) != 0;
         this.cont = new VThreadContinuation(this, task);
 
         if (scheduler == BUILTIN_SCHEDULER) {
@@ -799,13 +808,14 @@ final class VirtualThread extends BaseVirtualThread {
             // submit task to schedule
             try {
                 if (currentThread().isVirtual()) {
+                    boolean useLazy = lazy || currentThreadIsSticky();
                     Continuation.pin();
                     try {
                         if (scheduler == BUILTIN_SCHEDULER
                                 && currentCarrierThread() instanceof CarrierThread ct) {
                             ForkJoinPool pool = ct.getPool();
                             ForkJoinTask<?> task = ForkJoinTask.adapt(runContinuation);
-                            if (lazy) {
+                            if (useLazy) {
                                 pool.lazySubmit(task);
                             } else {
                                 pool.externalSubmit(task);
@@ -991,7 +1001,7 @@ final class VirtualThread extends BaseVirtualThread {
             // unparked while parked
             if ((s == PARKED || s == TIMED_PARKED) && compareAndSetState(s, UNPARKED)) {
 
-                if (lazySubmit && currentThread().isVirtual()) {
+                if ((lazySubmit || currentThreadIsSticky()) && currentThread().isVirtual()) {
                     Continuation.pin();
                     try {
                         if (scheduler == BUILTIN_SCHEDULER
