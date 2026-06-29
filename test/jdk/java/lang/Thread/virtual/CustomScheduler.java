@@ -34,13 +34,16 @@ import java.lang.reflect.Field;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.LockSupport;
+import java.util.concurrent.CountDownLatch;
 
 import jdk.test.lib.thread.VThreadRunner;
 import jdk.test.lib.thread.VThreadScheduler;
@@ -285,6 +288,69 @@ class CustomScheduler {
                 executor.execute(task);
             }
         };
+    }
+
+    /**
+     * Test virtual thread mounted on carrier executing class initializer
+     */
+    @Test
+    void testMountedAtKlassInit() throws Exception {
+        class CarrierHelper {
+            static boolean passed;
+            static {
+                try {
+                    Carrier.testEmpty();
+                    Carrier.testParking();
+                    Carrier.testMonitorEnter();
+                    passed = true;
+                } catch (Exception e) {}
+            }
+        }
+        assertTrue(CarrierHelper.passed);
+    }
+
+    class Carrier {
+        static ThreadFactory factory = VThreadScheduler.virtualThreadBuilder(r -> r.run()).factory();
+
+        static void testEmpty() throws Exception {
+            Thread vthread = factory.newThread(() -> {});
+            vthread.start();
+            vthread.join();
+        }
+
+        static void testParking() throws Exception {
+            Thread vthread = factory.newThread(LockSupport::park);
+            vthread.start();
+            assertTrue(vthread.getState() == Thread.State.WAITING);
+            LockSupport.unpark(vthread);
+            vthread.join();
+        }
+
+        static void testMonitorEnter() throws Exception {
+            Object lock = new Object();
+            AtomicBoolean done = new AtomicBoolean();
+            AtomicInteger counter = new AtomicInteger();
+            CountDownLatch started = new CountDownLatch(1);
+
+            Thread contender = Thread.ofPlatform().start(() -> {
+                synchronized (lock) {
+                    started.countDown();
+                    while (!done.get()) {}
+                }
+            });
+            started.await();
+            Thread vthread = factory.newThread(() -> {
+                synchronized (lock) {
+                    counter.getAndIncrement();
+                }
+            });
+            vthread.start();
+            assertTrue(vthread.getState() == Thread.State.BLOCKED);
+
+            done.set(true);
+            contender.join();
+            vthread.join();
+        }
     }
 
     /**
