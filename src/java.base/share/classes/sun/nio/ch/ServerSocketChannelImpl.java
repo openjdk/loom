@@ -553,6 +553,7 @@ class ServerSocketChannelImpl
         assert Thread.holdsLock(stateLock) && state == ST_CLOSING;
         if ((thread == null) && !isRegistered()) {
             state = ST_CLOSED;
+            Poller.closePoll(fdVal);
             nd.close(fd);
             return true;
         } else {

@@ -55,10 +55,19 @@ public abstract class Poller {
     // the poller group for the I/O pollers and poller threads
     private static final PollerGroup POLLER_GROUP = createPollerGroup();
 
+    // sentinel value in the map indicating an fd is registered with the
+    // underlying polling mechanism but no virtual thread is waiting
+    private static final Thread REGISTERED = new Thread("registered");
+
+    // sentinel value indicating an fd is registered AND an event was consumed
+    // while no virtual thread was waiting (edge-triggered race avoidance)
+    private static final Thread POLLED = new Thread("polled");
+
     // the poller or sub-poller thread (used for observability only)
     private @Stable Thread owner;
 
-    // maps file descriptors to parked Thread
+    // maps file descriptors to parked Thread, or to REGISTERED/POLLED sentinel
+    // for pollers that retain registrations across park/unpark cycles
     private final Map<Integer, Thread> map = new ConcurrentHashMap<>();
 
     // shutdown (if supported by poller group)
@@ -170,9 +179,7 @@ public abstract class Poller {
     }
 
     /**
-     * Register the file descriptor with the I/O event management facility so that it is
-     * polled when the file descriptor is ready for I/O. The registration is "one shot",
-     * meaning it should be polled at most once.
+     * Register the file descriptor for polling.
      */
     abstract void implStartPoll(int fdVal) throws IOException;
 
@@ -182,6 +189,16 @@ public abstract class Poller {
      * @param polled true if the file descriptor has already been polled
      */
     abstract void implStopPoll(int fdVal, boolean polled) throws IOException;
+
+    /**
+     * Returns true if this poller retains fd registrations across park/unpark
+     * cycles (e.g., edge-triggered epoll). When true, the map entry is replaced
+     * with a REGISTERED sentinel on wakeup/deregister instead of being removed,
+     * and implStartPoll is only called on first registration.
+     */
+    boolean retainRegistration() {
+        return false;
+    }
 
     /**
      * Poll for events. The {@link #polled(int)} method is invoked for each
@@ -205,7 +222,13 @@ public abstract class Poller {
      * Callback by the poll method when a file descriptor is polled.
      */
     final void polled(int fdVal) {
-        Thread t = map.remove(fdVal);
+        Thread t;
+        if (retainRegistration()) {
+            t = map.replace(fdVal, POLLED);
+            if (t == REGISTERED || t == POLLED) return;
+        } else {
+            t = map.remove(fdVal);
+        }
         if (t != null) {
             if (POLLER_GROUP.useLazyUnpark() && Thread.currentThread().isVirtual()) {
                 JLA.lazyUnparkVirtualThread(t);
@@ -233,6 +256,14 @@ public abstract class Poller {
      */
     public static void pollSelector(int fdVal, long nanos) throws IOException {
         POLLER_GROUP.pollSelector(fdVal, nanos);
+    }
+
+    /**
+     * Cleans up any retained registration state for a file descriptor that is
+     * being closed. Used when no virtual thread is currently blocked on the fd.
+     */
+    public static void closePoll(int fdVal) {
+        POLLER_GROUP.closePoll(fdVal);
     }
 
     /**
@@ -266,9 +297,15 @@ public abstract class Poller {
      */
     private void startPoll(int fdVal) throws IOException {
         Thread previous = map.put(fdVal, Thread.currentThread());
-        assert previous == null;
+        assert previous == null || previous == REGISTERED || previous == POLLED;
         try {
-            implStartPoll(fdVal);
+            if (previous == null) {
+                implStartPoll(fdVal);
+            } else if (previous == POLLED) {
+                // An event was consumed while no VT was waiting (edge-triggered
+                // race). Self-unpark so the caller retries without blocking.
+                LockSupport.unpark(Thread.currentThread());
+            }
         } catch (Throwable t) {
             map.remove(fdVal);
             throw t;
@@ -281,14 +318,28 @@ public abstract class Poller {
      * Deregister a file descriptor from the I/O event management facility.
      */
     private void stopPoll(int fdVal) throws IOException {
-        Thread previous = map.remove(fdVal);
-        boolean polled = (previous == null);
-        assert polled || previous == Thread.currentThread();
+        boolean polled;
+        if (retainRegistration()) {
+            Thread previous = map.replace(fdVal, REGISTERED);
+            polled = (previous == REGISTERED);
+        } else {
+            Thread previous = map.remove(fdVal);
+            polled = (previous == null);
+            assert polled || previous == Thread.currentThread();
+        }
         try {
             implStopPoll(fdVal, polled);
         } finally {
             Reference.reachabilityFence(this);
         }
+    }
+
+    /**
+     * Removes any retained registration state for the given file descriptor.
+     */
+    private void clearRegistration(int fdVal) {
+        map.remove(fdVal, REGISTERED);
+        map.remove(fdVal, POLLED);
     }
 
     /**
@@ -407,6 +458,19 @@ public abstract class Poller {
          */
         boolean useLazyUnpark() {
             return false;
+        }
+
+        /**
+         * Cleans up any retained registration state for the given fd across
+         * all read and write pollers in this group.
+         */
+        void closePoll(int fdVal) {
+            for (Poller p : readPollers()) {
+                p.clearRegistration(fdVal);
+            }
+            for (Poller p : writePollers()) {
+                p.clearRegistration(fdVal);
+            }
         }
 
         /**

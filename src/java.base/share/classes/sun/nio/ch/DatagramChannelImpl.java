@@ -1718,6 +1718,7 @@ class DatagramChannelImpl
             state = ST_CLOSED;
             try {
                 // close socket
+                Poller.closePoll(fdVal);
                 cleaner.clean();
             } catch (UncheckedIOException ioe) {
                 throw ioe.getCause();

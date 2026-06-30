@@ -846,6 +846,7 @@ public final class NioSocketImpl extends SocketImpl implements PlatformSocketImp
         assert Thread.holdsLock(stateLock) && state == ST_CLOSING;
         if (readerThread == null && writerThread == null) {
             try {
+                Poller.closePoll(fdVal(fd));
                 cleaner.clean();
             } catch (UncheckedIOException ioe) {
                 throw ioe.getCause();

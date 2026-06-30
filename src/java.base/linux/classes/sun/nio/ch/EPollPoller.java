@@ -42,6 +42,9 @@ class EPollPoller extends Poller {
     private final long address;
     private final EventFD eventfd;  // wakeup event, used for shutdown
 
+    // true for read sub-pollers that use edge-triggered registration
+    private final boolean edgeTriggered;
+
     // close action, and cleaner if this is subpoller
     private final Runnable closer;
     private final Cleanable cleaner;
@@ -74,6 +77,7 @@ class EPollPoller extends Poller {
         this.maxEvents = maxEvents;
         this.address = address;
         this.eventfd = eventfd;
+        this.edgeTriggered = subPoller && read && (mode != Mode.POLLER_PER_CARRIER);
 
         // create action to close epoll instance, register cleaner when wakeable
         this.closer = closer(epfd, address, eventfd);
@@ -112,19 +116,32 @@ class EPollPoller extends Poller {
     }
 
     @Override
+    boolean retainRegistration() {
+        return edgeTriggered;
+    }
+
+    @Override
     void implStartPoll(int fdVal) throws IOException {
-        // re-enable if already registered but disabled (previously polled)
-        int err = EPoll.ctl(epfd, EPOLL_CTL_MOD, fdVal, (event | EPOLLONESHOT));
-        if (err == ENOENT)
-            err = EPoll.ctl(epfd, EPOLL_CTL_ADD, fdVal, (event | EPOLLONESHOT));
-        if (err != 0)
-            throw new IOException("epoll_ctl failed: " + err);
+        if (edgeTriggered) {
+            // edge-triggered: called only on first registration (base class skips
+            // subsequent calls when the REGISTERED sentinel is already in the map)
+            int err = EPoll.ctl(epfd, EPOLL_CTL_ADD, fdVal, (event | EPOLLET));
+            if (err != 0)
+                throw new IOException("epoll_ctl failed: " + err);
+        } else {
+            // re-enable if already registered but disabled (previously polled)
+            int err = EPoll.ctl(epfd, EPOLL_CTL_MOD, fdVal, (event | EPOLLONESHOT));
+            if (err == ENOENT)
+                err = EPoll.ctl(epfd, EPOLL_CTL_ADD, fdVal, (event | EPOLLONESHOT));
+            if (err != 0)
+                throw new IOException("epoll_ctl failed: " + err);
+        }
     }
 
     @Override
     void implStopPoll(int fdVal, boolean polled) {
-        // event is disabled if already polled
-        if (!polled) {
+        // edge-triggered: leave the fd registered in epoll for reuse
+        if (!edgeTriggered && !polled) {
             EPoll.ctl(epfd, EPOLL_CTL_DEL, fdVal, 0);
         }
     }
