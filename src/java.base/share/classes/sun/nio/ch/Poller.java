@@ -667,6 +667,7 @@ public abstract class Poller {
             Thread carrier = JLA.currentCarrierThread();
             Thread.Builder.OfVirtual builder = Thread.ofVirtual()
                     .inheritInheritableThreadLocals(false)
+                    .stickyAffinity()
                     .name(carrier.getName() + "-Read-Poller")
                     .uncaughtExceptionHandler((_, e) -> e.printStackTrace());
             Thread thread = JLA.defaultVirtualThreadScheduler()
