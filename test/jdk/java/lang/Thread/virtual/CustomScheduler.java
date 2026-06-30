@@ -295,6 +295,7 @@ class CustomScheduler {
      */
     @Test
     void testMountedAtKlassInit() throws Exception {
+        assumeFalse(Thread.currentThread().isVirtual(), "Main thread is a virtual thread");
         class CarrierHelper {
             static boolean passed;
             static {
