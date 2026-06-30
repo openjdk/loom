@@ -679,8 +679,10 @@ final class VirtualThread extends BaseVirtualThread {
         if (s == YIELDING) {
             setState(YIELDED);
 
-            // external submit if there are no tasks in the local task queue
-            if (currentThread() instanceof CarrierThread ct && ct.getQueuedTaskCount() == 0) {
+            // sticky VTs stay on the current carrier — skip external submit
+            if (!stickyAffinity
+                    && currentThread() instanceof CarrierThread ct
+                    && ct.getQueuedTaskCount() == 0) {
                 externalSubmitRunContinuation();
             } else {
                 submitRunContinuation();
