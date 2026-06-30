@@ -207,7 +207,11 @@ public abstract class Poller {
     final void polled(int fdVal) {
         Thread t = map.remove(fdVal);
         if (t != null) {
-            LockSupport.unpark(t);
+            if (POLLER_GROUP.useLazyUnpark() && Thread.currentThread().isVirtual()) {
+                JLA.lazyUnparkVirtualThread(t);
+            } else {
+                LockSupport.unpark(t);
+            }
         }
     }
 
@@ -535,7 +539,6 @@ public abstract class Poller {
 
             ThreadFactory factory = Thread.ofVirtual()
                     .inheritInheritableThreadLocals(false)
-                    .stickyAffinity()
                     .name("SubPoller-", 0)
                     .uncaughtExceptionHandler((_, e) -> e.printStackTrace())
                     .factory();
