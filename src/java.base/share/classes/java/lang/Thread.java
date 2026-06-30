@@ -968,25 +968,40 @@ public class Thread implements Runnable {
          * @implSpec The default implementation creates a new virtual thread. It should
          * be rare to override this method.
          *
-         * @param builder the virtual thread builder
-         * @param preferredCarrier the preferred carrirer, can be {@code null}
+         * @param name the thread name, can be {@code null}
+         * @param characteristics the thread characteristics
+         * @param preferredCarrier the preferred carrier, can be {@code null}
          * @param task the object to run when the thread executes
          * @return the {@code VirtualThreadTask} that scheduler executes
          * @throws UnsupportedOperationException if this is the built-in default scheduler
+         */
+        default VirtualThreadTask newThread(String name, int characteristics,
+                                            Thread preferredCarrier,
+                                            Runnable task) {
+            Objects.requireNonNull(task);
+            if (this == VirtualThread.builtinScheduler(false)) {
+                throw new UnsupportedOperationException();
+            }
+            var vthread = new VirtualThread(this, preferredCarrier, name, characteristics, task);
+            return vthread.virtualThreadTask();
+        }
+
+        /**
+         * Creates a new virtual thread using the given builder's configuration.
+         * Delegates to {@link #newThread(String, int, Thread, Runnable)}.
          *
-         * @see <a href="Thread.html#inheritance">Inheritance when creating threads</a>
+         * @param builder the virtual thread builder
+         * @param preferredCarrier the preferred carrier, can be {@code null}
+         * @param task the object to run when the thread executes
+         * @return the {@code VirtualThreadTask} that scheduler executes
          */
         default VirtualThreadTask newThread(Builder.OfVirtual builder,
                                             Thread preferredCarrier,
                                             Runnable task) {
             Objects.requireNonNull(builder);
-            Objects.requireNonNull(task);
-            if (this == VirtualThread.builtinScheduler(false)) {
-                throw new UnsupportedOperationException();
-            }
             var vbuilder = (ThreadBuilders.VirtualThreadBuilder) builder;
-            var vthread = (VirtualThread) vbuilder.unstarted(task, preferredCarrier);
-            return vthread.virtualThreadTask();
+            return newThread(vbuilder.nextThreadName(), vbuilder.characteristics(),
+                    preferredCarrier, task);
         }
 
         /**

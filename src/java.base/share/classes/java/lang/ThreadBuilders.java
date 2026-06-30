@@ -405,12 +405,23 @@ class ThreadBuilders {
     /**
      * Creates a new virtual thread to run the given task.
      */
+    // true when a custom scheduler is installed via implClass, JIT constant-folds
+    static final boolean CUSTOM_SCHEDULER =
+            VirtualThread.defaultScheduler() != VirtualThread.builtinScheduler(true);
+
     private static Thread newVirtualThread(Thread.VirtualThreadScheduler scheduler,
                                            Thread preferredCarrier,
                                            String name,
                                            int characteristics,
                                            Runnable task) {
         if (ContinuationSupport.isSupported()) {
+            // Route through the custom scheduler's newThread() when implClass is set.
+            // scheduler is non-null only with the legacy per-builder scheduler field,
+            // superseded by the global custom scheduler API (implClass).
+            if (scheduler == null && CUSTOM_SCHEDULER) {
+                return VirtualThread.defaultScheduler()
+                        .newThread(name, characteristics, preferredCarrier, task).thread();
+            }
             return new VirtualThread(scheduler, preferredCarrier, name, characteristics, task);
         } else {
             if (scheduler != null)
