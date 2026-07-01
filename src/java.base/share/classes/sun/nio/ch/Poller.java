@@ -894,13 +894,7 @@ public abstract class Poller {
                     && ContinuationSupport.isSupported()) {
                 Thread carrier = JLA.currentCarrierThread();
                 // read the ThreadLocal from the carrier thread context
-                CarrierLocalPoller poller;
-                Continuation.pin();
-                try {
-                    poller = getLocalPoller();
-                } finally {
-                    Continuation.unpin();
-                }
+                CarrierLocalPoller poller = getLocalPoller();
                 if (poller != null) {
                     poller.register(fdVal, event, Thread.currentThread());
                     try {
