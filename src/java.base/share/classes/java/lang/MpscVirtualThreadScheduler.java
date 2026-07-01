@@ -180,8 +180,7 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
                 VirtualThreadTask task;
                 while ((task = queue.poll()) != null) {
                     try { task.run(); } catch (Throwable t) { }
-                    drained++;
-                    if ((drained & (TIME_CHECK_INTERVAL - 1)) == 0
+                    if ((++drained & (TIME_CHECK_INTERVAL - 1)) == 0
                             && System.nanoTime() - drainStart >= DRAIN_BUDGET_NS) {
                         break;
                     }

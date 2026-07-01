@@ -26,6 +26,7 @@ package java.lang;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
+import jdk.internal.vm.annotation.Contended;
 
 /**
  * Multi-Producer Single-Consumer unbounded array queue using VarHandles.
@@ -60,16 +61,25 @@ final class MpscUnboundedQueue<E> {
 
     private static final long RESIZE_BIT = 1L;
 
+    // producer-written fields
+    @Contended("producer")
     @SuppressWarnings("FieldMayBeFinal")
     private long producerIndex;
-    @SuppressWarnings("FieldMayBeFinal")
-    private long consumerIndex;
+    @Contended("producer")
     @SuppressWarnings("FieldMayBeFinal")
     private long producerLimit;
-
+    @Contended("producer")
     private long producerMask;
+    @Contended("producer")
     private E[] producerBuffer;
+
+    // consumer-written fields
+    @Contended("consumer")
+    @SuppressWarnings("FieldMayBeFinal")
+    private long consumerIndex;
+    @Contended("consumer")
     private long consumerMask;
+    @Contended("consumer")
     private E[] consumerBuffer;
 
     MpscUnboundedQueue(int initialCapacity) {
@@ -239,6 +249,7 @@ final class MpscUnboundedQueue<E> {
                 return null;
             }
             do {
+                Thread.onSpinWait();
                 e = lvRefElement(buffer, offset);
             } while (e == null);
         }
