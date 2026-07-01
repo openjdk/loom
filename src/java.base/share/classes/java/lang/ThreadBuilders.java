@@ -32,6 +32,7 @@ import java.lang.invoke.VarHandle;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.invoke.MhUtil;
 import jdk.internal.vm.ContinuationSupport;
@@ -94,6 +95,14 @@ class ThreadBuilders {
             } else {
                 characteristics |= Thread.NO_INHERIT_THREAD_LOCALS;
             }
+        }
+
+        void setStickyAffinity() {
+            characteristics |= Thread.STICKY_AFFINITY;
+        }
+
+        void setRoundRobinAffinity() {
+            characteristics |= Thread.ROUND_ROBIN_AFFINITY;
         }
 
         void setUncaughtExceptionHandler(UncaughtExceptionHandler ueh) {
@@ -234,6 +243,18 @@ class ThreadBuilders {
         @Override
         public OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh) {
             setUncaughtExceptionHandler(ueh);
+            return this;
+        }
+
+        @Override
+        public OfVirtual stickyAffinity() {
+            setStickyAffinity();
+            return this;
+        }
+
+        @Override
+        public OfVirtual roundRobinAffinity() {
+            setRoundRobinAffinity();
             return this;
         }
 
@@ -379,7 +400,13 @@ class ThreadBuilders {
      * ThreadFactory for virtual threads.
      */
     private static class VirtualThreadFactory extends BaseThreadFactory {
+        private static final VarHandle ROUND_ROBIN_COUNT = MhUtil.findVarHandle(
+                MethodHandles.lookup(), "roundRobinCount", long.class);
+
         private final Thread.VirtualThreadScheduler scheduler;
+        private final boolean roundRobin;
+        @SuppressWarnings("unused")
+        private volatile long roundRobinCount;
 
         VirtualThreadFactory(Thread.VirtualThreadScheduler scheduler,
                              String name,
@@ -388,6 +415,7 @@ class ThreadBuilders {
                              UncaughtExceptionHandler uhe) {
             super(name, start, characteristics, uhe);
             this.scheduler = scheduler;
+            this.roundRobin = (characteristics & Thread.ROUND_ROBIN_AFFINITY) != 0;
         }
 
         @Override
@@ -395,6 +423,9 @@ class ThreadBuilders {
             Objects.requireNonNull(task);
             String name = nextThreadName();
             Thread thread = newVirtualThread(scheduler, null, name, characteristics(), task);
+            if (roundRobin && thread instanceof VirtualThread vt) {
+                vt.affinityHint = (int) (long) ROUND_ROBIN_COUNT.getAndAdd(this, 1L);
+            }
             UncaughtExceptionHandler uhe = uncaughtExceptionHandler();
             if (uhe != null)
                 thread.uncaughtExceptionHandler(uhe);

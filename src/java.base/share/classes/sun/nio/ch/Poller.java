@@ -91,7 +91,14 @@ public abstract class Poller {
          * for I/O. If there are no events then the poller threads park until there
          * are I/O events to poll. The write poller is a system-wide platform thread.
          */
-        POLLER_PER_CARRIER
+        POLLER_PER_CARRIER,
+
+        /**
+         * Each carrier thread is its own poller. VT fds register directly with the
+         * carrier's epoll fd. No sub-pollers, no master poller. The carrier calls
+         * epoll_wait when idle. Write pollers are system-wide platform threads.
+         */
+        CARRIER_LOCAL_POLLER
     }
 
     /**
@@ -105,6 +112,7 @@ public abstract class Poller {
                     case "1" -> Mode.SYSTEM_THREADS;
                     case "2" -> Mode.VTHREAD_POLLERS;
                     case "3" -> Mode.POLLER_PER_CARRIER;
+                    case "4" -> Mode.CARRIER_LOCAL_POLLER;
                     default -> {
                         throw new RuntimeException(s + " is not a valid polling mode");
                     }
@@ -117,9 +125,10 @@ public abstract class Poller {
             int readPollers = pollerCount("jdk.readPollers", provider.defaultReadPollers());
             int writePollers = pollerCount("jdk.writePollers", provider.defaultWritePollers());
             PollerGroup group = switch (provider.pollerMode()) {
-                case SYSTEM_THREADS     -> new SystemThreadsPollerGroup(provider, readPollers, writePollers);
-                case VTHREAD_POLLERS    -> new VThreadsPollerGroup(provider, readPollers, writePollers);
-                case POLLER_PER_CARRIER -> new PollerPerCarrierPollerGroup(provider, writePollers);
+                case SYSTEM_THREADS        -> new SystemThreadsPollerGroup(provider, readPollers, writePollers);
+                case VTHREAD_POLLERS       -> new VThreadsPollerGroup(provider, readPollers, writePollers);
+                case POLLER_PER_CARRIER    -> new PollerPerCarrierPollerGroup(provider, writePollers);
+                case CARRIER_LOCAL_POLLER  -> new CarrierLocalPollerGroup(provider, writePollers);
             };
             group.start();
             return group;
@@ -667,6 +676,7 @@ public abstract class Poller {
             Thread carrier = JLA.currentCarrierThread();
             Thread.Builder.OfVirtual builder = Thread.ofVirtual()
                     .inheritInheritableThreadLocals(false)
+                    .stickyAffinity()
                     .name(carrier.getName() + "-Read-Poller")
                     .uncaughtExceptionHandler((_, e) -> e.printStackTrace());
             Thread thread = JLA.defaultVirtualThreadScheduler()
@@ -807,5 +817,104 @@ public abstract class Poller {
      */
     public static List<Poller> writePollers() {
         return POLLER_GROUP.writePollers();
+    }
+
+
+    // ---- CARRIER_LOCAL_POLLER group ----
+
+    /**
+     * Each carrier owns its own epoll fd. VT fds register directly with the
+     * carrier's poller. No sub-pollers, no master poller. Write pollers are
+     * system-wide platform threads.
+     */
+    private static class CarrierLocalPollerGroup extends PollerGroup {
+        private final Poller[] writePollers;
+
+        CarrierLocalPollerGroup(PollerProvider provider,
+                                int writePollerCount) throws IOException {
+            super(provider);
+            Poller[] writePollers = new Poller[writePollerCount];
+            try {
+                for (int i = 0; i < writePollerCount; i++) {
+                    writePollers[i] = provider.writePoller(false);
+                }
+            } catch (Throwable e) {
+                PollerGroup.closeAll(writePollers);
+                throw e;
+            }
+            this.writePollers = writePollers;
+        }
+
+        @Override
+        void start() {
+            Arrays.stream(writePollers).forEach(p -> {
+                startPlatformThread("Write-Poller", p::pollerLoop);
+            });
+        }
+
+        CarrierLocalPoller getLocalPoller() {
+            Object p = JLA.carrierLocalPoller();
+            return (p instanceof CarrierLocalPoller clp) ? clp : null;
+        }
+
+        private Poller writePoller(int fdVal) {
+            int index = provider().fdValToIndex(fdVal, writePollers.length);
+            return writePollers[index];
+        }
+
+        @Override
+        void poll(int fdVal, int event, long nanos, BooleanSupplier isOpen) throws IOException {
+            // POLLIN from VT: register directly with carrier's local poller
+            if (event == Net.POLLIN
+                    && Thread.currentThread().isVirtual()
+                    && ContinuationSupport.isSupported()) {
+                Thread carrier = JLA.currentCarrierThread();
+                // read the ThreadLocal from the carrier thread context
+                CarrierLocalPoller poller = getLocalPoller();
+                if (poller != null) {
+                    poller.register(fdVal, event, Thread.currentThread());
+                    try {
+                        if (isOpen.getAsBoolean()) {
+                            if (nanos > 0) {
+                                LockSupport.parkNanos(nanos);
+                            } else {
+                                LockSupport.park();
+                            }
+                        }
+                    } finally {
+                        poller.deregister(fdVal);
+                    }
+                    return;
+                }
+            }
+
+            // POLLOUT or fallback: use write poller
+            if (event == Net.POLLOUT) {
+                writePoller(fdVal).poll(fdVal, nanos, isOpen);
+            } else {
+                // platform thread POLLIN fallback
+                writePoller(fdVal).poll(fdVal, nanos, isOpen);
+            }
+        }
+
+        @Override
+        Poller masterPoller() {
+            return null;
+        }
+
+        @Override
+        List<Poller> readPollers() {
+            return List.of();
+        }
+
+        @Override
+        List<Poller> writePollers() {
+            return List.of(writePollers);
+        }
+
+        @Override
+        boolean useLazyUnpark() {
+            return true;
+        }
     }
 }

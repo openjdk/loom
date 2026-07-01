@@ -551,6 +551,11 @@ public interface JavaLangAccess {
     Thread currentCarrierThread();
 
     /**
+     * Returns the CarrierLocalPoller for the current carrier thread, or null.
+     */
+    Object carrierLocalPoller();
+
+    /**
      * Returns the value of the current carrier thread's copy of a thread-local.
      */
     <T> T getCarrierThreadLocal(CarrierThreadLocal<T> local);

@@ -2252,6 +2252,14 @@ public final class System {
                 return Thread.currentCarrierThread();
             }
 
+            public Object carrierLocalPoller() {
+                Thread carrier = Thread.currentCarrierThread();
+                if (carrier instanceof MpscVirtualThreadScheduler.CarrierThread ct) {
+                    return ct.poller;
+                }
+                return null;
+            }
+
             public <T> T getCarrierThreadLocal(CarrierThreadLocal<T> local) {
                 return ((ThreadLocal<T>)local).getCarrierThreadLocal();
             }

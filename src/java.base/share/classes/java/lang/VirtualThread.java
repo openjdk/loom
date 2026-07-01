@@ -106,6 +106,7 @@ final class VirtualThread extends BaseVirtualThread {
     private final VirtualThreadScheduler scheduler;
     private final Continuation cont;
     private final VThreadTask runContinuation;
+    private final boolean stickyAffinity;
 
     // virtual thread state, accessed by VM
     private volatile int state;
@@ -234,6 +235,25 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
+     * Returns true if the current thread is a virtual thread with sticky affinity.
+     */
+    static boolean currentThreadIsSticky() {
+        return currentThread() instanceof VirtualThread vt && vt.stickyAffinity;
+    }
+
+    /**
+     * Returns true if this virtual thread has sticky affinity.
+     */
+    boolean hasStickyAffinity() {
+        return stickyAffinity;
+    }
+
+    // Carrier affinity hint. Set by the factory (round-robin counter) or by the
+    // scheduler on first start (resolved carrier id). The scheduler resolves it
+    // to a carrier via modulus. -1 means no affinity.
+    int affinityHint = -1;
+
+    /**
      * Returns the continuation scope used for virtual threads.
      */
     static ContinuationScope continuationScope() {
@@ -271,6 +291,7 @@ final class VirtualThread extends BaseVirtualThread {
             throw new UnsupportedOperationException();
         }
         this.scheduler = scheduler;
+        this.stickyAffinity = (characteristics & Thread.STICKY_AFFINITY) != 0;
         this.cont = new VThreadContinuation(this, task);
 
         if (scheduler == BUILTIN_SCHEDULER) {
@@ -670,8 +691,10 @@ final class VirtualThread extends BaseVirtualThread {
         if (s == YIELDING) {
             setState(YIELDED);
 
-            // external submit if there are no tasks in the local task queue
-            if (currentThread() instanceof CarrierThread ct && ct.getQueuedTaskCount() == 0) {
+            // sticky VTs stay on the current carrier — skip external submit
+            if (!stickyAffinity
+                    && currentThread() instanceof CarrierThread ct
+                    && ct.getQueuedTaskCount() == 0) {
                 externalSubmitRunContinuation();
             } else {
                 submitRunContinuation();
@@ -799,13 +822,14 @@ final class VirtualThread extends BaseVirtualThread {
             // submit task to schedule
             try {
                 if (currentThread().isVirtual()) {
+                    boolean useLazy = lazy || currentThreadIsSticky();
                     Continuation.pin();
                     try {
                         if (scheduler == BUILTIN_SCHEDULER
                                 && currentCarrierThread() instanceof CarrierThread ct) {
                             ForkJoinPool pool = ct.getPool();
                             ForkJoinTask<?> task = ForkJoinTask.adapt(runContinuation);
-                            if (lazy) {
+                            if (useLazy) {
                                 pool.lazySubmit(task);
                             } else {
                                 pool.externalSubmit(task);
@@ -991,7 +1015,7 @@ final class VirtualThread extends BaseVirtualThread {
             // unparked while parked
             if ((s == PARKED || s == TIMED_PARKED) && compareAndSetState(s, UNPARKED)) {
 
-                if (lazySubmit && currentThread().isVirtual()) {
+                if ((lazySubmit || currentThreadIsSticky()) && currentThread().isVirtual()) {
                     Continuation.pin();
                     try {
                         if (scheduler == BUILTIN_SCHEDULER
@@ -1512,7 +1536,10 @@ final class VirtualThread extends BaseVirtualThread {
         } else {
             minRunnable = Integer.max(parallelism / 2, 1);
         }
-        if (Boolean.getBoolean("jdk.virtualThreadScheduler.useTPE")) {
+        if (Boolean.getBoolean("jdk.virtualThreadScheduler.useMpsc")) {
+            System.err.println("WARNING: Using experimental MPSC virtual thread scheduler");
+            return new MpscVirtualThreadScheduler(parallelism);
+        } else if (Boolean.getBoolean("jdk.virtualThreadScheduler.useTPE")) {
             return new BuiltinThreadPoolExecutorScheduler(parallelism);
         } else {
             return new BuiltinForkJoinPoolScheduler(parallelism, maxPoolSize, minRunnable, wrapped);

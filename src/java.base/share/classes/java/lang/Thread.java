@@ -705,6 +705,20 @@ public class Thread implements Runnable {
     static final int NO_INHERIT_THREAD_LOCALS = 1 << 2;
 
     /**
+     * Characteristic value signifying that this virtual thread has sticky affinity.
+     * When a sticky virtual thread starts or unparks another virtual thread,
+     * the runtime uses lazy submission to preserve thread locality.
+     */
+    static final int STICKY_AFFINITY = 1 << 3;
+
+    /**
+     * Characteristic value signifying that this virtual thread uses round-robin
+     * carrier affinity. Each thread created by the resulting factory is submitted
+     * to the next carrier in sequence.
+     */
+    static final int ROUND_ROBIN_AFFINITY = 1 << 4;
+
+    /**
      * Thread identifier assigned to the primordial thread.
      */
     static final long PRIMORDIAL_TID = 3;
@@ -1266,6 +1280,28 @@ public class Thread implements Runnable {
 
             @Override OfVirtual inheritInheritableThreadLocals(boolean inherit);
             @Override OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
+
+            /**
+             * Sets this builder to create virtual threads with sticky affinity.
+             * When a sticky virtual thread starts or unparks another virtual thread,
+             * the runtime uses lazy submission to preserve thread locality.
+             *
+             * @return this builder
+             * @since 99
+             */
+            OfVirtual stickyAffinity();
+
+            /**
+             * Sets this builder to create virtual threads with round-robin carrier
+             * affinity. Each thread created by the resulting factory is submitted to
+             * the next carrier in the scheduler's pool in sequence.
+             *
+             * <p> This is a scheduling hint. The scheduler may ignore it.
+             *
+             * @return this builder
+             * @since 99
+             */
+            OfVirtual roundRobinAffinity();
 
             /**
              * Creates a new {@code Thread} from the current state of the builder and
