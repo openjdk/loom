@@ -26,9 +26,6 @@ package java.lang;
 
 import java.lang.Thread.VirtualThreadScheduler;
 import java.lang.Thread.VirtualThreadTask;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.locks.LockSupport;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.annotation.Contended;
@@ -50,35 +47,33 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
     private static final long PROBE =
             U.objectFieldOffset(Thread.class, "threadLocalRandomProbe");
 
-    private final Carrier[] carriers;
-    private volatile boolean shutdown;
+    private final CarrierThread[] carriers;
 
     MpscVirtualThreadScheduler(int parallelism) {
         if (parallelism < 1) {
             throw new IllegalArgumentException("parallelism must be >= 1");
         }
-        this.carriers = new Carrier[parallelism];
+        this.carriers = new CarrierThread[parallelism];
         for (int i = 0; i < parallelism; i++) {
-            carriers[i] = new Carrier(i, this);
+            carriers[i] = new CarrierThread(i, this);
         }
         for (int i = 0; i < parallelism; i++) {
-            carriers[i].thread.start();
+            carriers[i].start();
         }
     }
 
     @Override
     public void onStart(VirtualThreadTask task) {
-        if (shutdown) throw new RejectedExecutionException("Scheduler is shut down");
-        Carrier target = carrierForStart(task);
-        enqueue(target, task);
+
+        enqueue(carrierForStart(task), task);
     }
 
     @Override
     public void onContinue(VirtualThreadTask task) {
-        if (shutdown) throw new RejectedExecutionException("Scheduler is shut down");
+
 
         Object att = task.attachment();
-        if (att instanceof Carrier target) {
+        if (att instanceof CarrierThread target) {
             enqueue(target, task);
             return;
         }
@@ -86,24 +81,24 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
         enqueue(carrierForStart(task), task);
     }
 
-    private Carrier carrierForStart(VirtualThreadTask task) {
+    private CarrierThread carrierForStart(VirtualThreadTask task) {
         if (task.thread() instanceof VirtualThread vt && vt.affinityHint >= 0) {
             return carriers[Math.floorMod(vt.affinityHint, carriers.length)];
         }
         try {
             Thread preferred = task.preferredCarrier();
-            if (preferred instanceof MpscCarrierThread mct && mct.scheduler == this) {
-                return mct.carrier;
+            if (preferred instanceof CarrierThread ct && ct.scheduler == this) {
+                return ct;
             }
         } catch (UnsupportedOperationException e) {
         }
         return carrierFor();
     }
 
-    private Carrier carrierFor() {
+    private CarrierThread carrierFor() {
         Thread caller = Thread.currentCarrierThread();
-        if (caller instanceof MpscCarrierThread mct && mct.scheduler == this) {
-            return mct.carrier;
+        if (caller instanceof CarrierThread ct && ct.scheduler == this) {
+            return ct;
         }
         return carriers[Math.floorMod(probe(), carriers.length)];
     }
@@ -119,87 +114,59 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
         return p;
     }
 
-    private void enqueue(Carrier target, VirtualThreadTask task) {
-        target.queue.offer(task);
-        if ((int) Carrier.CARRIER_STATE.getAcquire(target) == Carrier.PARKED) {
-            LockSupport.unpark(target.thread);
+    private static void enqueue(CarrierThread carrier, VirtualThreadTask task) {
+        carrier.queue.offer(task);
+        if (carrier.carrierState == CarrierThread.PARKED) {
+            LockSupport.unpark(carrier);
         }
     }
 
-    // ---- Carrier ----
+    // ---- Carrier thread ----
 
-    static final class Carrier {
-        static final VarHandle CARRIER_STATE;
-
-        static {
-            try {
-                MethodHandles.Lookup l = MethodHandles.lookup();
-                CARRIER_STATE = l.findVarHandle(Carrier.class, "carrierState", int.class);
-            } catch (ReflectiveOperationException e) {
-                throw new ExceptionInInitializerError(e);
-            }
-        }
-
+    static final class CarrierThread extends Thread {
         static final int RUNNING = 0;
         static final int PARKED  = 1;
 
         final int id;
         final MpscUnboundedQueue<VirtualThreadTask> queue = new MpscUnboundedQueue<>(64);
         final MpscVirtualThreadScheduler scheduler;
-        final MpscCarrierThread thread;
 
         @Contended
-        @SuppressWarnings("unused") volatile int carrierState;
+        volatile int carrierState;
 
-        Carrier(int id, MpscVirtualThreadScheduler scheduler) {
+        CarrierThread(int id, MpscVirtualThreadScheduler scheduler) {
+            super(null, null, "mpsc-carrier-" + id, 0, false);
             this.id = id;
-            this.scheduler = scheduler;
-            this.thread = new MpscCarrierThread(this, scheduler);
-        }
-    }
-
-    // ---- Carrier thread ----
-
-    static final class MpscCarrierThread extends Thread {
-        final Carrier carrier;
-        final MpscVirtualThreadScheduler scheduler;
-
-        MpscCarrierThread(Carrier carrier, MpscVirtualThreadScheduler scheduler) {
-            super(null, null, "mpsc-carrier-" + carrier.id, 0, false);
-            this.carrier = carrier;
             this.scheduler = scheduler;
             setDaemon(true);
         }
 
         @Override
         public void run() {
-            carrierLoop(carrier);
-        }
-    }
-
-    // ---- Carrier loop ----
-
-    static void carrierLoop(Carrier carrier) {
-        for (;;) {
-            VirtualThreadTask task = carrier.queue.poll();
-            if (task != null) {
-                task.attach(carrier);
-                try {
-                    task.run();
-                } catch (Throwable t) {
+            var queue = this.queue;
+            for (;;) {
+                VirtualThreadTask task = queue.poll();
+                if (task != null) {
+                    if (task.attachment() != this) {
+                        task.attach(this);
+                    }
+                    try {
+                        task.run();
+                    } catch (Throwable t) {
+                    }
+                    continue;
                 }
-                continue;
+
+                carrierState = PARKED;
+
+                if (!queue.isEmpty()) {
+                    carrierState = RUNNING;
+                    continue;
+                }
+
+                LockSupport.park();
+                carrierState = RUNNING;
             }
-
-            Carrier.CARRIER_STATE.setVolatile(carrier, Carrier.PARKED);
-
-            if (!carrier.queue.isEmpty()) {
-                Carrier.CARRIER_STATE.set(carrier, Carrier.RUNNING);
-                continue;
-            }
-
-            LockSupport.park();
-            Carrier.CARRIER_STATE.set(carrier, Carrier.RUNNING);
         }
     }
 
