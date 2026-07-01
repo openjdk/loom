@@ -248,9 +248,9 @@ final class VirtualThread extends BaseVirtualThread {
         return stickyAffinity;
     }
 
-    // round-robin affinity hint: the raw counter value from the factory.
-    // The scheduler resolves it to a carrier via modulus.
-    // -1 means no affinity hint.
+    // Carrier affinity hint. Set by the factory (round-robin counter) or by the
+    // scheduler on first start (resolved carrier id). The scheduler resolves it
+    // to a carrier via modulus. -1 means no affinity.
     int affinityHint = -1;
 
     /**
@@ -294,7 +294,7 @@ final class VirtualThread extends BaseVirtualThread {
         this.stickyAffinity = (characteristics & Thread.STICKY_AFFINITY) != 0;
         this.cont = new VThreadContinuation(this, task);
 
-        if (scheduler == BUILTIN_SCHEDULER && !(scheduler instanceof MpscVirtualThreadScheduler)) {
+        if (scheduler == BUILTIN_SCHEDULER) {
             this.runContinuation = new VThreadTask(this);
         } else {
             this.runContinuation = new CustomVThreadTask(this, preferredCarrier);

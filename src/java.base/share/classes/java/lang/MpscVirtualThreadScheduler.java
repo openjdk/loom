@@ -24,21 +24,27 @@
  */
 package java.lang;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.Thread.VirtualThreadScheduler;
 import java.lang.Thread.VirtualThreadTask;
 import java.util.concurrent.locks.LockSupport;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.annotation.Contended;
+import sun.nio.ch.CarrierLocalPoller;
+import sun.nio.ch.Poller;
 
 /**
  * An alternative virtual thread scheduler using a single MPSC queue per carrier.
  * No work stealing — each carrier drains only its own queue.
  *
  * <p>External submissions use a probe-based hash (FJP-style) to distribute
- * across carriers. Carrier affinity is set once at start via task attachment;
+ * across carriers. Carrier affinity is set once at start via affinityHint;
  * onContinue always routes back to the same carrier.
  *
- * <p>Yield always keeps a virtual thread on its current carrier.
+ * <p>With poller Mode 4 (CARRIER_LOCAL_POLLER), each carrier owns its own
+ * epoll fd. VT fds register directly — no sub-pollers, no master poller.
+ * The carrier interleaves task draining with I/O polling.
  */
 final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
 
@@ -46,7 +52,6 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
 
     private static final long PROBE =
             U.objectFieldOffset(Thread.class, "threadLocalRandomProbe");
-
 
     private final CarrierThread[] carriers;
 
@@ -65,39 +70,40 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
 
     @Override
     public void onStart(VirtualThreadTask task) {
-        CarrierThread target = carrierForStart(task);
-        task.attach(target);
-        target.queue.offer(task);
-        if (target.carrierState == CarrierThread.PARKED) {
-            LockSupport.unpark(target);
+        VirtualThread vt = (VirtualThread) task.thread();
+        CarrierThread target;
+        if (vt.affinityHint >= 0) {
+            target = carriers[Math.floorMod(vt.affinityHint, carriers.length)];
+        } else {
+            target = carrierFor();
         }
+        vt.affinityHint = target.id;
+        enqueue(target, task);
     }
 
     @Override
     public void onContinue(VirtualThreadTask task) {
-        Object att = task.attachment();
-        if (att instanceof CarrierThread target) {
-            target.queue.offer(task);
-            if (target.carrierState == CarrierThread.PARKED) {
-                LockSupport.unpark(target);
-            }
+        int hint = ((VirtualThread) task.thread()).affinityHint;
+        if (hint >= 0 && hint < carriers.length) {
+            enqueue(carriers[hint], task);
             return;
         }
         onStart(task);
     }
 
-    private CarrierThread carrierForStart(VirtualThreadTask task) {
-        if (task.thread() instanceof VirtualThread vt && vt.affinityHint >= 0) {
-            return carriers[Math.floorMod(vt.affinityHint, carriers.length)];
-        }
-        try {
-            Thread preferred = task.preferredCarrier();
-            if (preferred instanceof CarrierThread ct && ct.scheduler == this) {
-                return ct;
+    private static void enqueue(CarrierThread carrier, VirtualThreadTask task) {
+        carrier.queue.offer(task);
+        if (carrier.carrierState == CarrierThread.PARKED) {
+            if (carrier.poller != null) {
+                try {
+                    carrier.poller.wakeup();
+                } catch (IOException e) {
+                    LockSupport.unpark(carrier);
+                }
+            } else {
+                LockSupport.unpark(carrier);
             }
-        } catch (UnsupportedOperationException e) {
         }
-        return carrierFor();
     }
 
     private CarrierThread carrierFor() {
@@ -129,6 +135,9 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
         final MpscUnboundedQueue<VirtualThreadTask> queue = new MpscUnboundedQueue<>(64);
         final MpscVirtualThreadScheduler scheduler;
 
+        // carrier-local poller (Mode 4), null if using Mode 3 or lower
+        CarrierLocalPoller poller;
+
         @Contended
         volatile int carrierState;
 
@@ -141,14 +150,96 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
 
         @Override
         public void run() {
+            // create carrier-local poller if Mode 4
+            CarrierLocalPoller localPoller = Poller.carrierLocalPoller();
+            if (localPoller == null) {
+                try {
+                    localPoller = new CarrierLocalPoller();
+                    Poller.registerCarrierLocalPoller(localPoller);
+                } catch (IOException e) {
+                    // Mode 4 not active, fall through to plain loop
+                }
+            }
+            // only use if we successfully registered it
+            if (Poller.carrierLocalPoller() != null) {
+                this.poller = localPoller;
+                eventLoop();
+            } else {
+                plainLoop();
+            }
+        }
+
+        /**
+         * Mode 4: interleave task draining with I/O polling.
+         * Like Netty's EventLoop: drain tasks → poll I/O → drain → ...
+         * Block in epoll_wait only when both queue and I/O are idle.
+         */
+        private static final long DRAIN_BUDGET_NS = java.util.concurrent.TimeUnit.MICROSECONDS
+                .toNanos(Integer.getInteger("jdk.virtualThreadScheduler.drainBudgetUs", 50));
+        private static final int TIME_CHECK_INTERVAL = 4;
+
+        private void eventLoop() {
+            var queue = this.queue;
+            var poller = this.poller;
+            boolean ioActive = false;
+            for (;;) {
+                // drain tasks with time budget
+                int drained = 0;
+                long drainStart = System.nanoTime();
+                VirtualThreadTask task;
+                while ((task = queue.poll()) != null) {
+                    try { task.run(); } catch (Throwable t) { }
+                    drained++;
+                    if ((drained & (TIME_CHECK_INTERVAL - 1)) == 0
+                            && System.nanoTime() - drainStart >= DRAIN_BUDGET_NS) {
+                        break;
+                    }
+                }
+
+                // non-blocking I/O poll
+                int ioEvents = 0;
+                try {
+                    ioEvents = poller.poll(0);
+                } catch (IOException e) { }
+
+                if (drained + ioEvents > 0) {
+                    ioActive = true;
+                    continue;
+                }
+
+                // nothing happened
+                if (ioActive) {
+                    ioActive = false;
+                    continue;
+                }
+
+                // genuinely idle: blocking poll
+                carrierState = PARKED;
+
+                if ((task = queue.poll()) != null) {
+                    carrierState = RUNNING;
+                    try { task.run(); } catch (Throwable t) { }
+                    ioActive = true;
+                    continue;
+                }
+
+                try {
+                    poller.poll(-1);
+                } catch (IOException e) { }
+                carrierState = RUNNING;
+                ioActive = true;
+            }
+        }
+
+        /**
+         * Plain loop (Mode 3 or lower): poll tasks, park when idle.
+         */
+        private void plainLoop() {
             var queue = this.queue;
             for (;;) {
                 VirtualThreadTask task = queue.poll();
                 if (task != null) {
-                    try {
-                        task.run();
-                    } catch (Throwable t) {
-                    }
+                    try { task.run(); } catch (Throwable t) { }
                     continue;
                 }
 
