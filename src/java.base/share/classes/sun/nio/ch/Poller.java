@@ -848,7 +848,7 @@ public abstract class Poller {
      */
     private static class CarrierLocalPollerGroup extends PollerGroup {
         private final Poller[] writePollers;
-        private static final ThreadLocal<CarrierLocalPoller> LOCAL_POLLER = new ThreadLocal<>();
+        private static final Map<Long, CarrierLocalPoller> CARRIER_POLLERS = new ConcurrentHashMap<>();
 
         CarrierLocalPollerGroup(PollerProvider provider,
                                 int writePollerCount) throws IOException {
@@ -873,11 +873,12 @@ public abstract class Poller {
         }
 
         void setLocalPoller(CarrierLocalPoller poller) {
-            LOCAL_POLLER.set(poller);
+            CARRIER_POLLERS.put(Thread.currentThread().threadId(), poller);
         }
 
         CarrierLocalPoller getLocalPoller() {
-            return LOCAL_POLLER.get();
+            Thread carrier = JLA.currentCarrierThread();
+            return CARRIER_POLLERS.get(carrier.threadId());
         }
 
         private Poller writePoller(int fdVal) {
@@ -893,26 +894,27 @@ public abstract class Poller {
                     && ContinuationSupport.isSupported()) {
                 Thread carrier = JLA.currentCarrierThread();
                 // read the ThreadLocal from the carrier thread context
+                CarrierLocalPoller poller;
                 Continuation.pin();
                 try {
-                    CarrierLocalPoller poller = LOCAL_POLLER.get();
-                    if (poller != null) {
-                        poller.register(fdVal, event, Thread.currentThread());
-                        try {
-                            if (isOpen.getAsBoolean()) {
-                                if (nanos > 0) {
-                                    LockSupport.parkNanos(nanos);
-                                } else {
-                                    LockSupport.park();
-                                }
-                            }
-                        } finally {
-                            poller.deregister(fdVal);
-                        }
-                        return;
-                    }
+                    poller = getLocalPoller();
                 } finally {
                     Continuation.unpin();
+                }
+                if (poller != null) {
+                    poller.register(fdVal, event, Thread.currentThread());
+                    try {
+                        if (isOpen.getAsBoolean()) {
+                            if (nanos > 0) {
+                                LockSupport.parkNanos(nanos);
+                            } else {
+                                LockSupport.park();
+                            }
+                        }
+                    } finally {
+                        poller.deregister(fdVal);
+                    }
+                    return;
                 }
             }
 

@@ -150,23 +150,17 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
 
         @Override
         public void run() {
-            // create carrier-local poller if Mode 4
-            CarrierLocalPoller localPoller = Poller.carrierLocalPoller();
-            if (localPoller == null) {
+            if ("4".equals(System.getProperty("jdk.pollerMode"))) {
                 try {
-                    localPoller = new CarrierLocalPoller();
-                    Poller.registerCarrierLocalPoller(localPoller);
+                    this.poller = new CarrierLocalPoller();
+                    Poller.registerCarrierLocalPoller(this.poller);
+                    eventLoop();
+                    return;
                 } catch (IOException e) {
-                    // Mode 4 not active, fall through to plain loop
+                    throw new UncheckedIOException(e);
                 }
             }
-            // only use if we successfully registered it
-            if (Poller.carrierLocalPoller() != null) {
-                this.poller = localPoller;
-                eventLoop();
-            } else {
-                plainLoop();
-            }
+            plainLoop();
         }
 
         /**
