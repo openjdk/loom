@@ -47,7 +47,8 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
     private static final long PROBE =
             U.objectFieldOffset(Thread.class, "threadLocalRandomProbe");
 
-    private static final int SPINS_BEFORE_PARK = 16;
+    private static final int SPINS_BEFORE_PARK =
+            Runtime.getRuntime().availableProcessors() > 1 ? 16 : 0;
 
     private final CarrierThread[] carriers;
 
@@ -154,20 +155,20 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
                 }
 
                 // spin briefly before parking
-                boolean found = false;
                 for (int i = 0; i < SPINS_BEFORE_PARK; i++) {
                     Thread.onSpinWait();
-                    if (!queue.isEmpty()) {
-                        found = true;
+                    if ((task = queue.poll()) != null) {
+                        try { task.run(); } catch (Throwable t) { }
                         break;
                     }
                 }
-                if (found) continue;
+                if (task != null) continue;
 
                 carrierState = PARKED;
 
-                if (!queue.isEmpty()) {
+                if ((task = queue.poll()) != null) {
                     carrierState = RUNNING;
+                    try { task.run(); } catch (Throwable t) { }
                     continue;
                 }
 
