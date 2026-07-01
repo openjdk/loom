@@ -33,6 +33,7 @@ import java.io.UncheckedIOException;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.locks.LockSupport;
 import jdk.internal.misc.Unsafe;
+import jdk.internal.vm.annotation.Contended;
 import sun.nio.ch.Poller;
 
 /**
@@ -57,7 +58,6 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
             U.objectFieldOffset(Thread.class, "threadLocalRandomProbe");
 
     private final Carrier[] carriers;
-    private final int carrierMask;
     private final boolean carrierMasterPoller;
     private volatile boolean shutdown;
 
@@ -65,20 +65,20 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
         if (parallelism < 1) {
             throw new IllegalArgumentException("parallelism must be >= 1");
         }
-        // round up to power of two for mask-based probing
-        int size = Integer.highestOneBit(parallelism - 1) << 1;
-        if (size < parallelism) size = parallelism;
-        if (size < 1) size = 1;
-        if (Integer.bitCount(size) != 1) {
-            size = Integer.highestOneBit(size) << 1;
-        }
-        this.carrierMask = size - 1;
-        this.carriers = new Carrier[size];
+        this.carriers = new Carrier[parallelism];
         this.carrierMasterPoller = "4".equals(System.getProperty("jdk.pollerMode"));
-        for (int i = 0; i < size; i++) {
+        for (int i = 0; i < parallelism; i++) {
             carriers[i] = new Carrier(i, this);
         }
-        for (int i = 0; i < size; i++) {
+        for (int i = 0; i < parallelism; i++) {
+            int[] sibs = new int[parallelism - 1];
+            int idx = 0;
+            for (int j = 0; j < parallelism; j++) {
+                if (j != i) sibs[idx++] = j;
+            }
+            carriers[i].siblings = sibs;
+        }
+        for (int i = 0; i < parallelism; i++) {
             carriers[i].thread.start();
         }
     }
@@ -127,7 +127,7 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
             return mct.carrier;
         }
         // external submission: FJP-style probing
-        return carriers[probe() & carrierMask];
+        return carriers[Math.floorMod(probe(), carriers.length)];
     }
 
     private static int probe() {
@@ -200,14 +200,20 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
         int drainCounter;
 
         // ticket lock for external queue (stealers + carrier serialize on this)
+        @Contended("ticket")
         @SuppressWarnings("unused") volatile int consumerTicket;
+        @Contended("ticket")
         @SuppressWarnings("unused") volatile int consumerServing;
 
-        // carrier state
+        // carrier state (read by external producers checking PARKED)
+        @Contended
         @SuppressWarnings("unused") volatile int carrierState;
 
         // per-carrier master poller (null if not in Mode 4)
         Poller.CarrierPollerHandle pollerHandle;
+
+        // sibling carrier IDs for steal scan (excludes self)
+        int[] siblings;
 
         Carrier(int id, MpscVirtualThreadScheduler scheduler) {
             this.id = id;
@@ -366,17 +372,17 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
 
     /**
      * Try to steal one task from a sibling carrier's external queue.
-     * Scans all carriers starting from the next carrier id.
+     * Only probes carriers that are RUNNING (active carriers are likely
+     * to have work piling up; parked carriers have empty queues).
      */
     private static VirtualThreadTask trySteal(Carrier carrier) {
         Carrier[] all = carrier.scheduler.carriers;
-        int n = all.length;
-        int mask = carrier.scheduler.carrierMask;
-        int start = carrier.id + 1;
-        for (int i = 0; i < n - 1; i++) {
-            int idx = (start + i) & mask;
-            Carrier victim = all[idx];
-            if (victim == carrier) continue;
+        int[] siblings = carrier.siblings;
+        for (int siblingId : siblings) {
+            Carrier victim = all[siblingId];
+            if ((int) Carrier.CARRIER_STATE.getAcquire(victim) != Carrier.RUNNING) {
+                continue;
+            }
             VirtualThreadTask task = victim.tryStealOne();
             if (task != null) {
                 return task;
