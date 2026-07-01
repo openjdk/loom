@@ -91,15 +91,7 @@ public abstract class Poller {
          * for I/O. If there are no events then the poller threads park until there
          * are I/O events to poll. The write poller is a system-wide platform thread.
          */
-        POLLER_PER_CARRIER,
-
-        /**
-         * Like POLLER_PER_CARRIER but each carrier thread is its own master poller.
-         * No global master poller platform thread. Each carrier creates a master
-         * poller epoll fd and calls epoll_wait when idle. Sub-pollers register their
-         * fds with the carrier's master poller.
-         */
-        CARRIER_MASTER_POLLER
+        POLLER_PER_CARRIER
     }
 
     /**
@@ -113,7 +105,6 @@ public abstract class Poller {
                     case "1" -> Mode.SYSTEM_THREADS;
                     case "2" -> Mode.VTHREAD_POLLERS;
                     case "3" -> Mode.POLLER_PER_CARRIER;
-                    case "4" -> Mode.CARRIER_MASTER_POLLER;
                     default -> {
                         throw new RuntimeException(s + " is not a valid polling mode");
                     }
@@ -128,8 +119,7 @@ public abstract class Poller {
             PollerGroup group = switch (provider.pollerMode()) {
                 case SYSTEM_THREADS        -> new SystemThreadsPollerGroup(provider, readPollers, writePollers);
                 case VTHREAD_POLLERS       -> new VThreadsPollerGroup(provider, readPollers, writePollers);
-                case POLLER_PER_CARRIER    -> new PollerPerCarrierPollerGroup(provider, writePollers);
-                case CARRIER_MASTER_POLLER -> new PollerCarrierMasterGroup(provider, writePollers);
+                case POLLER_PER_CARRIER -> new PollerPerCarrierPollerGroup(provider, writePollers);
             };
             group.start();
             return group;
@@ -820,227 +810,4 @@ public abstract class Poller {
         return POLLER_GROUP.writePollers();
     }
 
-    /**
-     * Handle for a carrier-local master poller. The carrier calls {@code poll}
-     * when idle and {@code wakeup} when tasks are submitted externally.
-     */
-    public static final class CarrierPollerHandle {
-        private final Poller masterPoller;
-
-        CarrierPollerHandle(Poller masterPoller) {
-            this.masterPoller = masterPoller;
-        }
-
-        /**
-         * Poll for events on this carrier's master poller. Returns the number of
-         * sub-poller fds that had I/O events (0 means woken by eventfd/timeout).
-         */
-        public int poll(int timeout) throws IOException {
-            return masterPoller.poll(timeout);
-        }
-
-        /**
-         * Wake the carrier if it is blocked in {@code poll}.
-         */
-        public void wakeup() throws IOException {
-            masterPoller.wakeupPoller();
-        }
-
-        Poller poller() {
-            return masterPoller;
-        }
-    }
-
-    /**
-     * Creates a carrier-local master poller handle. Called by the carrier thread
-     * at startup when using CARRIER_MASTER_POLLER mode. The carrier's epoll fd
-     * is used as the master for sub-pollers on this carrier.
-     */
-    public static CarrierPollerHandle createCarrierPollerHandle() throws IOException {
-        if (!(POLLER_GROUP instanceof PollerCarrierMasterGroup group)) {
-            throw new UnsupportedOperationException("Not in CARRIER_MASTER_POLLER mode");
-        }
-        return group.createHandle();
-    }
-
-    /**
-     * Registers the given carrier master poller handle for the current carrier
-     * thread so that sub-pollers created on this carrier use it.
-     */
-    public static void registerCarrierMasterPoller(CarrierPollerHandle handle) {
-        if (POLLER_GROUP instanceof PollerCarrierMasterGroup group) {
-            group.registerMaster(Thread.currentThread(), handle.poller());
-        }
-    }
-
-    // ---- CARRIER_MASTER_POLLER group ----
-
-    /**
-     * CARRIER_MASTER_POLLER poller group. Like POLLER_PER_CARRIER but each carrier
-     * thread is its own master poller — no global master poller platform thread.
-     * Sub-pollers register their fds with the carrier's master poller.
-     */
-    private static class PollerCarrierMasterGroup extends PollerGroup {
-        private final Set<Poller> readPollers = ConcurrentHashMap.newKeySet();
-        private final Poller[] writePollers;
-
-        // master poller per carrier thread (keyed by thread id)
-        private final Map<Long, Poller> carrierMasters = new ConcurrentHashMap<>();
-
-        private static final TerminatingThreadLocal<CarrierPollerState> CARRIER_STATE =
-            new TerminatingThreadLocal<>() {
-                @Override
-                protected void threadTerminated(CarrierPollerState state) {
-                    if (state != null) {
-                        state.group().vtTerminated(state.readPoller());
-                    }
-                }
-            };
-
-        private record CarrierPollerState(
-                PollerCarrierMasterGroup group,
-                Poller readPoller) { }
-
-        PollerCarrierMasterGroup(PollerProvider provider,
-                                 int writePollerCount) throws IOException {
-            super(provider);
-            Poller[] writePollers = new Poller[writePollerCount];
-            try {
-                for (int i = 0; i < writePollerCount; i++) {
-                    writePollers[i] = provider.writePoller(false);
-                }
-            } catch (Throwable e) {
-                PollerGroup.closeAll(writePollers);
-                throw e;
-            }
-            this.writePollers = writePollers;
-        }
-
-        @Override
-        void start() {
-            // only write pollers need platform threads; no master poller thread
-            Arrays.stream(writePollers).forEach(p -> {
-                startPlatformThread("Write-Poller", p::pollerLoop);
-            });
-        }
-
-        CarrierPollerHandle createHandle() throws IOException {
-            Poller masterPoller = provider().readPoller(true);
-            return new CarrierPollerHandle(masterPoller);
-        }
-
-        void registerMaster(Thread carrierThread, Poller masterPoller) {
-            carrierMasters.put(carrierThread.threadId(), masterPoller);
-        }
-
-        private Poller carrierMaster() {
-            Thread carrier = JLA.currentCarrierThread();
-            return carrierMasters.get(carrier.threadId());
-        }
-
-        private Poller writePoller(int fdVal) {
-            int index = provider().fdValToIndex(fdVal, writePollers.length);
-            return writePollers[index];
-        }
-
-        private Poller startReadPoller() throws IOException {
-            assert Thread.currentThread().isVirtual() && ContinuationSupport.isSupported();
-
-            Poller readPoller = provider().readPoller(true);
-            readPollers.add(readPoller);
-
-            Poller master = carrierMaster();
-            if (master == null) {
-                throw new IllegalStateException("No master poller registered for carrier");
-            }
-
-            Thread carrier = JLA.currentCarrierThread();
-            Thread.Builder.OfVirtual builder = Thread.ofVirtual()
-                    .inheritInheritableThreadLocals(false)
-                    .stickyAffinity()
-                    .name(carrier.getName() + "-Read-Poller")
-                    .uncaughtExceptionHandler((_, e) -> e.printStackTrace());
-            Thread thread = JLA.defaultVirtualThreadScheduler()
-                    .newThread(builder, carrier, () -> subPollerLoop(readPoller, master))
-                    .thread();
-            thread.start();
-            return readPoller;
-        }
-
-        private Poller readPoller() throws IOException {
-            assert Thread.currentThread().isVirtual() && ContinuationSupport.isSupported();
-            Continuation.pin();
-            try {
-                CarrierPollerState state = CARRIER_STATE.get();
-                if (state != null) {
-                    return state.readPoller();
-                } else {
-                    Poller readPoller = startReadPoller();
-                    CARRIER_STATE.set(new CarrierPollerState(this, readPoller));
-                    return readPoller;
-                }
-            } finally {
-                Continuation.unpin();
-            }
-        }
-
-        private void subPollerLoop(Poller readPoller, Poller master) {
-            try {
-                readPoller.subPollerLoop(master);
-            } finally {
-                readPoller.wakeupAll();
-                readPollers.remove(readPoller);
-            }
-        }
-
-        private void vtTerminated(Poller readPoller) {
-            readPoller.setShutdown();
-            try {
-                readPoller.wakeupPoller();
-            } catch (Throwable e) {
-                e.printStackTrace();
-            }
-        }
-
-        @Override
-        void poll(int fdVal, int event, long nanos, BooleanSupplier isOpen) throws IOException {
-            if (event == Net.POLLIN
-                    && Thread.currentThread().isVirtual()
-                    && ContinuationSupport.isSupported()) {
-                readPoller().poll(fdVal, nanos, isOpen);
-                return;
-            }
-            if (event == Net.POLLIN) {
-                // platform thread fallback: use the carrier's master if available
-                Poller master = carrierMasters.get(Thread.currentThread().threadId());
-                if (master != null) {
-                    master.poll(fdVal, nanos, isOpen);
-                } else {
-                    throw new IOException("No poller available for platform thread POLLIN");
-                }
-            } else {
-                writePoller(fdVal).poll(fdVal, nanos, isOpen);
-            }
-        }
-
-        @Override
-        Poller masterPoller() {
-            return null;  // no global master
-        }
-
-        @Override
-        List<Poller> readPollers() {
-            return readPollers.stream().toList();
-        }
-
-        @Override
-        List<Poller> writePollers() {
-            return List.of(writePollers);
-        }
-
-        @Override
-        boolean useLazyUnpark() {
-            return true;
-        }
-    }
 }

@@ -28,13 +28,10 @@ import java.lang.Thread.VirtualThreadScheduler;
 import java.lang.Thread.VirtualThreadTask;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.locks.LockSupport;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.annotation.Contended;
-import sun.nio.ch.Poller;
 
 /**
  * An alternative virtual thread scheduler using two MPSC queues per carrier:
@@ -58,7 +55,6 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
             U.objectFieldOffset(Thread.class, "threadLocalRandomProbe");
 
     private final Carrier[] carriers;
-    private final boolean carrierMasterPoller;
     private volatile boolean shutdown;
 
     MpscVirtualThreadScheduler(int parallelism) {
@@ -66,7 +62,6 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
             throw new IllegalArgumentException("parallelism must be >= 1");
         }
         this.carriers = new Carrier[parallelism];
-        this.carrierMasterPoller = "4".equals(System.getProperty("jdk.pollerMode"));
         for (int i = 0; i < parallelism; i++) {
             carriers[i] = new Carrier(i, this);
         }
@@ -152,15 +147,7 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
 
     private static void wakeCarrier(Carrier carrier) {
         if ((int) Carrier.CARRIER_STATE.getAcquire(carrier) == Carrier.PARKED) {
-            if (carrier.pollerHandle != null) {
-                try {
-                    carrier.pollerHandle.wakeup();
-                } catch (IOException e) {
-                    LockSupport.unpark(carrier.thread);
-                }
-            } else {
-                LockSupport.unpark(carrier.thread);
-            }
+            LockSupport.unpark(carrier.thread);
         }
     }
 
@@ -209,9 +196,6 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
         @Contended
         @SuppressWarnings("unused") volatile int carrierState;
 
-        // per-carrier master poller (null if not in Mode 4)
-        Poller.CarrierPollerHandle pollerHandle;
-
         // sibling carrier IDs for steal scan (excludes self)
         int[] siblings;
 
@@ -235,10 +219,6 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
             CONSUMER_SERVING.setRelease(this, ticket + 1);
         }
 
-        /**
-         * Try to steal one task from this carrier's external queue.
-         * Returns null if another stealer is active or the queue is empty.
-         */
         VirtualThreadTask tryStealOne() {
             int t = (int) CONSUMER_TICKET.getAcquire(this);
             if (t != (int) CONSUMER_SERVING.getAcquire(this)) {
@@ -255,6 +235,9 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
         }
 
         VirtualThreadTask pollExternal() {
+            if (externalQueue.isEmpty()) {
+                return null;
+            }
             int ticket = acquireTicket();
             try {
                 return externalQueue.poll();
@@ -290,18 +273,8 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
     // ---- Carrier loop ----
 
     static void carrierLoop(Carrier carrier) {
-        // create per-carrier master poller if Mode 4 is active
-        if (carrier.scheduler.carrierMasterPoller) {
-            try {
-                carrier.pollerHandle = Poller.createCarrierPollerHandle();
-                Poller.registerCarrierMasterPoller(carrier.pollerHandle);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }
-
         for (;;) {
-            VirtualThreadTask task = pollTask(carrier);
+            VirtualThreadTask task = pollOneTask(carrier);
             if (task != null) {
                 runTask(carrier, task);
                 continue;
@@ -314,41 +287,20 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
                 continue;
             }
 
-            // genuinely idle: park (or poll if Mode 4)
-            Carrier.CARRIER_STATE.setRelease(carrier, Carrier.PARKED);
+            // genuinely idle: park
+            Carrier.CARRIER_STATE.setVolatile(carrier, Carrier.PARKED);
 
-            // re-check after setting PARKED to avoid missed wakeups
             if (!carrier.bothQueuesEmpty()) {
                 Carrier.CARRIER_STATE.set(carrier, Carrier.RUNNING);
                 continue;
             }
 
-            if (carrier.pollerHandle != null) {
-                try {
-                    int polled = carrier.pollerHandle.poll(-1);
-                    Carrier.CARRIER_STATE.set(carrier, Carrier.RUNNING);
-                    if (polled > 0) {
-                        // I/O wakeup: prioritize sticky queue (sub-pollers land there)
-                        VirtualThreadTask stickyTask = carrier.stickyQueue.poll();
-                        if (stickyTask != null) {
-                            runTask(carrier, stickyTask);
-                        }
-                    }
-                } catch (IOException e) {
-                    Carrier.CARRIER_STATE.set(carrier, Carrier.RUNNING);
-                }
-            } else {
-                LockSupport.park();
-                Carrier.CARRIER_STATE.set(carrier, Carrier.RUNNING);
-            }
+            LockSupport.park();
+            Carrier.CARRIER_STATE.set(carrier, Carrier.RUNNING);
         }
     }
 
-    /**
-     * Poll from one of the two queues, alternating with a counter to prevent
-     * starvation. Falls back to the other queue if the primary is empty.
-     */
-    private static VirtualThreadTask pollTask(Carrier carrier) {
+    private static VirtualThreadTask pollOneTask(Carrier carrier) {
         carrier.drainCounter++;
         if ((carrier.drainCounter & 1) == 0) {
             VirtualThreadTask task = carrier.stickyQueue.poll();
