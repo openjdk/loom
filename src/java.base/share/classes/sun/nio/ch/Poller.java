@@ -819,25 +819,6 @@ public abstract class Poller {
         return POLLER_GROUP.writePollers();
     }
 
-    /**
-     * Returns the CarrierLocalPoller for the current carrier thread, or null
-     * if not in CARRIER_LOCAL_POLLER mode or not on an MPSC carrier.
-     */
-    public static CarrierLocalPoller carrierLocalPoller() {
-        if (POLLER_GROUP instanceof CarrierLocalPollerGroup group) {
-            return group.getLocalPoller();
-        }
-        return null;
-    }
-
-    /**
-     * Registers a CarrierLocalPoller for the current thread.
-     */
-    public static void registerCarrierLocalPoller(CarrierLocalPoller poller) {
-        if (POLLER_GROUP instanceof CarrierLocalPollerGroup group) {
-            group.setLocalPoller(poller);
-        }
-    }
 
     // ---- CARRIER_LOCAL_POLLER group ----
 
@@ -848,7 +829,6 @@ public abstract class Poller {
      */
     private static class CarrierLocalPollerGroup extends PollerGroup {
         private final Poller[] writePollers;
-        private static final Map<Long, CarrierLocalPoller> CARRIER_POLLERS = new ConcurrentHashMap<>();
 
         CarrierLocalPollerGroup(PollerProvider provider,
                                 int writePollerCount) throws IOException {
@@ -872,13 +852,9 @@ public abstract class Poller {
             });
         }
 
-        void setLocalPoller(CarrierLocalPoller poller) {
-            CARRIER_POLLERS.put(Thread.currentThread().threadId(), poller);
-        }
-
         CarrierLocalPoller getLocalPoller() {
-            Thread carrier = JLA.currentCarrierThread();
-            return CARRIER_POLLERS.get(carrier.threadId());
+            Object p = JLA.carrierLocalPoller();
+            return (p instanceof CarrierLocalPoller clp) ? clp : null;
         }
 
         private Poller writePoller(int fdVal) {

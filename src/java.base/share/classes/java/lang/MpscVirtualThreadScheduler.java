@@ -32,7 +32,6 @@ import java.util.concurrent.locks.LockSupport;
 import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.annotation.Contended;
 import sun.nio.ch.CarrierLocalPoller;
-import sun.nio.ch.Poller;
 
 /**
  * An alternative virtual thread scheduler using a single MPSC queue per carrier.
@@ -153,7 +152,6 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
             if ("4".equals(System.getProperty("jdk.pollerMode"))) {
                 try {
                     this.poller = new CarrierLocalPoller();
-                    Poller.registerCarrierLocalPoller(this.poller);
                     eventLoop();
                     return;
                 } catch (IOException e) {
