@@ -173,7 +173,6 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
         private void eventLoop() {
             var queue = this.queue;
             var poller = this.poller;
-            boolean ioActive = false;
             for (;;) {
                 // drain tasks with time budget
                 int drained = 0;
@@ -195,23 +194,15 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
                 } catch (IOException e) { }
 
                 if (drained + ioEvents > 0) {
-                    ioActive = true;
                     continue;
                 }
 
-                // nothing happened
-                if (ioActive) {
-                    ioActive = false;
-                    continue;
-                }
-
-                // genuinely idle: blocking poll
+                // nothing happened: blocking poll
                 carrierState = PARKED;
 
                 if ((task = queue.poll()) != null) {
                     carrierState = RUNNING;
                     try { task.run(); } catch (Throwable t) { }
-                    ioActive = true;
                     continue;
                 }
 
@@ -219,7 +210,6 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
                     poller.poll(-1);
                 } catch (IOException e) { }
                 carrierState = RUNNING;
-                ioActive = true;
             }
         }
 
