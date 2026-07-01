@@ -197,7 +197,12 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
                     continue;
                 }
 
-                // nothing happened: blocking poll
+                // one more non-blocking check before parking
+                try {
+                    if (poller.poll(0) > 0) continue;
+                } catch (IOException e) { }
+
+                // genuinely idle: blocking poll
                 carrierState = PARKED;
 
                 if ((task = queue.poll()) != null) {
