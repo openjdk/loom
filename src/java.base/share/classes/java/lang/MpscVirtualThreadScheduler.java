@@ -35,8 +35,8 @@ import jdk.internal.vm.annotation.Contended;
  * No work stealing — each carrier drains only its own queue.
  *
  * <p>External submissions use a probe-based hash (FJP-style) to distribute
- * across carriers. Carrier affinity is maintained via task attachment: after
- * first run, onContinue always routes back to the same carrier.
+ * across carriers. Carrier affinity is set once at start via task attachment;
+ * onContinue always routes back to the same carrier.
  *
  * <p>Yield always keeps a virtual thread on its current carrier.
  */
@@ -46,6 +46,8 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
 
     private static final long PROBE =
             U.objectFieldOffset(Thread.class, "threadLocalRandomProbe");
+
+    private static final int SPINS_BEFORE_PARK = 16;
 
     private final CarrierThread[] carriers;
 
@@ -64,21 +66,25 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
 
     @Override
     public void onStart(VirtualThreadTask task) {
-
-        enqueue(carrierForStart(task), task);
+        CarrierThread target = carrierForStart(task);
+        task.attach(target);
+        target.queue.offer(task);
+        if (target.carrierState == CarrierThread.PARKED) {
+            LockSupport.unpark(target);
+        }
     }
 
     @Override
     public void onContinue(VirtualThreadTask task) {
-
-
         Object att = task.attachment();
         if (att instanceof CarrierThread target) {
-            enqueue(target, task);
+            target.queue.offer(task);
+            if (target.carrierState == CarrierThread.PARKED) {
+                LockSupport.unpark(target);
+            }
             return;
         }
-
-        enqueue(carrierForStart(task), task);
+        onStart(task);
     }
 
     private CarrierThread carrierForStart(VirtualThreadTask task) {
@@ -114,13 +120,6 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
         return p;
     }
 
-    private static void enqueue(CarrierThread carrier, VirtualThreadTask task) {
-        carrier.queue.offer(task);
-        if (carrier.carrierState == CarrierThread.PARKED) {
-            LockSupport.unpark(carrier);
-        }
-    }
-
     // ---- Carrier thread ----
 
     static final class CarrierThread extends Thread {
@@ -147,15 +146,23 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
             for (;;) {
                 VirtualThreadTask task = queue.poll();
                 if (task != null) {
-                    if (task.attachment() != this) {
-                        task.attach(this);
-                    }
                     try {
                         task.run();
                     } catch (Throwable t) {
                     }
                     continue;
                 }
+
+                // spin briefly before parking
+                boolean found = false;
+                for (int i = 0; i < SPINS_BEFORE_PARK; i++) {
+                    Thread.onSpinWait();
+                    if (!queue.isEmpty()) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) continue;
 
                 carrierState = PARKED;
 
