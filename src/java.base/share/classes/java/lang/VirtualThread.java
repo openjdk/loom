@@ -242,6 +242,18 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
+     * Returns true if this virtual thread has sticky affinity.
+     */
+    boolean hasStickyAffinity() {
+        return stickyAffinity;
+    }
+
+    // round-robin affinity hint: the raw counter value from the factory.
+    // The scheduler resolves it to a carrier via modulus.
+    // -1 means no affinity hint.
+    int affinityHint = -1;
+
+    /**
      * Returns the continuation scope used for virtual threads.
      */
     static ContinuationScope continuationScope() {
@@ -282,7 +294,7 @@ final class VirtualThread extends BaseVirtualThread {
         this.stickyAffinity = (characteristics & Thread.STICKY_AFFINITY) != 0;
         this.cont = new VThreadContinuation(this, task);
 
-        if (scheduler == BUILTIN_SCHEDULER) {
+        if (scheduler == BUILTIN_SCHEDULER && !(scheduler instanceof MpscVirtualThreadScheduler)) {
             this.runContinuation = new VThreadTask(this);
         } else {
             this.runContinuation = new CustomVThreadTask(this, preferredCarrier);
@@ -1524,7 +1536,10 @@ final class VirtualThread extends BaseVirtualThread {
         } else {
             minRunnable = Integer.max(parallelism / 2, 1);
         }
-        if (Boolean.getBoolean("jdk.virtualThreadScheduler.useTPE")) {
+        if (Boolean.getBoolean("jdk.virtualThreadScheduler.useMpsc")) {
+            System.err.println("WARNING: Using experimental MPSC virtual thread scheduler");
+            return new MpscVirtualThreadScheduler(parallelism);
+        } else if (Boolean.getBoolean("jdk.virtualThreadScheduler.useTPE")) {
             return new BuiltinThreadPoolExecutorScheduler(parallelism);
         } else {
             return new BuiltinForkJoinPoolScheduler(parallelism, maxPoolSize, minRunnable, wrapped);

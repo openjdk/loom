@@ -47,7 +47,7 @@ class EPollPoller extends Poller {
     private final Cleanable cleaner;
 
     EPollPoller(Poller.Mode mode, boolean subPoller, boolean read) throws IOException {
-        boolean wakeable = (mode == Mode.POLLER_PER_CARRIER) && subPoller;
+        boolean wakeable = (mode == Mode.POLLER_PER_CARRIER || mode == Mode.CARRIER_MASTER_POLLER) && subPoller;
         int maxEvents = (subPoller) ? 16 : 64;
 
         int epfd = EPoll.create();
