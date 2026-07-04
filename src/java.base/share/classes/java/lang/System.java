@@ -2322,14 +2322,6 @@ public final class System {
                 }
             }
 
-            public void lazyUnparkVirtualThread(Thread thread) {
-                if (thread instanceof BaseVirtualThread vthread) {
-                    vthread.lazyUnpark();
-                } else {
-                    throw new IllegalArgumentException();
-                }
-            }
-
             public Thread.VirtualThreadScheduler builtinVirtualThreadScheduler() {
                 return VirtualThread.builtinScheduler(true);
             }
