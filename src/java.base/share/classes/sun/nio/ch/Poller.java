@@ -207,11 +207,7 @@ public abstract class Poller {
     final void polled(int fdVal) {
         Thread t = map.remove(fdVal);
         if (t != null) {
-            if (POLLER_GROUP.useLazyUnpark() && Thread.currentThread().isVirtual()) {
-                JLA.lazyUnparkVirtualThread(t);
-            } else {
-                LockSupport.unpark(t);
-            }
+            LockSupport.unpark(t);
         }
     }
 
@@ -401,13 +397,6 @@ public abstract class Poller {
          * Return the write pollers.
          */
         abstract List<Poller> writePollers();
-
-        /**
-         * Return true if the unparking threads should use lazyUnpark.
-         */
-        boolean useLazyUnpark() {
-            return false;
-        }
 
         /**
          * Close the given pollers.
@@ -761,11 +750,6 @@ public abstract class Poller {
         @Override
         List<Poller> writePollers() {
             return List.of(writePollers);
-        }
-
-        @Override
-        boolean useLazyUnpark() {
-            return true;
         }
     }
 

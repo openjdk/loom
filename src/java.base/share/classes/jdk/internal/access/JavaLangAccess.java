@@ -628,13 +628,6 @@ public interface JavaLangAccess {
     void unparkVirtualThread(Thread thread);
 
     /**
-     * Re-enables a virtual thread for scheduling. If the thread is parked then it will
-     * be scheduled to continue, without guaranteeing that it will eventually continue
-     * execution.
-     */
-    void lazyUnparkVirtualThread(Thread thread);
-
-    /**
      * Returns the builtin virtual thread scheduler.
      */
     Thread.VirtualThreadScheduler builtinVirtualThreadScheduler();
