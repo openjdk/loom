@@ -820,15 +820,20 @@ class PreemptableInitCall {
   bool _previous;
   DEBUG_ONLY(InstanceKlass* _previous_klass;)
  public:
-  PreemptableInitCall(JavaThread* thread, InstanceKlass* ik) : _thread(thread) {
-    _previous = thread->at_preemptable_init();
-    _thread->set_at_preemptable_init(true);
-    DEBUG_ONLY(_previous_klass = _thread->preempt_init_klass();)
-    DEBUG_ONLY(_thread->set_preempt_init_klass(ik));
+  PreemptableInitCall(JavaThread* thread, InstanceKlass* ik) : _thread(nullptr) {
+    if (thread->is_vthread_mounted()) {
+      _thread = thread;
+      _previous = _thread->at_preemptable_init();
+      _thread->set_at_preemptable_init(true);
+      DEBUG_ONLY(_previous_klass = _thread->preempt_init_klass();)
+      DEBUG_ONLY(_thread->set_preempt_init_klass(ik));
+    }
   }
   ~PreemptableInitCall() {
-    _thread->set_at_preemptable_init(_previous);
-    DEBUG_ONLY(_thread->set_preempt_init_klass(_previous_klass));
+    if (_thread != nullptr) {
+      _thread->set_at_preemptable_init(_previous);
+      DEBUG_ONLY(_thread->set_preempt_init_klass(_previous_klass));
+    }
   }
 };
 

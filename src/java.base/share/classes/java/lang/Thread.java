@@ -1276,25 +1276,11 @@ public class Thread implements Runnable {
 
             /**
              * Sets this builder to create virtual threads with sticky affinity.
-             * When a sticky virtual thread starts or unparks another virtual thread,
-             * the runtime uses lazy submission to preserve thread locality.
              *
              * @return this builder
              * @since 99
              */
             OfVirtual stickyAffinity();
-
-            /**
-             * Creates a new {@code Thread} from the current state of the builder and
-             * schedules it without guaranteeing that it will eventually execute.
-             *
-             * @param task the object to run when the thread executes
-             * @return a new started Thread
-             *
-             * @see <a href="Thread.html#inheritance">Inheritance when creating threads</a>
-             * @since 99
-             */
-            Thread lazyStart(Runnable task);
         }
     }
 

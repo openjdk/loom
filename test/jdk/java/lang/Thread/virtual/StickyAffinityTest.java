@@ -30,22 +30,16 @@
  * @run junit StickyAffinityTest
  */
 
-import java.lang.reflect.Field;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import java.util.concurrent.locks.LockSupport;
+
+import jdk.test.lib.thread.VThreadScheduler;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class StickyAffinityTest {
-
-    private static Thread currentCarrierThread() throws Exception {
-        Field f = Class.forName("java.lang.VirtualThread")
-                .getDeclaredField("carrierThread");
-        f.setAccessible(true);
-        return (Thread) f.get(Thread.currentThread());
-    }
 
     /**
      * Test that stickyAffinity() builder method creates and starts a thread.
@@ -91,9 +85,7 @@ class StickyAffinityTest {
         Thread target = Thread.ofVirtual().start(() -> {
             parked.countDown();
             LockSupport.park();
-            try {
-                targetCarrierAfterUnpark.set(currentCarrierThread());
-            } catch (Exception e) { throw new RuntimeException(e); }
+            targetCarrierAfterUnpark.set(VThreadScheduler.currentCarrierThread());
             done.countDown();
         });
         parked.await();
@@ -101,9 +93,7 @@ class StickyAffinityTest {
         Thread sticky = Thread.ofVirtual()
                 .stickyAffinity()
                 .start(() -> {
-                    try {
-                        stickyCarrier.set(currentCarrierThread());
-                    } catch (Exception e) { throw new RuntimeException(e); }
+                    stickyCarrier.set(VThreadScheduler.currentCarrierThread());
                     LockSupport.unpark(target);
                 });
         sticky.join();

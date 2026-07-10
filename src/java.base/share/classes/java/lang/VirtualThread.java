@@ -788,7 +788,8 @@ final class VirtualThread extends BaseVirtualThread {
      * @throws IllegalThreadStateException if the thread has already been started
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
-    private void start(ThreadContainer container, boolean lazy) {
+    @Override
+    void start(ThreadContainer container) {
         if (!compareAndSetState(NEW, STARTED)) {
             throw new IllegalThreadStateException("Already started");
         }
@@ -810,14 +811,13 @@ final class VirtualThread extends BaseVirtualThread {
             // submit task to schedule
             try {
                 if (currentThread().isVirtual()) {
-                    boolean useLazy = lazy || currentThreadIsSticky();
                     Continuation.pin();
                     try {
                         if (scheduler == BUILTIN_SCHEDULER
                                 && currentCarrierThread() instanceof CarrierThread ct) {
                             ForkJoinPool pool = ct.getPool();
                             ForkJoinTask<?> task = ForkJoinTask.adapt(runContinuation);
-                            if (useLazy) {
+                            if (currentThreadIsSticky()) {
                                 pool.lazySubmit(task);
                             } else {
                                 pool.externalSubmit(task);
@@ -845,20 +845,8 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     @Override
-    void start(ThreadContainer container) {
-        start(container, false);
-    }
-
-    @Override
     public void start() {
-        start(ThreadContainers.root(), false);
-    }
-
-    /**
-     * Schedules this thread to begin execution without guarantee that it will execute.
-     */
-    void lazyStart() {
-        start(ThreadContainers.root(), true);
+        start(ThreadContainers.root());
     }
 
     @Override
@@ -1047,11 +1035,6 @@ final class VirtualThread extends BaseVirtualThread {
     @Override
     void unpark() {
         unpark(false);
-    }
-
-    @Override
-    void lazyUnpark() {
-        unpark(true);
     }
 
     /**
