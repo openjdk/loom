@@ -63,5 +63,13 @@ abstract sealed class BaseVirtualThread extends Thread
      * Makes available the parking permit to the given this virtual thread.
      */
     abstract void unpark();
+
+    /**
+     * Makes available the parking permit to the given this virtual thread. If the
+     * thread is parked then there is no guarantee that it will continue execution.
+     */
+    void lazyUnpark() {
+        unpark();
+    }
 }
 

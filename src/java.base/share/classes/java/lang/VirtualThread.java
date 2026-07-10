@@ -242,6 +242,18 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
+     * Returns true if this virtual thread has sticky affinity.
+     */
+    boolean hasStickyAffinity() {
+        return stickyAffinity;
+    }
+
+    // Carrier affinity hint. Set by the factory (round-robin counter) or by the
+    // scheduler on first start (resolved carrier id). The scheduler resolves it
+    // to a carrier via modulus. -1 means no affinity.
+    int affinityHint = -1;
+
+    /**
      * Returns the continuation scope used for virtual threads.
      */
     static ContinuationScope continuationScope() {
@@ -788,8 +800,7 @@ final class VirtualThread extends BaseVirtualThread {
      * @throws IllegalThreadStateException if the thread has already been started
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
-    @Override
-    void start(ThreadContainer container) {
+    private void start(ThreadContainer container, boolean lazy) {
         if (!compareAndSetState(NEW, STARTED)) {
             throw new IllegalThreadStateException("Already started");
         }
@@ -811,13 +822,14 @@ final class VirtualThread extends BaseVirtualThread {
             // submit task to schedule
             try {
                 if (currentThread().isVirtual()) {
+                    boolean useLazy = lazy || currentThreadIsSticky();
                     Continuation.pin();
                     try {
                         if (scheduler == BUILTIN_SCHEDULER
                                 && currentCarrierThread() instanceof CarrierThread ct) {
                             ForkJoinPool pool = ct.getPool();
                             ForkJoinTask<?> task = ForkJoinTask.adapt(runContinuation);
-                            if (currentThreadIsSticky()) {
+                            if (useLazy) {
                                 pool.lazySubmit(task);
                             } else {
                                 pool.externalSubmit(task);
@@ -845,8 +857,20 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     @Override
+    void start(ThreadContainer container) {
+        start(container, false);
+    }
+
+    @Override
     public void start() {
-        start(ThreadContainers.root());
+        start(ThreadContainers.root(), false);
+    }
+
+    /**
+     * Schedules this thread to begin execution without guarantee that it will execute.
+     */
+    void lazyStart() {
+        start(ThreadContainers.root(), true);
     }
 
     @Override
@@ -1035,6 +1059,11 @@ final class VirtualThread extends BaseVirtualThread {
     @Override
     void unpark() {
         unpark(false);
+    }
+
+    @Override
+    void lazyUnpark() {
+        unpark(true);
     }
 
     /**
@@ -1507,7 +1536,10 @@ final class VirtualThread extends BaseVirtualThread {
         } else {
             minRunnable = Integer.max(parallelism / 2, 1);
         }
-        if (Boolean.getBoolean("jdk.virtualThreadScheduler.useTPE")) {
+        if (Boolean.getBoolean("jdk.virtualThreadScheduler.useMpsc")) {
+            System.err.println("WARNING: Using experimental MPSC virtual thread scheduler");
+            return new MpscVirtualThreadScheduler(parallelism);
+        } else if (Boolean.getBoolean("jdk.virtualThreadScheduler.useTPE")) {
             return new BuiltinThreadPoolExecutorScheduler(parallelism);
         } else {
             return new BuiltinForkJoinPoolScheduler(parallelism, maxPoolSize, minRunnable, wrapped);
