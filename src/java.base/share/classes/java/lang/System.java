@@ -2260,6 +2260,10 @@ public final class System {
                 return null;
             }
 
+            public boolean isMpscScheduler() {
+                return VirtualThread.builtinScheduler(true) instanceof MpscVirtualThreadScheduler;
+            }
+
             public <T> T getCarrierThreadLocal(CarrierThreadLocal<T> local) {
                 return ((ThreadLocal<T>)local).getCarrierThreadLocal();
             }

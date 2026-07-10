@@ -556,6 +556,11 @@ public interface JavaLangAccess {
     Object carrierLocalPoller();
 
     /**
+     * Returns true if the built-in scheduler is the MPSC scheduler.
+     */
+    boolean isMpscScheduler();
+
+    /**
      * Returns the value of the current carrier thread's copy of a thread-local.
      */
     <T> T getCarrierThreadLocal(CarrierThreadLocal<T> local);

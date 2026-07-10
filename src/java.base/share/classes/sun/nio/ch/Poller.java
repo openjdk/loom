@@ -112,7 +112,13 @@ public abstract class Poller {
                     case "1" -> Mode.SYSTEM_THREADS;
                     case "2" -> Mode.VTHREAD_POLLERS;
                     case "3" -> Mode.POLLER_PER_CARRIER;
-                    case "4" -> Mode.CARRIER_LOCAL_POLLER;
+                    case "4" -> {
+                        if (JLA.isMpscScheduler()) {
+                            yield Mode.CARRIER_LOCAL_POLLER;
+                        }
+                        System.err.println("WARNING: pollerMode=4 requires MPSC scheduler, falling back to mode 2");
+                        yield Mode.VTHREAD_POLLERS;
+                    }
                     default -> {
                         throw new RuntimeException(s + " is not a valid polling mode");
                     }
@@ -865,12 +871,10 @@ public abstract class Poller {
 
         @Override
         void poll(int fdVal, int event, long nanos, BooleanSupplier isOpen) throws IOException {
-            // POLLIN from VT: register directly with carrier's local poller
+            // POLLIN from VT: register with carrier's local poller
             if (event == Net.POLLIN
                     && Thread.currentThread().isVirtual()
                     && ContinuationSupport.isSupported()) {
-                Thread carrier = JLA.currentCarrierThread();
-                // read the ThreadLocal from the carrier thread context
                 CarrierLocalPoller poller = getLocalPoller();
                 if (poller != null) {
                     poller.register(fdVal, event, Thread.currentThread());
@@ -889,13 +893,8 @@ public abstract class Poller {
                 }
             }
 
-            // POLLOUT or fallback: use write poller
-            if (event == Net.POLLOUT) {
-                writePoller(fdVal).poll(fdVal, nanos, isOpen);
-            } else {
-                // platform thread POLLIN fallback
-                writePoller(fdVal).poll(fdVal, nanos, isOpen);
-            }
+            // POLLOUT or non-VT POLLIN: write poller
+            writePoller(fdVal).poll(fdVal, nanos, isOpen);
         }
 
         @Override
