@@ -2252,6 +2252,14 @@ public final class System {
                 return Thread.currentCarrierThread();
             }
 
+            public Object carrierLocalPoller() {
+                Thread carrier = Thread.currentCarrierThread();
+                if (carrier instanceof MpscVirtualThreadScheduler.CarrierThread ct) {
+                    return ct.poller;
+                }
+                return null;
+            }
+
             public <T> T getCarrierThreadLocal(CarrierThreadLocal<T> local) {
                 return ((ThreadLocal<T>)local).getCarrierThreadLocal();
             }
@@ -2317,6 +2325,14 @@ public final class System {
             public void unparkVirtualThread(Thread thread) {
                 if (thread instanceof BaseVirtualThread vthread) {
                     vthread.unpark();
+                } else {
+                    throw new IllegalArgumentException();
+                }
+            }
+
+            public void lazyUnparkVirtualThread(Thread thread) {
+                if (thread instanceof BaseVirtualThread vthread) {
+                    vthread.lazyUnpark();
                 } else {
                     throw new IllegalArgumentException();
                 }

@@ -551,6 +551,11 @@ public interface JavaLangAccess {
     Thread currentCarrierThread();
 
     /**
+     * Returns the CarrierLocalPoller for the current carrier thread, or null.
+     */
+    Object carrierLocalPoller();
+
+    /**
      * Returns the value of the current carrier thread's copy of a thread-local.
      */
     <T> T getCarrierThreadLocal(CarrierThreadLocal<T> local);
@@ -626,6 +631,13 @@ public interface JavaLangAccess {
      * @throws RejectedExecutionException if the scheduler cannot accept a task
      */
     void unparkVirtualThread(Thread thread);
+
+    /**
+     * Re-enables a virtual thread for scheduling. If the thread is parked then it will
+     * be scheduled to continue, without guaranteeing that it will eventually continue
+     * execution.
+     */
+    void lazyUnparkVirtualThread(Thread thread);
 
     /**
      * Returns the builtin virtual thread scheduler.
