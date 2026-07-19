@@ -679,9 +679,8 @@ final class VirtualThread extends BaseVirtualThread {
         if (s == YIELDING) {
             setState(YIELDED);
 
-            // sticky VTs stay on the current carrier — skip external submit
-            if (!stickyAffinity
-                    && currentThread() instanceof CarrierThread ct
+            // let all VTs (including sticky) use external submit when queue is empty
+            if (currentThread() instanceof CarrierThread ct
                     && ct.getQueuedTaskCount() == 0) {
                 externalSubmitRunContinuation();
             } else {
@@ -818,7 +817,7 @@ final class VirtualThread extends BaseVirtualThread {
                             ForkJoinPool pool = ct.getPool();
                             ForkJoinTask<?> task = ForkJoinTask.adapt(runContinuation);
                             if (currentThreadIsSticky()) {
-                                pool.lazySubmit(task);
+                                pool.execute(task);
                             } else {
                                 pool.externalSubmit(task);
                             }
