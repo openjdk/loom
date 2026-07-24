@@ -1074,6 +1074,8 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
                          && chunk->is_empty()
                          && unextended_sp >= _freeze_size;
   if (reuse_old_chunk) {
+    // added for telemetry purpose: can be either be a debug/trace or a proper JFR event if this will ever land
+    // log_info(continuations)("CHUNK_REUSE capacity=%d freeze_size=%d", unextended_sp, _freeze_size);
     chunk->set_gc_mode(false);
     chunk->set_has_bitmap(false);
     _barriers = true;
@@ -1579,6 +1581,9 @@ public:
 template <typename ConfigT>
 stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size, int argsize_md) {
   log_develop_trace(continuations)("allocate_chunk allocating new chunk");
+  log_info(continuations)("CHUNK_ALLOC stack_size=%zu size_words=%zu preempt=%d",
+    stack_size, InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass())->instance_size(stack_size),
+    _preempt ? 1 : 0);
 
   InstanceStackChunkKlass* klass = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass());
   size_t size_in_words = klass->instance_size(stack_size);
