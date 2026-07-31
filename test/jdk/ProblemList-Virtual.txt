@@ -55,3 +55,4 @@ jdk/jfr/jvm/TestGetAllEventClasses.java 0000000 generic-all
 
 #############################################################################
 
+# Value Objects failures start here:

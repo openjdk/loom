@@ -70,3 +70,6 @@ gc/z/TestGarbageCollectorMXBean.java                                    8278129 
 
 #############################################################################
 
+# Value Objects failures start here:
+runtime/cds/appcds/aotCache/AOTMapTest.java#valhalla 8388438 generic-all
+runtime/cds/appcds/cacheObject/ArchivedFlatArrayTest.java 8388438 generic-all

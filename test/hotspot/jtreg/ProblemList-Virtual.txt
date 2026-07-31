@@ -100,3 +100,5 @@ vmTestbase/gc/gctests/MemoryEaterMT/MemoryEaterMT.java 0000000 generic-all
 # implementation or test code.
 
 #############################################################################
+
+# Value Objects failures start here:
