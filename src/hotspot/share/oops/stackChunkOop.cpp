@@ -529,11 +529,25 @@ public:
     _sp = f.sp();
     _cb = f.cb();
 
-    int fsize = f.frame_size() - ((f.is_interpreted() == _callee_interpreted) ? _argsize : 0);
+    int fsize = f.frame_size();
+    int argsize = f.stack_argsize() + frame::metadata_words_at_top;
+    bool augmented = false;
+    if (f.is_compiled() && f.cb()->as_nmethod()->needs_stack_repair()) {
+      int real_frame_size = 0;
+      augmented = f.to_frame().was_augmented_on_entry(real_frame_size);
+      if (augmented) {
+        fsize = real_frame_size - (_callee_interpreted ? 0 : _argsize);
+        // The arguments reside inside the augmented frame.
+        argsize = 0;
+      }
+    }
+    if (!augmented) {
+      fsize -= (f.is_interpreted() == _callee_interpreted) ? _argsize : 0;
+    }
     int num_oops = f.num_oops(map);
     assert(num_oops >= 0, "");
 
-    _argsize   = f.stack_argsize() + frame::metadata_words_at_top;
+    _argsize   = argsize;
     _size     += fsize;
     _num_oops += num_oops;
     if (f.is_interpreted()) {
