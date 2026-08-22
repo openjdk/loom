@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, 2025, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2021, 2026, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -529,25 +529,20 @@ public:
     _sp = f.sp();
     _cb = f.cb();
 
-    int fsize = f.frame_size();
-    int argsize = f.stack_argsize() + frame::metadata_words_at_top;
-    bool augmented = false;
-    if (f.is_compiled() && f.cb()->as_nmethod()->needs_stack_repair()) {
-      int real_frame_size = 0;
-      augmented = f.to_frame().was_augmented_on_entry(real_frame_size);
-      if (augmented) {
-        fsize = real_frame_size - (_callee_interpreted ? 0 : _argsize);
-        // The arguments reside inside the augmented frame.
-        argsize = 0;
-      }
-    }
-    if (!augmented) {
-      fsize -= (f.is_interpreted() == _callee_interpreted) ? _argsize : 0;
-    }
+    int fsize = f.frame_size() - ((f.is_interpreted() == _callee_interpreted) ? _argsize : 0);
     int num_oops = f.num_oops(map);
     assert(num_oops >= 0, "");
 
-    _argsize   = argsize;
+    _argsize   = f.stack_argsize() + frame::metadata_words_at_top;
+    if (f.is_compiled()) {
+      int real_frame_size = 0;
+      frame fr = f.to_frame();
+      if (fr.was_augmented_on_entry(real_frame_size)) {
+        // Extended frames exclude stack arguments passed by caller as they are
+        // never accessed. For interpreted callers they are discarded when freezing.
+        _argsize = 0;
+      }
+    }
     _size     += fsize;
     _num_oops += num_oops;
     if (f.is_interpreted()) {
