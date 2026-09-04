@@ -608,6 +608,17 @@ freeze_result Freeze<ConfigT>::try_freeze_fast() {
   DEBUG_ONLY(_fast_freeze_size = size_if_fast_freeze_available();)
   assert(_fast_freeze_size == 0, "");
 
+  // Parallel/Serial GC: if the tail is a reusable old-gen chunk, go straight
+  // to freeze_slow which has the reuse logic in finalize_freeze. Allocating
+  // here would orphan the reusable chunk (set_tail in freeze_fast_new_chunk
+  // runs before the _barriers check can bail out).
+  {
+    stackChunkOop tail = _cont.tail();
+    if (tail != nullptr && tail->is_gc_mode() && tail->is_empty()) {
+      return freeze_slow();
+    }
+  }
+
   stackChunkOop chunk = allocate_chunk(cont_size() + frame::metadata_words + _monitors_in_lockstack, _cont.argsize() + frame::metadata_words_at_top);
   if (freeze_fast_new_chunk(chunk)) {
     return freeze_ok;
@@ -1049,6 +1060,27 @@ freeze_result FreezeBase::finalize_freeze(const frame& callee, frame& caller, in
     "Chunk allocated in freeze_fast is of insufficient size "
     "unextended_sp: %d size: %d is_empty: %d", unextended_sp, _freeze_size, chunk->is_empty());
   assert(!allocated_old_in_freeze_fast || (!UseZGC && !UseG1GC), "Unexpected allocation");
+
+  // Parallel/Serial GC: an empty gc_mode chunk with enough capacity can be
+  // reused instead of allocating a new one. We keep gc_mode set (the chunk
+  // is still in old gen) and set _barriers so that finish_freeze applies
+  // transform + card marking after the copy. This is the same mechanism used
+  // when allocate_chunk's slow path places a chunk directly in old gen.
+  // G1/ZGC cannot do this — G1 asserts against writing into old-gen chunks,
+  // and ZGC's concurrent relocation makes it unsafe.
+  bool reuse_old_chunk = !UseG1GC && !UseZGC
+                         && chunk != nullptr
+                         && chunk->is_gc_mode()
+                         && chunk->is_empty()
+                         && unextended_sp >= _freeze_size;
+  if (reuse_old_chunk) {
+    // added for telemetry purpose: can be either be a debug/trace or a proper JFR event if this will ever land
+    // log_info(continuations)("CHUNK_REUSE capacity=%d freeze_size=%d", unextended_sp, _freeze_size);
+    chunk->set_gc_mode(false);
+    chunk->set_has_bitmap(false);
+    _barriers = true;
+    allocated_old_in_freeze_fast = true;
+  }
 
   DEBUG_ONLY(bool empty_chunk = true);
   if (unextended_sp < _freeze_size || chunk->is_gc_mode() || (!allocated_old_in_freeze_fast && chunk->requires_barriers())) {
@@ -1562,6 +1594,9 @@ public:
 template <typename ConfigT>
 stackChunkOop Freeze<ConfigT>::allocate_chunk(size_t stack_size, int argsize_md) {
   log_develop_trace(continuations)("allocate_chunk allocating new chunk");
+  log_info(continuations)("CHUNK_ALLOC stack_size=%zu size_words=%zu preempt=%d",
+    stack_size, InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass())->instance_size(stack_size),
+    _preempt ? 1 : 0);
 
   InstanceStackChunkKlass* klass = InstanceStackChunkKlass::cast(vmClasses::StackChunk_klass());
   size_t size_in_words = klass->instance_size(stack_size);
@@ -3077,12 +3112,20 @@ void ThawBase::finish_thaw(frame& f) {
   stackChunkOop chunk = _cont.tail();
 
   if (chunk->is_empty()) {
-    // Only remove chunk from list if it can't be reused for another freeze
+    // Only remove chunk from list if it can't be reused for another freeze.
+    // For Parallel/Serial GC, keep the empty chunk for reuse even when
+    // seen_by_gc() — the next freeze will write into it via the slow path
+    // with post-hoc barrier processing. This avoids allocating a new
+    // StackChunk on every freeze after promotion, which otherwise creates
+    // an allocation-churn cascade for long-lived virtual threads.
+    // G1/ZGC require detachment because their concurrent collectors
+    // cannot safely handle writes into old-gen chunks via post-hoc barriers.
     if (seen_by_gc()) {
-      _cont.set_tail(chunk->parent());
-    } else {
-      chunk->set_has_mixed_frames(false);
+      if (UseG1GC || UseZGC) {
+        _cont.set_tail(chunk->parent());
+      }
     }
+    chunk->set_has_mixed_frames(false);
     chunk->set_max_thawing_size(0);
   } else {
     chunk->set_max_thawing_size(chunk->max_thawing_size() - _align_size);
