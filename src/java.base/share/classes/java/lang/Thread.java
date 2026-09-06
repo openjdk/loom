@@ -730,6 +730,13 @@ public class Thread implements Runnable {
     static final int NO_INHERIT_THREAD_LOCALS = 1 << 2;
 
     /**
+     * Characteristic value signifying that this virtual thread has sticky affinity.
+     * When a sticky virtual thread starts or unparks another virtual thread,
+     * the runtime uses lazy submission to preserve thread locality.
+     */
+    static final int STICKY_AFFINITY = 1 << 3;
+
+    /**
      * Thread identifier assigned to the primordial thread.
      */
     static final long PRIMORDIAL_TID = 3;
@@ -1291,6 +1298,14 @@ public class Thread implements Runnable {
 
             @Override OfVirtual inheritInheritableThreadLocals(boolean inherit);
             @Override OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
+
+            /**
+             * Sets this builder to create virtual threads with sticky affinity.
+             *
+             * @return this builder
+             * @since 99
+             */
+            OfVirtual stickyAffinity();
         }
     }
 

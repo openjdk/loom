@@ -106,6 +106,7 @@ final class VirtualThread extends BaseVirtualThread {
     private final VirtualThreadScheduler scheduler;
     private final Continuation cont;
     private final VThreadTask runContinuation;
+    private final boolean stickyAffinity;
 
     // virtual thread state, accessed by VM
     private volatile int state;
@@ -234,6 +235,13 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
+     * Returns true if the current thread is a virtual thread with sticky affinity.
+     */
+    static boolean currentThreadIsSticky() {
+        return currentThread() instanceof VirtualThread vt && vt.stickyAffinity;
+    }
+
+    /**
      * Returns the continuation scope used for virtual threads.
      */
     static ContinuationScope continuationScope() {
@@ -271,6 +279,7 @@ final class VirtualThread extends BaseVirtualThread {
             throw new UnsupportedOperationException();
         }
         this.scheduler = scheduler;
+        this.stickyAffinity = (characteristics & Thread.STICKY_AFFINITY) != 0;
         this.cont = new VThreadContinuation(this, task);
 
         if (scheduler == BUILTIN_SCHEDULER) {
@@ -670,8 +679,9 @@ final class VirtualThread extends BaseVirtualThread {
         if (s == YIELDING) {
             setState(YIELDED);
 
-            // external submit if there are no tasks in the local task queue
-            if (currentThread() instanceof CarrierThread ct && ct.getQueuedTaskCount() == 0) {
+            // let all VTs (including sticky) use external submit when queue is empty
+            if (currentThread() instanceof CarrierThread ct
+                    && ct.getQueuedTaskCount() == 0) {
                 externalSubmitRunContinuation();
             } else {
                 submitRunContinuation();
@@ -806,7 +816,11 @@ final class VirtualThread extends BaseVirtualThread {
                                 && currentCarrierThread() instanceof CarrierThread ct) {
                             ForkJoinPool pool = ct.getPool();
                             ForkJoinTask<?> task = ForkJoinTask.adapt(runContinuation);
-                            pool.externalSubmit(task);
+                            if (currentThreadIsSticky()) {
+                                pool.execute(task);
+                            } else {
+                                pool.externalSubmit(task);
+                            }
                         } else {
                             scheduler.onStart(runContinuation);
                         }
@@ -976,7 +990,7 @@ final class VirtualThread extends BaseVirtualThread {
             // unparked while parked
             if ((s == PARKED || s == TIMED_PARKED) && compareAndSetState(s, UNPARKED)) {
 
-                if (lazySubmit && currentThread().isVirtual()) {
+                if ((lazySubmit || currentThreadIsSticky()) && currentThread().isVirtual()) {
                     Continuation.pin();
                     try {
                         if (scheduler == BUILTIN_SCHEDULER

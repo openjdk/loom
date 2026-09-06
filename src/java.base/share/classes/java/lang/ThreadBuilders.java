@@ -96,6 +96,10 @@ class ThreadBuilders {
             }
         }
 
+        void setStickyAffinity() {
+            characteristics |= Thread.STICKY_AFFINITY;
+        }
+
         void setUncaughtExceptionHandler(UncaughtExceptionHandler ueh) {
             this.uhe = Objects.requireNonNull(ueh);
         }
@@ -234,6 +238,12 @@ class ThreadBuilders {
         @Override
         public OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh) {
             setUncaughtExceptionHandler(ueh);
+            return this;
+        }
+
+        @Override
+        public OfVirtual stickyAffinity() {
+            setStickyAffinity();
             return this;
         }
 
