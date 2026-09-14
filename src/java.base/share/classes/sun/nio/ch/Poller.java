@@ -552,8 +552,13 @@ public abstract class Poller {
             this.readPollers = readPollers;
             this.writePollers = writePollers;
 
+            // roundRobinAffinity spreads the sub-pollers across carriers. Without it a
+            // scheduler that places by caller-carrier or by a probe hash puts every
+            // sub-poller created from this one factory on a single carrier, which a
+            // scheduler without work stealing never corrects.
             ThreadFactory factory = Thread.ofVirtual()
                     .inheritInheritableThreadLocals(false)
+                    .roundRobinAffinity()
                     .name("SubPoller-", 0)
                     .uncaughtExceptionHandler((_, e) -> e.printStackTrace())
                     .factory();
