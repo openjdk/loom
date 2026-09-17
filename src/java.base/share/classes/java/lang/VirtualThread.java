@@ -256,7 +256,7 @@ final class VirtualThread extends BaseVirtualThread {
      * @param characteristics characteristics
      * @param task the task to execute
      */
-    VirtualThread(VirtualThreadScheduler scheduler,
+    public VirtualThread(VirtualThreadScheduler scheduler,
                   Thread preferredCarrier,
                   String name,
                   int characteristics,
