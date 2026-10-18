@@ -40,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * @test
  * @bug 8154212 8154470 8392966
  * @summary Miscellaneous tests for java launcher
+ * @requires test.thread.factory != "Virtual"
  * @library /test/lib
  * @build jdk.test.lib.process.ProcessTools jdk.test.lib.JDKToolFinder
  *        jdk.test.lib.process.OutputAnalyzer
