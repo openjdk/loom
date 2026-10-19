@@ -2835,6 +2835,15 @@ public class Thread implements Runnable {
     /** Probe hash value; nonzero if threadLocalRandomSeed initialized */
     int threadLocalRandomProbe;
 
+    /**
+     * Carrier index used by MpscVirtualThreadScheduler for external submissions from
+     * this thread. Separate from threadLocalRandomProbe on purpose: a nonzero value
+     * there means ThreadLocalRandom's seed has been initialized, and it is also what
+     * Striped64 uses to pick a cell, so neither may be written by a scheduler.
+     * Accessed only by the owning thread.
+     */
+    int mpscProbe;
+
     /** Secondary seed isolated from public ThreadLocalRandom sequence */
     int threadLocalRandomSecondarySeed;
 

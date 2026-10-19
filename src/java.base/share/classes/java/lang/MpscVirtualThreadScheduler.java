@@ -29,7 +29,6 @@ import java.io.UncheckedIOException;
 import java.lang.Thread.VirtualThreadScheduler;
 import java.lang.Thread.VirtualThreadTask;
 import java.util.concurrent.locks.LockSupport;
-import jdk.internal.misc.Unsafe;
 import jdk.internal.vm.annotation.Contended;
 import sun.nio.ch.CarrierLocalPoller;
 
@@ -37,7 +36,8 @@ import sun.nio.ch.CarrierLocalPoller;
  * An alternative virtual thread scheduler using a single MPSC queue per carrier.
  * No work stealing — each carrier drains only its own queue.
  *
- * <p>External submissions use a probe-based hash (FJP-style) to distribute
+ * <p>External submissions use a per-thread probe: each submitting platform
+ * thread targets one carrier for its lifetime, and different threads are spread
  * across carriers. Carrier affinity is set once at start via affinityHint;
  * onContinue always routes back to the same carrier.
  *
@@ -46,11 +46,6 @@ import sun.nio.ch.CarrierLocalPoller;
  * The carrier interleaves task draining with I/O polling.
  */
 final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
-
-    private static final Unsafe U = Unsafe.getUnsafe();
-
-    private static final long PROBE =
-            U.objectFieldOffset(Thread.class, "threadLocalRandomProbe");
 
     private final CarrierThread[] carriers;
 
@@ -124,13 +119,40 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
         return carriers[Math.floorMod(probe(), carriers.length)];
     }
 
+    /**
+     * Hands out the starting value of each platform thread's probe, so that different
+     * submitting threads start on different carriers. A global sequence rather than
+     * anything derived from the thread, for the reason ThreadLocalRandom.localInit()
+     * uses one: thread ids are sequential, and a hash of a handful of them spreads
+     * poorly over a small carrier count.
+     */
+    private static final java.util.concurrent.atomic.AtomicInteger PROBE_SEEDER =
+            new java.util.concurrent.atomic.AtomicInteger();
+
+    /**
+     * Returns the carrier index for external submissions from the calling platform
+     * thread. Stable for the life of the thread: every virtual thread it starts goes to
+     * the same carrier, and different threads are spread by the seeder.
+     *
+     * Stability is deliberate. A thread submitting a burst wakes its target carrier
+     * once and then finds it RUNNING for the rest of the burst, so the burst costs one
+     * eventfd write. Rotating the index instead sends consecutive tasks to different
+     * carriers, each of which drains its share and re-parks before its next task
+     * arrives, so nearly every submission finds a parked carrier and pays a wakeup.
+     * This is the same reason ForkJoinPool keeps its probe stable and advances it only
+     * on a failed queue acquisition. Callers that need their threads spread ask for it
+     * with roundRobinAffinity(), which assigns carriers at the factory and does not
+     * come through here.
+     *
+     * Only platform threads reach here: a submission from a virtual thread takes the
+     * calling-carrier path in carrierFor().
+     */
     private static int probe() {
-        int p = U.getInt(Thread.currentThread(), PROBE);
+        Thread t = Thread.currentThread();
+        int p = t.mpscProbe;
         if (p == 0) {
-            long tid = Thread.currentThread().threadId();
-            p = (int) (tid ^ (tid >>> 16));
-            if (p == 0) p = 1;
-            U.putInt(Thread.currentThread(), PROBE, p);
+            p = PROBE_SEEDER.incrementAndGet();
+            t.mpscProbe = p;
         }
         return p;
     }
