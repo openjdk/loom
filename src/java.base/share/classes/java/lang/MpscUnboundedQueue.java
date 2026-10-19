@@ -112,8 +112,13 @@ final class MpscUnboundedQueue<E> {
         return (long) PRODUCER_LIMIT.getAcquire(this);
     }
 
+    // A volatile load, not an acquire, as in JCTools. The carrier's pre-park re-check
+    // is a volatile store of PARKED followed by a read of this index, pairing with a
+    // producer's CAS here followed by a load of the carrier state; that Dekker pair
+    // needs the load to be ordered after the store, which the memory model guarantees
+    // for a volatile load and not for an acquire.
     private long lvProducerIndex() {
-        return (long) PRODUCER_INDEX.getAcquire(this);
+        return (long) PRODUCER_INDEX.getVolatile(this);
     }
 
     private boolean casProducerIndex(long expect, long newValue) {
