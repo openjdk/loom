@@ -177,25 +177,10 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
          * Like Netty's EventLoop: drain tasks → poll I/O → drain → ...
          * Block in epoll_wait only when both queue and I/O are idle.
          */
-        private static final long DRAIN_BUDGET_NS = java.util.concurrent.TimeUnit.MICROSECONDS
-                .toNanos(Integer.getInteger("jdk.virtualThreadScheduler.drainBudgetUs", 50));
-        private static final int TIME_CHECK_INTERVAL = 4;
-
         private void eventLoop() {
-            var queue = this.queue;
             var poller = this.poller;
             for (;;) {
-                // drain tasks with time budget
-                int drained = 0;
-                long drainStart = System.nanoTime();
-                VirtualThreadTask task;
-                while ((task = queue.poll()) != null) {
-                    try { task.run(); } catch (Throwable t) { }
-                    if ((++drained & (TIME_CHECK_INTERVAL - 1)) == 0
-                            && System.nanoTime() - drainStart >= DRAIN_BUDGET_NS) {
-                        break;
-                    }
-                }
+                int drained = drainRound();
 
                 // non-blocking I/O poll
                 int ioEvents = 0;
@@ -215,7 +200,8 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
                 // genuinely idle: blocking poll
                 carrierState = PARKED;
 
-                if ((task = queue.poll()) != null) {
+                VirtualThreadTask task = queue.poll();
+                if (task != null) {
                     carrierState = RUNNING;
                     try { task.run(); } catch (Throwable t) { }
                     continue;
@@ -226,6 +212,42 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
                 } catch (IOException e) { }
                 carrierState = RUNNING;
             }
+        }
+
+        /**
+         * Runs the tasks the queue held when the round began, and no more.
+         *
+         * The snapshot bounds the round without reading a clock. Tasks that arrive while
+         * the round is running -- the continuations this round's own task.run() calls
+         * submit, and the ones the following poll will unpark -- are left for the next
+         * round, so arrivals can never keep the poll from being reached at all, which
+         * draining to empty can.
+         *
+         * What it does not do is bound the round in time. The quota is the queue depth
+         * at entry and nothing here bounds that, so a round lasts quota x service time
+         * and the interval between polls grows with the backlog. That interval bounds
+         * discovery of an fd that becomes ready mid-round: its continuation is enqueued
+         * only once a poll sees it, so every task that runs before that poll is ahead of
+         * it in the FIFO. A time budget does bound the interval while tasks are short --
+         * it cannot bound a round holding one slow task, having no way to preempt a task
+         * already running -- and charges a clock read per round to do it. Which bound is
+         * better is a question about the depth distribution of this queue under a real
+         * workload, and that has not been measured.
+         *
+         * Only not-yet-discovered readiness pays that cost. A continuation an earlier
+         * poll already enqueued sits at the tail of this same FIFO, and ending the round
+         * sooner does not move it ahead of anything queued before it.
+         */
+        private int drainRound() {
+            var queue = this.queue;
+            int quota = queue.size();
+            int ran = 0;
+            VirtualThreadTask task;
+            while (ran < quota && (task = queue.poll()) != null) {
+                try { task.run(); } catch (Throwable t) { }
+                ran++;
+            }
+            return ran;
         }
 
         /**
