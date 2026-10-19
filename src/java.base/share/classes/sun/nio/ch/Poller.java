@@ -134,7 +134,7 @@ public abstract class Poller {
                 case SYSTEM_THREADS        -> new SystemThreadsPollerGroup(provider, readPollers, writePollers);
                 case VTHREAD_POLLERS       -> new VThreadsPollerGroup(provider, readPollers, writePollers);
                 case POLLER_PER_CARRIER    -> new PollerPerCarrierPollerGroup(provider, writePollers);
-                case CARRIER_LOCAL_POLLER  -> new CarrierLocalPollerGroup(provider, writePollers);
+                case CARRIER_LOCAL_POLLER  -> new CarrierLocalPollerGroup(provider, readPollers, writePollers);
             };
             group.start();
             return group;
@@ -839,28 +839,48 @@ public abstract class Poller {
      * system-wide platform threads.
      */
     private static class CarrierLocalPollerGroup extends PollerGroup {
+        // System-wide fallback pollers, in platform threads. The read pollers serve the
+        // virtual threads that have no carrier-local poller: those not mounted on an
+        // MPSC carrier, as under a custom default scheduler (implClass) wrapping it, and
+        // all of them when -XX:-VMContinuations is in effect.
+        private final Poller[] readPollers;
         private final Poller[] writePollers;
 
         CarrierLocalPollerGroup(PollerProvider provider,
+                                int readPollerCount,
                                 int writePollerCount) throws IOException {
             super(provider);
+            Poller[] readPollers = new Poller[readPollerCount];
             Poller[] writePollers = new Poller[writePollerCount];
             try {
+                for (int i = 0; i < readPollerCount; i++) {
+                    readPollers[i] = provider.readPoller(false);
+                }
                 for (int i = 0; i < writePollerCount; i++) {
                     writePollers[i] = provider.writePoller(false);
                 }
             } catch (Throwable e) {
+                PollerGroup.closeAll(readPollers);
                 PollerGroup.closeAll(writePollers);
                 throw e;
             }
+            this.readPollers = readPollers;
             this.writePollers = writePollers;
         }
 
         @Override
         void start() {
+            Arrays.stream(readPollers).forEach(p -> {
+                startPlatformThread("Read-Poller", p::pollerLoop);
+            });
             Arrays.stream(writePollers).forEach(p -> {
                 startPlatformThread("Write-Poller", p::pollerLoop);
             });
+        }
+
+        private Poller readPoller(int fdVal) {
+            int index = provider().fdValToIndex(fdVal, readPollers.length);
+            return readPollers[index];
         }
 
         CarrierLocalPoller getLocalPoller() {
@@ -898,8 +918,16 @@ public abstract class Poller {
                 }
             }
 
-            // POLLOUT or non-VT POLLIN: write poller
-            writePoller(fdVal).poll(fdVal, nanos, isOpen);
+            // No carrier-local poller for this caller: a virtual thread not mounted on an
+            // MPSC carrier, or -XX:-VMContinuations. Fall back to the system-wide pollers.
+            // A POLLIN must never be handed to a write poller: that registers EPOLLOUT,
+            // which a connected socket satisfies at once, so the caller wakes, finds
+            // nothing to read and parks again -- a spin for as long as it waits.
+            if (event == Net.POLLIN) {
+                readPoller(fdVal).poll(fdVal, nanos, isOpen);
+            } else {
+                writePoller(fdVal).poll(fdVal, nanos, isOpen);
+            }
         }
 
         @Override
@@ -909,7 +937,7 @@ public abstract class Poller {
 
         @Override
         List<Poller> readPollers() {
-            return List.of();
+            return List.of(readPollers);
         }
 
         @Override
