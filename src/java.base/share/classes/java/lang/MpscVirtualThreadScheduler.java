@@ -93,6 +93,17 @@ final class MpscVirtualThreadScheduler implements VirtualThreadScheduler {
     private static void enqueue(CarrierThread carrier, VirtualThreadTask task) {
         carrier.queue.offer(task);
         if (carrier.carrierState == CarrierThread.PARKED) {
+            // A virtual thread never runs while its carrier's state reads PARKED: the
+            // carrier stores RUNNING before it executes anything. So an enqueue that
+            // observes PARKED from the carrier's own thread can only originate inside the
+            // carrier's blocking poll -- in Mode 4, a readiness unpark from
+            // CarrierLocalPoller.poll(-1) -- and the carrier unconditionally stores
+            // RUNNING and drains the queue when that poll returns. Signalling it would
+            // cost an eventfd write, and a later spurious wakeup, for a carrier already
+            // on its way back to the drain loop.
+            if (Thread.currentCarrierThread() == carrier) {
+                return;
+            }
             if (carrier.poller != null) {
                 try {
                     carrier.poller.wakeup();
