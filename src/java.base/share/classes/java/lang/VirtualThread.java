@@ -31,15 +31,13 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinPool.ForkJoinWorkerThreadFactory;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.Future;
-import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import jdk.internal.event.VirtualThreadEndEvent;
 import jdk.internal.event.VirtualThreadStartEvent;
@@ -89,12 +87,7 @@ final class VirtualThread extends BaseVirtualThread {
             DEFAULT_SCHEDULER = builtinScheduler;
             EXTERNAL_VIEW = createExternalView(builtinScheduler);
         }
-        propValue = System.getProperty("jdk.virtualThreadScheduler.useSTPE");
-        if (propValue != null) {
-            USE_STPE = Boolean.parseBoolean(propValue);
-        } else {
-            USE_STPE = Runtime.getRuntime().availableProcessors() < 4;
-        }
+        USE_STPE = Boolean.getBoolean("jdk.virtualThreadScheduler.useSTPE");
     }
 
     private static final long STATE = U.objectFieldOffset(VirtualThread.class, "state");
@@ -1492,11 +1485,24 @@ final class VirtualThread extends BaseVirtualThread {
         } else {
             minRunnable = Integer.max(parallelism / 2, 1);
         }
-        if (Boolean.getBoolean("jdk.virtualThreadScheduler.useTPE")) {
-            return new BuiltinThreadPoolExecutorScheduler(parallelism);
+        ForkJoinWorkerThreadFactory factory;
+        if (wrapped) {
+            factory = ForkJoinPool.defaultForkJoinWorkerThreadFactory;
         } else {
-            return new BuiltinForkJoinPoolScheduler(parallelism, maxPoolSize, minRunnable, wrapped);
+            String cn = System.getProperty("jdk.virtualThreadScheduler.threadFactory");
+            if (cn != null) {
+                try {
+                    Class<?> clazz = Class.forName(cn, true, ClassLoader.getSystemClassLoader());
+                    Constructor<?> ctor = clazz.getConstructor();
+                    factory = (ForkJoinWorkerThreadFactory) ctor.newInstance();
+                } catch (Exception ex) {
+                    throw new Error(ex);
+                }
+            } else {
+                factory = CarrierThread::new;
+            }
         }
+        return new BuiltinForkJoinPoolScheduler(parallelism, maxPoolSize, minRunnable, factory);
     }
 
     /**
@@ -1505,10 +1511,10 @@ final class VirtualThread extends BaseVirtualThread {
     private static class BuiltinForkJoinPoolScheduler
             extends ForkJoinPool implements VirtualThreadScheduler {
 
-        BuiltinForkJoinPoolScheduler(int parallelism, int maxPoolSize, int minRunnable, boolean wrapped) {
-            ForkJoinWorkerThreadFactory factory = wrapped
-                    ? ForkJoinPool.defaultForkJoinWorkerThreadFactory
-                    : CarrierThread::new;
+        BuiltinForkJoinPoolScheduler(int parallelism,
+                                     int maxPoolSize,
+                                     int minRunnable,
+                                     ForkJoinWorkerThreadFactory factory) {
             Thread.UncaughtExceptionHandler handler = (t, e) -> { };
             boolean asyncMode = true; // FIFO
             super(parallelism, factory, handler, asyncMode,
@@ -1528,35 +1534,6 @@ final class VirtualThread extends BaseVirtualThread {
         @Override
         public ScheduledFuture<?> schedule(Runnable task, long delay, TimeUnit unit) {
             return super.schedule(task, delay, unit);
-        }
-    }
-
-    /**
-     * Built-in ThreadPoolExecutor scheduler.
-     */
-    private static class BuiltinThreadPoolExecutorScheduler
-            extends ThreadPoolExecutor implements VirtualThreadScheduler {
-
-        BuiltinThreadPoolExecutorScheduler(int maxPoolSize) {
-            ThreadFactory factory = task -> {
-                Thread t = InnocuousThread.newThread(task);
-                t.setDaemon(true);
-                return t;
-            };
-            super(maxPoolSize, maxPoolSize,
-                    0L, SECONDS,
-                    new LinkedTransferQueue<>(),
-                    factory);
-        }
-
-        @Override
-        public void onStart(VirtualThreadTask task) {
-            execute(task);
-        }
-
-        @Override
-        public void onContinue(VirtualThreadTask task) {
-            execute(task);
         }
     }
 
