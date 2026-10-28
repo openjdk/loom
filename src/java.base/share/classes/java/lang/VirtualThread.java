@@ -67,7 +67,7 @@ final class VirtualThread extends BaseVirtualThread {
     private static final Unsafe U = Unsafe.getUnsafe();
     private static final ContinuationScope VTHREAD_SCOPE = new ContinuationScope("VirtualThreads");
 
-    private static final VirtualThreadScheduler BUILTIN_SCHEDULER;
+    private static final BuiltinScheduler BUILTIN_SCHEDULER;
     private static final VirtualThreadScheduler DEFAULT_SCHEDULER;
     private static final VirtualThreadScheduler EXTERNAL_VIEW;
     private static final boolean USE_STPE;
@@ -75,7 +75,7 @@ final class VirtualThread extends BaseVirtualThread {
         // experimental
         String propValue = System.getProperty("jdk.virtualThreadScheduler.implClass");
         if (propValue != null) {
-            VirtualThreadScheduler builtinScheduler = createBuiltinScheduler(true);
+            BuiltinScheduler builtinScheduler = createBuiltinScheduler(true);
             VirtualThreadScheduler externalView = createExternalView(builtinScheduler);
             VirtualThreadScheduler defaultScheduler = loadCustomScheduler(externalView, propValue);
             BUILTIN_SCHEDULER = builtinScheduler;
@@ -99,6 +99,7 @@ final class VirtualThread extends BaseVirtualThread {
     private final VirtualThreadScheduler scheduler;
     private final Continuation cont;
     private final VThreadTask runContinuation;
+    private final boolean stickyAffinity;
 
     // virtual thread state, accessed by VM
     private volatile int state;
@@ -227,6 +228,13 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
+     * Returns true if the current thread is a virtual thread with sticky affinity.
+     */
+    static boolean currentThreadIsSticky() {
+        return currentThread() instanceof VirtualThread vt && vt.stickyAffinity;
+    }
+
+    /**
      * Returns the continuation scope used for virtual threads.
      */
     static ContinuationScope continuationScope() {
@@ -247,12 +255,14 @@ final class VirtualThread extends BaseVirtualThread {
      * @param preferredCarrier the preferred carrier or null
      * @param name thread name
      * @param characteristics characteristics
+     * @param affinity the Thread.Affinity or Thread.Affinity.Group, or null
      * @param task the task to execute
      */
     VirtualThread(VirtualThreadScheduler scheduler,
                   Thread preferredCarrier,
                   String name,
                   int characteristics,
+                  Object affinity,
                   Runnable task) {
         super(name, characteristics, /*bound*/ false);
         Objects.requireNonNull(task);
@@ -264,12 +274,15 @@ final class VirtualThread extends BaseVirtualThread {
             throw new UnsupportedOperationException();
         }
         this.scheduler = scheduler;
+        this.stickyAffinity = (characteristics & Thread.STICKY_AFFINITY) != 0;
         this.cont = new VThreadContinuation(this, task);
 
         if (scheduler == BUILTIN_SCHEDULER) {
-            this.runContinuation = new VThreadTask(this);
+            int placement = Thread.Affinity.placement(affinity);
+            this.runContinuation = BUILTIN_SCHEDULER.newTask(this, placement, preferredCarrier);
         } else {
-            this.runContinuation = new CustomVThreadTask(this, preferredCarrier);
+            this.runContinuation = new CustomVThreadTask(this, preferredCarrier,
+                    Thread.Affinity.of(affinity));
         }
     }
 
@@ -294,6 +307,10 @@ final class VirtualThread extends BaseVirtualThread {
             throw new UnsupportedOperationException();
         }
         @Override
+        public Thread.Affinity affinity() {
+            throw new UnsupportedOperationException();
+        }
+        @Override
         public Object attach(Object att) {
             throw new UnsupportedOperationException();
         }
@@ -310,14 +327,20 @@ final class VirtualThread extends BaseVirtualThread {
         private static final VarHandle ATT =
                 MhUtil.findVarHandle(MethodHandles.lookup(), "att", Object.class);
         private final Thread preferredCarrier;
+        private final Thread.Affinity affinity;
         private volatile Object att;
-        CustomVThreadTask(VirtualThread vthread, Thread preferredCarrier) {
+        CustomVThreadTask(VirtualThread vthread, Thread preferredCarrier, Thread.Affinity affinity) {
             super(vthread);
             this.preferredCarrier = preferredCarrier;
+            this.affinity = affinity;
         }
         @Override
         public Thread preferredCarrier() {
             return preferredCarrier;
+        }
+        @Override
+        public Thread.Affinity affinity() {
+            return affinity;
         }
         @Override
         public Object attach(Object att) {
@@ -663,8 +686,9 @@ final class VirtualThread extends BaseVirtualThread {
         if (s == YIELDING) {
             setState(YIELDED);
 
-            // external submit if there are no tasks in the local task queue
-            if (currentThread() instanceof CarrierThread ct && ct.getQueuedTaskCount() == 0) {
+            // let all VTs (including sticky) use external submit when queue is empty
+            if (currentThread() instanceof CarrierThread ct
+                    && ct.getQueuedTaskCount() == 0) {
                 externalSubmitRunContinuation();
             } else {
                 submitRunContinuation();
@@ -796,10 +820,12 @@ final class VirtualThread extends BaseVirtualThread {
                     Continuation.pin();
                     try {
                         if (scheduler == BUILTIN_SCHEDULER
+                                && currentThreadIsSticky()
+                                && BUILTIN_SCHEDULER.submitLocal(runContinuation)) {
+                            // queued on the current carrier
+                        } else if (scheduler == BUILTIN_SCHEDULER
                                 && currentCarrierThread() instanceof CarrierThread ct) {
-                            ForkJoinPool pool = ct.getPool();
-                            ForkJoinTask<?> task = ForkJoinTask.adapt(runContinuation);
-                            pool.externalSubmit(task);
+                            ct.getPool().externalSubmit(ForkJoinTask.adapt(runContinuation));
                         } else {
                             scheduler.onStart(runContinuation);
                         }
@@ -969,14 +995,16 @@ final class VirtualThread extends BaseVirtualThread {
             // unparked while parked
             if ((s == PARKED || s == TIMED_PARKED) && compareAndSetState(s, UNPARKED)) {
 
-                if (lazySubmit && currentThread().isVirtual()) {
+                if ((lazySubmit || currentThreadIsSticky())
+                        && scheduler == BUILTIN_SCHEDULER
+                        && currentThread().isVirtual()) {
                     Continuation.pin();
                     try {
-                        if (scheduler == BUILTIN_SCHEDULER
-                                && currentCarrierThread() instanceof CarrierThread ct) {
-                            ct.getPool().lazySubmit(ForkJoinTask.adapt(runContinuation));
-                            return;
+                        // queued on the current carrier
+                        if (!BUILTIN_SCHEDULER.submitLocal(runContinuation)) {
+                            scheduler.onContinue(runContinuation);
                         }
+                        return;
                     } catch (RejectedExecutionException ree) {
                         submitFailed(ree);
                         throw ree;
@@ -1464,7 +1492,7 @@ final class VirtualThread extends BaseVirtualThread {
      * Creates the built-in ForkJoinPool scheduler.
      * @param wrapped true if wrapped by a custom default scheduler
      */
-    private static VirtualThreadScheduler createBuiltinScheduler(boolean wrapped) {
+    private static BuiltinScheduler createBuiltinScheduler(boolean wrapped) {
         int parallelism, maxPoolSize, minRunnable;
         String parallelismValue = System.getProperty("jdk.virtualThreadScheduler.parallelism");
         String maxPoolSizeValue = System.getProperty("jdk.virtualThreadScheduler.maxPoolSize");
@@ -1506,10 +1534,38 @@ final class VirtualThread extends BaseVirtualThread {
     }
 
     /**
+     * A built-in scheduler. Besides the scheduler callbacks, it creates the task of each
+     * virtual thread it schedules, so that it can keep per-thread state there, and it
+     * can queue a task on the current carrier: the start or wakeup that a sticky thread
+     * submits locally.
+     */
+    interface BuiltinScheduler extends VirtualThreadScheduler {
+        /**
+         * Creates the task of a new virtual thread scheduled by this scheduler.
+         * @param placement the carrier position requested before start, or -1
+         * @param preferredCarrier the preferred carrier or null
+         */
+        default VThreadTask newTask(VirtualThread vthread, int placement, Thread preferredCarrier) {
+            return new VThreadTask(vthread);
+        }
+
+        /**
+         * Invoked by a sticky virtual thread, with its continuation pinned, to queue the
+         * task of a thread it starts or unparks on its current carrier, signalling idle
+         * carriers as any submission from this carrier does.
+         * Returns false if the task was not queued, and the caller then submits it as it
+         * would otherwise.
+         */
+        default boolean submitLocal(VThreadTask task) {
+            return false;
+        }
+    }
+
+    /**
      * The built-in ForkJoinPool scheduler.
      */
     private static class BuiltinForkJoinPoolScheduler
-            extends ForkJoinPool implements VirtualThreadScheduler {
+            extends ForkJoinPool implements BuiltinScheduler {
 
         BuiltinForkJoinPoolScheduler(int parallelism,
                                      int maxPoolSize,
@@ -1529,6 +1585,16 @@ final class VirtualThread extends BaseVirtualThread {
         @Override
         public void onContinue(VirtualThreadTask task) {
             execute(ForkJoinTask.adapt(task));
+        }
+
+        /** Pushes the task on the current carrier's work queue. */
+        @Override
+        public boolean submitLocal(VThreadTask task) {
+            if (currentCarrierThread() instanceof CarrierThread ct) {
+                ct.getPool().execute(ForkJoinTask.adapt(task));
+                return true;
+            }
+            return false;
         }
 
         @Override

@@ -25,6 +25,8 @@
 
 package java.lang;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.ref.Reference;
 import java.lang.reflect.Field;
 import java.time.Duration;
@@ -36,8 +38,10 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.StructureViolationException;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 import jdk.internal.foreign.ConfinedSegmentPool;
+import jdk.internal.invoke.MhUtil;
 import jdk.internal.event.ThreadSleepEvent;
 import jdk.internal.misc.TerminatingThreadLocal;
 import jdk.internal.misc.Unsafe;
@@ -730,6 +734,12 @@ public class Thread implements Runnable {
     static final int NO_INHERIT_THREAD_LOCALS = 1 << 2;
 
     /**
+     * Characteristic value signifying that this virtual thread has sticky affinity:
+     * the virtual threads it starts or unparks are submitted to its current carrier.
+     */
+    static final int STICKY_AFFINITY = 1 << 3;
+
+    /**
      * Thread identifier assigned to the primordial thread.
      */
     static final long PRIMORDIAL_TID = 3;
@@ -893,6 +903,16 @@ public class Thread implements Runnable {
         Thread preferredCarrier();
 
         /**
+         * Returns the affinity of the virtual thread. A thread created by a builder
+         * with an {@linkplain Builder.OfVirtual#affinity(Affinity.Group) affinity
+         * group} has a new affinity drawn from the group. The scheduler may choose to
+         * ignore it.
+         * @return the affinity or {@code null} if the virtual thread has no affinity
+         * @since 99
+         */
+        Affinity affinity();
+
+        /**
          * Attaches the given object to this task.
          * @param att the object to attach
          * @return the previously-attached object, if any, otherwise {@code null}
@@ -1034,6 +1054,124 @@ public class Thread implements Runnable {
          */
         default Future<?> schedule(Runnable task, long delay, TimeUnit unit) {
             return VirtualThread.DelayedTaskSchedulers.schedule(task, delay, unit);
+        }
+    }
+
+    /**
+     * An affinity places virtual threads. All the virtual threads created with the
+     * same affinity run at the same home, and the homes of the affinities of one
+     * {@linkplain Group group} are spread evenly. An affinity is opaque: it has no
+     * state that can be read, and it is equal only to itself.
+     *
+     * <p> An affinity is a scheduling request. A scheduler that can place threads
+     * runs a thread with an affinity at the affinity's home for the thread's whole
+     * life: neither work stealing nor {@linkplain Builder.OfVirtual#stickyAffinity()
+     * sticky affinity} moves it. A scheduler that cannot place threads ignores
+     * affinities; the default scheduler, a {@link java.util.concurrent.ForkJoinPool
+     * ForkJoinPool}, is one of these.
+     *
+     * <p> An affinity gives no mutual exclusion: threads with the same affinity may
+     * run in parallel, and where they do not, they still interleave wherever one of
+     * them parks or yields. It is not a synchronization mechanism.
+     *
+     * @apiNote Threads that should run together share an affinity: the short-lived
+     * threads of one actor, or a child that should run next to its parent. Threads
+     * that should run apart, such as event loops, are created from a factory that
+     * draws a new affinity from a group for each thread. Sharding by key uses an
+     * array of affinities drawn from one group:
+     * {@snippet lang=java :
+     *     Thread.Affinity.Group group = Thread.Affinity.newGroup();
+     *     ThreadFactory loops = Thread.ofVirtual().affinity(group).factory();
+     *
+     *     Thread.Affinity actor = group.newAffinity();
+     *     Thread burst = Thread.ofVirtual().affinity(actor).start(task);
+     * }
+     *
+     * @see Builder.OfVirtual#affinity(Affinity)
+     * @see Builder.OfVirtual#affinity(Affinity.Group)
+     * @since 99
+     */
+    public static final class Affinity {
+        // the home's position in its group's creation order; a scheduler that places
+        // threads maps it onto its carriers
+        final int index;
+
+        private Affinity(int index) {
+            this.index = index;
+        }
+
+        /**
+         * {@return a new group of affinities}
+         */
+        public static Group newGroup() {
+            return new Group();
+        }
+
+        /**
+         * Returns the affinity that the given affinity or group gives a new thread,
+         * drawing a new one from the group, or null.
+         */
+        static Affinity of(Object affinityOrGroup) {
+            if (affinityOrGroup instanceof Group g) {
+                return g.newAffinity();
+            }
+            return (Affinity) affinityOrGroup;
+        }
+
+        /**
+         * Returns the carrier position that the given affinity or group requests for
+         * a new thread, drawing from the group, or -1 if there is none.
+         */
+        static int placement(Object affinityOrGroup) {
+            if (affinityOrGroup instanceof Affinity a) {
+                return a.index;
+            } else if (affinityOrGroup instanceof Group g) {
+                return g.nextIndex();
+            } else {
+                return -1;
+            }
+        }
+
+        /**
+         * A group of affinities whose homes are spread evenly, in the order the
+         * affinities are created. Each group spreads its own affinities independently
+         * of the affinities of other groups.
+         *
+         * <p> A group that hands out more affinities than the scheduler has homes
+         * wraps around, so some affinities share a home, and two groups can share
+         * homes when there are few. Threads that should be spread relative to each
+         * other must draw from one group. Do not use a group directly on a factory
+         * of short-lived threads, such as request handlers: on a scheduler that
+         * places threads, each thread is placed for life.
+         *
+         * @since 99
+         */
+        public static final class Group {
+            private static final VarHandle NEXT = MhUtil.findVarHandle(
+                    MethodHandles.lookup(), "next", int.class);
+
+            // gives each group a different first home: the golden-ratio sequence
+            // visits the residues of any carrier count evenly
+            private static final AtomicInteger SEEDS = new AtomicInteger();
+
+            private volatile int next;
+
+            private Group() {
+                this.next = SEEDS.getAndAdd(0x9E3779B9);
+            }
+
+            /**
+             * {@return a new affinity, whose home is the next one in this group}
+             */
+            public Affinity newAffinity() {
+                return new Affinity(nextIndex());
+            }
+
+            // non-negative, as a placement of -1 means none; consecutive draws stay
+            // consecutive except where the counter wraps
+            int nextIndex() {
+                return (int) NEXT.getAndAdd(this, 1) & Integer.MAX_VALUE;
+            }
         }
     }
 
@@ -1291,6 +1429,58 @@ public class Thread implements Runnable {
 
             @Override OfVirtual inheritInheritableThreadLocals(boolean inherit);
             @Override OfVirtual uncaughtExceptionHandler(UncaughtExceptionHandler ueh);
+
+            /**
+             * Sets this builder to create virtual threads with sticky affinity. The
+             * virtual threads that a sticky thread starts, and those that it unparks
+             * with {@link LockSupport#unpark(Thread) LockSupport.unpark}, are
+             * submitted to run on the sticky thread's current carrier, unless they
+             * have an {@linkplain Affinity affinity} that the scheduler honours. They
+             * can still be taken by another carrier: a start or an unpark signals
+             * other carriers as any submission from that carrier does, so that idle
+             * carriers can run a burst of threads that the sticky thread starts or
+             * unparks.
+             *
+             * <p> A custom scheduler does not see sticky affinity: it receives these
+             * starts and wakeups as ordinary {@code onStart} and {@code onContinue}
+             * calls.
+             *
+             * <p> Other wakeups are not submitted locally: a virtual thread blocked
+             * entering a monitor that the sticky thread exits, and one waiting in
+             * {@code Object.wait} that is interrupted or whose timeout expires.
+             *
+             * @return this builder
+             * @since 99
+             */
+            OfVirtual stickyAffinity();
+
+            /**
+             * Sets this builder to create virtual threads with the given affinity:
+             * they run at the affinity's home, with every other thread created with
+             * it, if the scheduler places threads. Replaces any affinity or group set
+             * before. A placed thread is not moved, so it waits while another thread
+             * at its home is pinned.
+             *
+             * @param affinity the affinity
+             * @return this builder
+             * @throws NullPointerException if {@code affinity} is {@code null}
+             * @since 99
+             */
+            OfVirtual affinity(Affinity affinity);
+
+            /**
+             * Sets this builder to create each virtual thread with a new affinity
+             * from the given group, so that the threads are spread evenly, if the
+             * scheduler places threads. Replaces any affinity or group set before. A
+             * placed thread is not moved, so it waits while another thread at its
+             * home is pinned.
+             *
+             * @param group the group
+             * @return this builder
+             * @throws NullPointerException if {@code group} is {@code null}
+             * @since 99
+             */
+            OfVirtual affinity(Affinity.Group group);
         }
     }
 
