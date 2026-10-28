@@ -31,6 +31,62 @@
  * @run junit/othervm AffinityTest
  */
 
+/*
+ * @test id=mpsc
+ * @requires vm.continuations & os.family == "linux"
+ * @modules java.base/java.lang:+open
+ *          java.base/sun.nio.ch:+open
+ * @library /test/lib
+ * @run junit/othervm -Djdk.virtualThreadScheduler.useMpsc=true
+ *                    -Djdk.virtualThreadScheduler.parallelism=4 AffinityTest
+ */
+
+/*
+ * @test id=mpsc-steal
+ * @requires vm.continuations & os.family == "linux"
+ * @modules java.base/java.lang:+open
+ *          java.base/sun.nio.ch:+open
+ * @library /test/lib
+ * @run junit/othervm -Djdk.virtualThreadScheduler.useMpsc=true
+ *                    -Djdk.virtualThreadScheduler.mpscSteal=true
+ *                    -Djdk.virtualThreadScheduler.parallelism=4 AffinityTest
+ */
+
+/*
+ * @test id=mpsc-steal-mode4
+ * @requires vm.continuations & os.family == "linux"
+ * @modules java.base/java.lang:+open
+ *          java.base/sun.nio.ch:+open
+ * @library /test/lib
+ * @run junit/othervm -Djdk.virtualThreadScheduler.useMpsc=true
+ *                    -Djdk.virtualThreadScheduler.mpscSteal=true
+ *                    -Djdk.pollerMode=4
+ *                    -Djdk.virtualThreadScheduler.parallelism=4 AffinityTest
+ */
+
+/*
+ * @test id=mpsc-mode2
+ * @requires vm.continuations & os.family == "linux"
+ * @modules java.base/java.lang:+open
+ *          java.base/sun.nio.ch:+open
+ * @library /test/lib
+ * @run junit/othervm -Djdk.virtualThreadScheduler.useMpsc=true
+ *                    -Djdk.pollerMode=2
+ *                    -Djdk.virtualThreadScheduler.parallelism=4 AffinityTest
+ */
+
+/*
+ * @test id=mpsc-steal-mode3
+ * @requires vm.continuations & os.family == "linux"
+ * @modules java.base/java.lang:+open
+ *          java.base/sun.nio.ch:+open
+ * @library /test/lib
+ * @run junit/othervm -Djdk.virtualThreadScheduler.useMpsc=true
+ *                    -Djdk.virtualThreadScheduler.mpscSteal=true
+ *                    -Djdk.pollerMode=3
+ *                    -Djdk.virtualThreadScheduler.parallelism=4 AffinityTest
+ */
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;

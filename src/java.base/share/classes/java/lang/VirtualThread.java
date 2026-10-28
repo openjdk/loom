@@ -302,6 +302,18 @@ final class VirtualThread extends BaseVirtualThread {
         public final void run() {
             vthread.runContinuation();;
         }
+        /**
+         * Whether the thread is unmounted after Thread.yield and not yet continued.
+         * Meaningful only to the built-in scheduler inside its onContinue for this
+         * task: there it is exact, because only the yield's own resubmit
+         * (afterYield, on the carrier the thread yielded on, or a custom scheduler
+         * forwarding it) submits a YIELDED thread, and only running this task
+         * leaves YIELDED. Anywhere else it reads a transient state that may change
+         * at any time.
+         */
+        final boolean isYielded() {
+            return vthread.state() == YIELDED;
+        }
         @Override
         public Thread preferredCarrier() {
             throw new UnsupportedOperationException();
@@ -329,6 +341,9 @@ final class VirtualThread extends BaseVirtualThread {
         private final Thread preferredCarrier;
         private final Thread.Affinity affinity;
         private volatile Object att;
+        // per-thread state of the built-in scheduler, when the custom scheduler
+        // delegates this task to it (through the external view)
+        Object builtinState;
         CustomVThreadTask(VirtualThread vthread, Thread preferredCarrier, Thread.Affinity affinity) {
             super(vthread);
             this.preferredCarrier = preferredCarrier;
@@ -1512,6 +1527,10 @@ final class VirtualThread extends BaseVirtualThread {
             minRunnable = Integer.parseInt(minRunnableValue);
         } else {
             minRunnable = Integer.max(parallelism / 2, 1);
+        }
+        if (Boolean.getBoolean("jdk.virtualThreadScheduler.useMpsc")) {
+            System.err.println("WARNING: Using experimental MPSC virtual thread scheduler");
+            return new MpscVirtualThreadScheduler(parallelism);
         }
         ForkJoinWorkerThreadFactory factory;
         if (wrapped) {
