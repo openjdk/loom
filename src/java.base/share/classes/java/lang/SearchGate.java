@@ -58,39 +58,18 @@ final class SearchGate {
     @Contended("searching")
     private volatile int searching;
 
-    // bestVictim's strides: coprime with the carrier count, so a walk visits each once
-    private final int[] coprimes;
+    // bestVictim walks a power of two >= the carrier count: an odd stride visits each slot once
+    private final int mask;
 
     /** The array is filled after this, before any carrier starts or the scheduler is published. */
     SearchGate(MpscCarrierThread[] carriers, IdleSet idleSet) {
         this.carriers = carriers;
         this.idleSet = idleSet;
-        this.coprimes = coprimes(carriers.length);
-    }
-
-    private static int[] coprimes(int n) {
-        int count = 0;
-        for (int k = 1; k <= n; k++) {
-            if (gcd(k, n) == 1) {
-                count++;
-            }
+        int m = 1;
+        while (m < carriers.length) {
+            m <<= 1;
         }
-        int[] result = new int[count];
-        for (int k = 1, i = 0; k <= n; k++) {
-            if (gcd(k, n) == 1) {
-                result[i++] = k;
-            }
-        }
-        return result;
-    }
-
-    private static int gcd(int a, int b) {
-        while (b != 0) {
-            int t = a % b;
-            a = b;
-            b = t;
-        }
-        return a;
+        this.mask = m - 1;
     }
 
     void signal(MpscCarrierThread victim) {
@@ -179,15 +158,18 @@ final class SearchGate {
      */
     MpscCarrierThread bestVictim(MpscCarrierThread self, int r) {
         var carriers = this.carriers;
-        var coprimes = this.coprimes;
         int n = carriers.length;
-        int pos = Integer.remainderUnsigned(r, n);
-        int inc = coprimes[Integer.remainderUnsigned(r >>> 8, coprimes.length)];
+        int mask = this.mask;
+        int step = (r >>> 16) | 1;
         MpscCarrierThread best = null;
         int bestSize = 0;
         int looked = 0;
-        for (int i = 0; i < n; i++) {
-            MpscCarrierThread c = carriers[pos];
+        for (int i = 0, pos = r; i <= mask; i++, pos += step) {
+            int j = pos & mask;
+            if (j >= n) {
+                continue;
+            }
+            MpscCarrierThread c = carriers[j];
             if (c != self) {
                 int size = c.stealableBacklog();
                 if (size > bestSize) {
@@ -197,10 +179,6 @@ final class SearchGate {
                 if (++looked >= 2 && best != null) {
                     break;
                 }
-            }
-            pos += inc;
-            if (pos >= n) {
-                pos -= n;
             }
         }
         return best;
