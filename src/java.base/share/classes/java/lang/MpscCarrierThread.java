@@ -55,9 +55,13 @@ import static java.lang.MpscVirtualThreadScheduler.setHome;
  * <li>A task offered to a parked carrier is never missed, and a park costs at most
  *     one wake.
  * <li>No task runs while the state reads PARKED.
- * <li>With stealing, every stealable task is announced, by its producer or by the
- *     owner after WAKING, or run by its owner.
+ * <li>With stealing, a stealable task is announced unless it is the next task its
+ *     owner runs: by its producer when that is another thread (or by the owner after
+ *     WAKING, for it), else by the owner before it runs the next task.
  * <li>stealQueue is single-consumer: the owner and thieves take turns.
+ * <li>With stealing, the owner's own thread offers stealable tasks only with no thread
+ *     mounted (after a continuation unmounts, or from its polls), never from a task's
+ *     code; run(task) is the only place a task runs.
  * </ul>
  */
 final class MpscCarrierThread extends Thread implements LocalPoller.Carrier {
@@ -98,9 +102,9 @@ final class MpscCarrierThread extends Thread implements LocalPoller.Carrier {
     @Contended("local")
     private int xorshift;
 
-    // stealable tasks queued on this carrier from its own thread since the last poll began
+    // an own-thread offer since the last task ran: run(task) announces what is behind it
     @Contended("local")
-    private int pollQueued;
+    private boolean unannounced;
 
     MpscCarrierThread(int id, MpscVirtualThreadScheduler scheduler, IdleSet idleSet,
                       SearchGate gate, LocalPoller poller) {
@@ -161,18 +165,13 @@ final class MpscCarrierThread extends Thread implements LocalPoller.Carrier {
         idleSet.setIdle(this);
     }
 
-    /**
-     * After the blocking poll or park. polled, what that poll queued here, is announced
-     * only from PARKED: WAKING's backlog counts it, SEARCHING's release rescans for it.
-     */
-    private void leaveParked(int polled) {
+    /** After the blocking poll or park. */
+    private void leaveParked() {
         int prev = (int) STATE.getAndSet(this, RUNNING);
         idleSet.clearIdle(this);
         if (prev == WAKING) {
             announceBacklog(false);
-        } else if (prev < SEARCHING) {
-            announcePolled(polled);
-        } else {
+        } else if (prev >= SEARCHING) {
             search(gate.carrier(prev - SEARCHING));
         }
     }
@@ -203,19 +202,17 @@ final class MpscCarrierThread extends Thread implements LocalPoller.Carrier {
 
     void offerStealable(VirtualThreadTask task) {
         stealQueue.offer(task);
+        if (Thread.currentThread() == this) {
+            unannounced = true;
+            return;
+        }
         int state = carrierState;
         if (state == PARKED) {
-            if (Thread.currentCarrierThread() != this) {
-                if (wakeParked() == RUNNING && hasStealable()) {
-                    gate.signal(this);
-                }
-            } else {
-                pollQueued++;
+            if (wakeParked() == RUNNING && hasStealable()) {
+                gate.signal(this);
             }
-        } else if (state != WAKING && Thread.currentThread() != this) {
+        } else if (state != WAKING) {
             gate.signal(this);
-        } else if (Thread.currentThread() == this) {
-            pollQueued++;
         }
     }
 
@@ -387,43 +384,27 @@ final class MpscCarrierThread extends Thread implements LocalPoller.Carrier {
             int drained = drainRoundSteal();
 
             int ioEvents = 0;
-            pollQueued = 0;
             try {
                 ioEvents = poller.poll(0);
             } catch (IOException e) { }
-            announcePolled(pollQueued);
 
             if (drained + ioEvents > 0) {
                 continue;
             }
 
-            pollQueued = 0;
             try {
-                ioEvents = poller.poll(0);
+                if (poller.poll(0) > 0) continue;
             } catch (IOException e) { }
-            announcePolled(pollQueued);
-            if (ioEvents > 0) {
-                continue;
-            }
 
             enterParked();
             if (workBeforeBlocking()) {
                 continue;
             }
 
-            pollQueued = 0;
             try {
                 poller.poll(-1);
             } catch (IOException e) { }
-            // read first: a stolen task leaveParked runs adds its resubmits, not readiness
-            int polled = pollQueued;
-            leaveParked(polled);
-        }
-    }
-
-    private void announcePolled(int polled) {
-        if (polled > 1) {
-            gate.signal(this);
+            leaveParked();
         }
     }
 
@@ -439,7 +420,7 @@ final class MpscCarrierThread extends Thread implements LocalPoller.Carrier {
             }
 
             LockSupport.park();
-            leaveParked(0);
+            leaveParked();
         }
     }
 
@@ -451,14 +432,44 @@ final class MpscCarrierThread extends Thread implements LocalPoller.Carrier {
         int ran = 0;
         VirtualThreadTask task;
         for (int i = 0; i < quota && (task = queue.poll()) != null; i++) {
-            try { task.run(); } catch (Throwable t) { }
+            run(task);
             ran++;
         }
         for (int i = 0; i < stealQuota && (task = pollStealable()) != null; i++) {
-            try { task.run(); } catch (Throwable t) { }
+            run(task);
             ran++;
         }
-        return ran + runYielded(yielded);
+        return ran + runYieldedSteal(yielded);
+    }
+
+    /** As runYielded, through run(task). */
+    private int runYieldedSteal(MpscTask task) {
+        int ran = 0;
+        while (task != null) {
+            MpscTask next = task.nextYielded;
+            // before the run: a yield in it links the task into the next round's list
+            task.nextYielded = null;
+            run(task);
+            ran++;
+            task = next;
+        }
+        return ran;
+    }
+
+    /**
+     * With stealing, the only place a task runs: a run site that bypasses it leaves the
+     * owner's own offers unannounced. Those offers are announced here if anything
+     * stealable is still queued behind this task; a lone stealable task finds stealQueue
+     * empty after its own take and stays with its owner.
+     */
+    private void run(VirtualThreadTask task) {
+        if (unannounced) {
+            unannounced = false;
+            if (hasStealable()) {
+                gate.signal(this);
+            }
+        }
+        try { task.run(); } catch (Throwable t) { }
     }
 
     /** Still PARKED: rechecks its own queues, then tries one steal; false to block. */
@@ -469,7 +480,7 @@ final class MpscCarrierThread extends Thread implements LocalPoller.Carrier {
         }
         if (task != null) {
             abortPark();
-            try { task.run(); } catch (Throwable t) { }
+            run(task);
             return true;
         }
         MpscCarrierThread victim = gate.bestVictim(this, nextRandom());
@@ -506,7 +517,7 @@ final class MpscCarrierThread extends Thread implements LocalPoller.Carrier {
     private void runStolen(VirtualThreadTask task) {
         // before the run, so that a sticky wakeup during it can set a newer home
         setHome(task, stealableHome);
-        try { task.run(); } catch (Throwable t) { }
+        run(task);
     }
 
     private VirtualThreadTask pollStealable() {

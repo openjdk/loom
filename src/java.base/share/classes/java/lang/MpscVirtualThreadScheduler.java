@@ -52,9 +52,10 @@ import sun.nio.ch.LocalPollers;
  *
  * <p>With {@link #STEAL}, every unplaced thread's home is its carrier's stealable
  * queue, and then the last carrier that took it. A producer of a stealable task wakes
- * the owner if it is parked, else signals (SearchGate), except for the owner's own
- * submissions between tasks and an owner that is WAKING, which announces for them. See MpscCarrierThread for the carrier states and SearchGate for
- * the searcher token.
+ * the owner if it is parked, else signals (SearchGate); the owner announces its own
+ * submissions before its next task if they are not that task, and a WAKING owner
+ * announces what its waker deferred. See MpscCarrierThread for the carrier states and
+ * SearchGate for the searcher token.
  */
 final class MpscVirtualThreadScheduler
         implements VirtualThread.BuiltinScheduler, LocalPoller.Scheduler {
