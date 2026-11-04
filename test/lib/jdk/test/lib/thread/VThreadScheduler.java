@@ -131,6 +131,25 @@ public class VThreadScheduler {
         return virtualThreadBuilder(scheduler).factory();
     }
 
+    /**
+     * Returns the carrier thread for the current virtual thread.
+     */
+    public static Thread currentCarrierThread() {
+        try {
+            Method m = Thread.class.getDeclaredMethod("currentCarrierThread");
+            m.setAccessible(true);
+            return (Thread) m.invoke(null);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException re) {
+                throw re;
+            }
+            throw new RuntimeException(e);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public static ThreadFactory virtualThreadFactory(Executor executor) {
         return virtualThreadBuilder(executor).factory();
     }

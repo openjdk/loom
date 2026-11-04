@@ -92,7 +92,30 @@ public abstract class Poller {
          * for I/O. If there are no events then the poller threads park until there
          * are I/O events to poll. The write poller is a system-wide platform thread.
          */
-        POLLER_PER_CARRIER
+        POLLER_PER_CARRIER,
+
+        /**
+         * Each carrier thread is its own poller: it owns a LocalPoller (an epoll fd
+         * on Linux, the only platform with local pollers), and VT fds register
+         * directly with it. No sub-pollers, no master poller. The carrier blocks in
+         * its poller when idle. Write pollers are system-wide platform threads.
+         * Selected only if {@link LocalPollers#enabled()} and the built-in scheduler
+         * is a {@link LocalPoller.Scheduler}: then it is also the default, chosen
+         * silently when jdk.pollerMode is not set. Otherwise jdk.pollerMode=4 falls
+         * back, with a warning, to the platform's default mode.
+         */
+        CARRIER_LOCAL_POLLER
+    }
+
+    /**
+     * Whether Mode 4 can be used: local pollers are enabled and the built-in scheduler's
+     * carriers own them (then that scheduler created them when it initialized).
+     */
+    private static boolean carrierLocalPollers() {
+        // enabled() first: without continuations or local pollers on this platform,
+        // the built-in scheduler is not initialized here
+        return LocalPollers.enabled()
+                && JLA.builtinVirtualThreadScheduler() instanceof LocalPoller.Scheduler;
     }
 
     /**
@@ -100,27 +123,41 @@ public abstract class Poller {
      */
     private static PollerGroup createPollerGroup() {
         try {
-            PollerProvider provider;
+            // the requested mode, or null for the platform's default
+            Mode mode = null;
             if (System.getProperty("jdk.pollerMode") instanceof String s) {
-                Mode mode = switch (s) {
+                mode = switch (s) {
                     case "1" -> Mode.SYSTEM_THREADS;
                     case "2" -> Mode.VTHREAD_POLLERS;
                     case "3" -> Mode.POLLER_PER_CARRIER;
+                    case "4" -> {
+                        if (carrierLocalPollers()) {
+                            yield Mode.CARRIER_LOCAL_POLLER;
+                        }
+                        System.err.println("WARNING: jdk.pollerMode=4 requires continuations, "
+                                + "a platform with carrier-local pollers and the MPSC scheduler; "
+                                + "using the default poller mode");
+                        yield null;
+                    }
                     default -> {
                         throw new RuntimeException(s + " is not a valid polling mode");
                     }
                 };
-                provider = PollerProvider.createProvider(mode);
-            } else {
-                provider = PollerProvider.createProvider();
+            } else if (carrierLocalPollers()) {
+                // no mode requested: Mode 4 is the default where available, silently
+                mode = Mode.CARRIER_LOCAL_POLLER;
             }
+            PollerProvider provider = (mode != null)
+                    ? PollerProvider.createProvider(mode)
+                    : PollerProvider.createProvider();
 
             int readPollers = pollerCount("jdk.readPollers", provider.defaultReadPollers());
             int writePollers = pollerCount("jdk.writePollers", provider.defaultWritePollers());
             PollerGroup group = switch (provider.pollerMode()) {
-                case SYSTEM_THREADS     -> new SystemThreadsPollerGroup(provider, readPollers, writePollers);
-                case VTHREAD_POLLERS    -> new VThreadsPollerGroup(provider, readPollers, writePollers);
-                case POLLER_PER_CARRIER -> new PollerPerCarrierPollerGroup(provider, writePollers);
+                case SYSTEM_THREADS        -> new SystemThreadsPollerGroup(provider, readPollers, writePollers);
+                case VTHREAD_POLLERS       -> new VThreadsPollerGroup(provider, readPollers, writePollers);
+                case POLLER_PER_CARRIER    -> new PollerPerCarrierPollerGroup(provider, writePollers);
+                case CARRIER_LOCAL_POLLER  -> new CarrierLocalPollerGroup(provider, readPollers, writePollers);
             };
             group.start();
             return group;
@@ -544,8 +581,13 @@ public abstract class Poller {
             this.readPollers = readPollers;
             this.writePollers = writePollers;
 
+            // A group spreads the sub-pollers across carriers. Without it a scheduler
+            // that places by caller-carrier or by a probe hash puts every sub-poller
+            // created from this one factory on a single carrier, which a scheduler
+            // without work stealing never corrects.
             ThreadFactory factory = Thread.ofVirtual()
                     .inheritInheritableThreadLocals(false)
+                    .affinity(Thread.Affinity.newGroup())
                     .name("SubPoller-", 0)
                     .uncaughtExceptionHandler((_, e) -> e.printStackTrace())
                     .factory();
@@ -674,6 +716,7 @@ public abstract class Poller {
             Thread carrier = JLA.currentCarrierThread();
             Thread.Builder.OfVirtual builder = Thread.ofVirtual()
                     .inheritInheritableThreadLocals(false)
+                    .stickyAffinity()
                     .name(carrier.getName() + "-Read-Poller")
                     .uncaughtExceptionHandler((_, e) -> e.printStackTrace());
             Thread thread = JLA.defaultVirtualThreadScheduler()
@@ -809,5 +852,133 @@ public abstract class Poller {
      */
     public static List<Poller> writePollers() {
         return POLLER_GROUP.writePollers();
+    }
+
+
+    // ---- CARRIER_LOCAL_POLLER group ----
+
+    /**
+     * Each carrier owns a local poller. VT fds register directly with the
+     * carrier's poller. No sub-pollers, no master poller. Write pollers are
+     * system-wide platform threads.
+     */
+    private static class CarrierLocalPollerGroup extends PollerGroup {
+        // System-wide fallback pollers, in platform threads. The read pollers serve the
+        // virtual threads that have no carrier-local poller: those not mounted on an
+        // MPSC carrier, as under a custom default scheduler (implClass) wrapping it.
+        // Without continuations this group is not created (LocalPollers.enabled() is
+        // false).
+        private final Poller[] readPollers;
+        private final Poller[] writePollers;
+
+        CarrierLocalPollerGroup(PollerProvider provider,
+                                int readPollerCount,
+                                int writePollerCount) throws IOException {
+            super(provider);
+            Poller[] readPollers = new Poller[readPollerCount];
+            Poller[] writePollers = new Poller[writePollerCount];
+            try {
+                for (int i = 0; i < readPollerCount; i++) {
+                    readPollers[i] = provider.readPoller(false);
+                }
+                for (int i = 0; i < writePollerCount; i++) {
+                    writePollers[i] = provider.writePoller(false);
+                }
+            } catch (Throwable e) {
+                PollerGroup.closeAll(readPollers);
+                PollerGroup.closeAll(writePollers);
+                throw e;
+            }
+            this.readPollers = readPollers;
+            this.writePollers = writePollers;
+        }
+
+        @Override
+        void start() {
+            Arrays.stream(readPollers).forEach(p -> {
+                startPlatformThread("Read-Poller", p::pollerLoop);
+            });
+            Arrays.stream(writePollers).forEach(p -> {
+                startPlatformThread("Write-Poller", p::pollerLoop);
+            });
+        }
+
+        private Poller readPoller(int fdVal) {
+            int index = provider().fdValToIndex(fdVal, readPollers.length);
+            return readPollers[index];
+        }
+
+        LocalPoller getLocalPoller() {
+            return (JLA.currentCarrierThread() instanceof LocalPoller.Carrier c)
+                    ? c.localPoller()
+                    : null;
+        }
+
+
+        private Poller writePoller(int fdVal) {
+            int index = provider().fdValToIndex(fdVal, writePollers.length);
+            return writePollers[index];
+        }
+
+        @Override
+        void poll(int fdVal, int event, long nanos, BooleanSupplier isOpen) throws IOException {
+            // POLLIN from VT: register with carrier's local poller
+            if (event == Net.POLLIN
+                    && Thread.currentThread().isVirtual()
+                    && ContinuationSupport.isSupported()) {
+                // pinned so that the poller is the one of the carrier that registers:
+                // only a poller's own carrier inserts into its fd map
+                LocalPoller poller;
+                Continuation.pin();
+                try {
+                    poller = getLocalPoller();
+                    if (poller != null) {
+                        poller.register(fdVal, event, Thread.currentThread());
+                    }
+                } finally {
+                    Continuation.unpin();
+                }
+                if (poller != null) {
+                    try {
+                        if (isOpen.getAsBoolean()) {
+                            if (nanos > 0) {
+                                LockSupport.parkNanos(nanos);
+                            } else {
+                                LockSupport.park();
+                            }
+                        }
+                    } finally {
+                        poller.deregister(fdVal, Thread.currentThread());
+                    }
+                    return;
+                }
+            }
+
+            // No carrier-local poller for this caller: a virtual thread not mounted on an
+            // MPSC carrier. Fall back to the system-wide pollers.
+            // A POLLIN must never be handed to a write poller: that registers EPOLLOUT,
+            // which a connected socket satisfies at once, so the caller wakes, finds
+            // nothing to read and parks again -- a spin for as long as it waits.
+            if (event == Net.POLLIN) {
+                readPoller(fdVal).poll(fdVal, nanos, isOpen);
+            } else {
+                writePoller(fdVal).poll(fdVal, nanos, isOpen);
+            }
+        }
+
+        @Override
+        Poller masterPoller() {
+            return null;
+        }
+
+        @Override
+        List<Poller> readPollers() {
+            return List.of(readPollers);
+        }
+
+        @Override
+        List<Poller> writePollers() {
+            return List.of(writePollers);
+        }
     }
 }

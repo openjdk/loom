@@ -61,4 +61,14 @@ class DefaultPollerProvider extends PollerProvider {
     Poller writePoller(boolean subPoller) throws IOException {
         return new EPollPoller(pollerMode(), subPoller, false);
     }
+
+    @Override
+    boolean supportsLocalPoller() {
+        return true;
+    }
+
+    @Override
+    LocalPoller localPoller() throws IOException {
+        return new CarrierLocalPoller();
+    }
 }
