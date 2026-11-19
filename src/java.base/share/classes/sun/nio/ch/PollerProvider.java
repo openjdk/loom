@@ -89,4 +89,21 @@ abstract class PollerProvider {
      * @param subPoller true to create a sub-poller
      */
     abstract Poller writePoller(boolean subPoller) throws IOException;
+
+    /**
+     * Whether this platform has carrier-local pollers (poller Mode 4).
+     * @implSpec The default implementation returns false.
+     */
+    boolean supportsLocalPoller() {
+        return false;
+    }
+
+    /**
+     * Creates a carrier-local poller, for one carrier thread to own.
+     * @implSpec The default implementation throws UnsupportedOperationException.
+     * @throws UnsupportedOperationException if {@link #supportsLocalPoller()} is false
+     */
+    LocalPoller localPoller() throws IOException {
+        throw new UnsupportedOperationException();
+    }
 }
